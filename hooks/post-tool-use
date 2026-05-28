@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# PostToolUse hook for harness-anchor.
+#
+# Triggered after Edit|Write tool calls. Warn-only — never blocks.
+# Output (when warning): JSON additionalContext for next-turn injection.
+#
+# Phase 3: generic framework + regression-warn check.
+# Phase 4 adds C/C++ specific clang-tidy invocation.
+#
+# Hard constraints:
+#   - Must complete in <5 seconds (else timeout caller skips us)
+#   - Silent on missing tools (warn-only philosophy, never pollute context with infra errors)
+#   - Never emits permissionDecision/stopReason/block
+
+set -uo pipefail   # no -e: a single check failure should not abort other checks
+
+# 5-second hard wall-clock cap (in case any sub-check hangs).
+timeout_self() {
+    # If the env supports `timeout`, set a global cap via a trap.
+    # On macOS without coreutils, this is a no-op; the hook is fast anyway.
+    :
+}
+timeout_self
+
+# Read stdin JSON; tolerate non-JSON / empty stdin.
+input="$(cat 2>/dev/null || true)"
+
+# Extract file_path field (very narrow JSON parse — avoid jq dependency).
+file_path=""
+if [ -n "$input" ]; then
+    file_path=$(printf '%s' "$input" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    fp = d.get('tool_input', {}).get('file_path', '')
+    print(fp)
+except Exception:
+    pass
+" 2>/dev/null || echo "")
+fi
+
+# No file path → nothing to check.
+if [ -z "$file_path" ]; then
+    exit 0
+fi
+
+# Find project root (where feature_list.json lives) — walk up from file_path.
+project_root=""
+search_dir="$(dirname "$file_path")"
+while [ "$search_dir" != "/" ] && [ -n "$search_dir" ]; do
+    if [ -f "$search_dir/feature_list.json" ]; then
+        project_root="$search_dir"
+        break
+    fi
+    search_dir="$(dirname "$search_dir")"
+done
+
+# No anchored project → nothing to check.
+if [ -z "$project_root" ]; then
+    exit 0
+fi
+
+warnings=()
+
+# ---- Check 1: regression-warn ----
+# If the edited file is referenced in evidence.artifacts of a feature marked
+# status='pass', that's a regression risk. Surface a one-line warning.
+rel_path="${file_path#$project_root/}"
+regression=$(python3 - "$project_root/feature_list.json" "$rel_path" <<'PY' 2>/dev/null || true
+import json, sys, os
+flist_path, rel = sys.argv[1], sys.argv[2]
+try:
+    with open(flist_path) as f:
+        data = json.load(f)
+    for feat in data.get('features', []):
+        if feat.get('status') != 'pass':
+            continue
+        ev = feat.get('evidence') or {}
+        artifacts = ev.get('artifacts') or []
+        # naive: warn if rel path appears as a substring of any artifact path
+        # OR if it's a source file likely to invalidate the proof
+        if any(rel in a for a in artifacts):
+            print(f"Regression risk: file '{rel}' is referenced as evidence for passed feature '{feat['id']}'. Re-verify before continuing.")
+            sys.exit(0)
+        # also warn if changing source while a feature passed without re-verify
+        # — rough heuristic: any source file change after pass
+        if rel.endswith(('.c','.cc','.cpp','.cxx','.h','.hpp','.ts','.js','.py','.rs','.go')):
+            print(f"Note: feature '{feat['id']}' is marked pass. Source change may invalidate its evidence. Consider re-running /verify.")
+            sys.exit(0)
+except Exception:
+    pass
+PY
+)
+
+if [ -n "$regression" ]; then
+    warnings+=("$regression")
+fi
+
+# ---- Check 2: C/C++ static analysis (clang-tidy on changed files) ----
+# Phase 4: invoke clang-tidy if file is C/C++ and prerequisites are in place.
+# Silent skip on anything missing — never pollute agent context with infra errors.
+case "$file_path" in
+    *.c|*.cc|*.cpp|*.cxx|*.h|*.hpp|*.hh)
+        # Need clang-tidy on PATH
+        if command -v clang-tidy >/dev/null 2>&1; then
+            # Need compile_commands.json — check root, .build/, build/
+            cc_dir=""
+            for d in "$project_root" "$project_root/.build" "$project_root/build" "$project_root/builddir"; do
+                if [ -f "$d/compile_commands.json" ]; then
+                    cc_dir="$d"
+                    break
+                fi
+            done
+            if [ -n "$cc_dir" ]; then
+                # 5-second timeout cap (BSD/macOS `timeout` may be `gtimeout`; try both)
+                tidy_cmd="clang-tidy"
+                if command -v timeout >/dev/null 2>&1; then
+                    tidy_cmd="timeout 5 clang-tidy"
+                elif command -v gtimeout >/dev/null 2>&1; then
+                    tidy_cmd="gtimeout 5 clang-tidy"
+                fi
+                # --quiet suppresses progress; capture warnings only
+                tidy_out=$($tidy_cmd -p "$cc_dir" --quiet "$file_path" 2>/dev/null | grep -E '(warning|error):' | head -20 || true)
+                if [ -n "$tidy_out" ]; then
+                    # Truncate to ~1500 chars to stay under hook budget
+                    if [ "${#tidy_out}" -gt 1500 ]; then
+                        tidy_out="${tidy_out:0:1500}
+... (truncated; run clang-tidy directly for full output)"
+                    fi
+                    warnings+=("clang-tidy on $(basename "$file_path"):
+$tidy_out")
+                fi
+            fi
+        fi
+        ;;
+esac
+
+# ---- Emit output ----
+if [ "${#warnings[@]}" -eq 0 ]; then
+    exit 0
+fi
+
+# Pure-bash JSON escape (no jq).
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+# Join warnings with newlines, then escape.
+joined=""
+for w in "${warnings[@]}"; do
+    if [ -z "$joined" ]; then joined="$w"; else joined="$joined
+$w"; fi
+done
+escaped=$(escape_for_json "$joined")
+
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "PostToolUse",\n    "additionalContext": "<harness-anchor PostToolUse>\\n%s\\n</harness-anchor PostToolUse>"\n  }\n}\n' "$escaped"
+
+exit 0

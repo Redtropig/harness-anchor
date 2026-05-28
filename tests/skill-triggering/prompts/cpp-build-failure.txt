@@ -1,0 +1,12 @@
+My C++ project won't build. I get this error:
+
+```
+CMake Error at CMakeLists.txt:14 (find_package):
+  Could not find a package configuration file provided by "fmt" with any of
+  the following names:
+
+    fmtConfig.cmake
+    fmt-config.cmake
+```
+
+How do I fix this?

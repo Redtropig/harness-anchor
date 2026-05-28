@@ -1,0 +1,18 @@
+{
+  "name": "harness-anchor-local",
+  "description": "Local dev marketplace for harness-anchor",
+  "owner": {
+    "name": "redtropig"
+  },
+  "plugins": [
+    {
+      "name": "harness-anchor",
+      "description": "Runtime harness layer for Claude Code (companion to superpowers): state, scope, verification gates, C/C++ engineering",
+      "version": "0.1.0",
+      "source": "./",
+      "author": {
+        "name": "redtropig"
+      }
+    }
+  ]
+}

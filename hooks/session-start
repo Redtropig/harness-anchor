@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# SessionStart hook for harness-anchor (Phase 1 — minimal).
+#
+# Injects the using-harness-anchor SKILL.md content as additionalContext so the
+# agent boots aware of harness-anchor's strong-constraint runtime layer.
+#
+# Phase 3 will extend this to also inject PROJECT-TOC.md slice, active feature
+# id, session-handoff.md head, and cpp-detect.sh JSON.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+SKILL_FILE="${PLUGIN_ROOT}/skills/using-harness-anchor/SKILL.md"
+
+# Defensive: missing skill file → silent exit (warn-only philosophy, never
+# pollute agent context with our own infra errors).
+if [ ! -f "$SKILL_FILE" ]; then
+    exit 0
+fi
+
+skill_content="$(cat "$SKILL_FILE")"
+
+# Token budget guard (per plan §1, Tier 1 ≤ 2000 tokens ≈ 8000 chars).
+# Hard truncate if oversized, with a pointer to the on-disk file.
+MAX_CHARS=8000
+if [ "${#skill_content}" -gt "$MAX_CHARS" ]; then
+    skill_content="${skill_content:0:$MAX_CHARS}
+
+<truncated — see ${SKILL_FILE} for full content>"
+fi
+
+# Pure-bash JSON escaping (no jq dependency).
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+banner="<harness-anchor>
+harness-anchor v0.1.0 active — runtime constraint layer for agent state, scope, verification.
+Phase 1 skeleton: only meta-skill loaded. Run /anchor to scaffold project state files.
+</harness-anchor>
+
+"
+
+context="$(escape_for_json "${banner}${skill_content}")"
+
+# Output format per Claude Code Hooks Guide (2026):
+#   { "hookSpecificOutput": { "hookEventName": "SessionStart", "additionalContext": "<...>" } }
+# This is silently injected (no user-visible message as of Claude Code 2.1.0+).
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
+
+exit 0

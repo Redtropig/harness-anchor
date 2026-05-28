@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "harness-anchor feature_list",
+  "description": "Machine-readable scope boundary and evidence record. Implements Default-FAIL contract: status='pass' requires non-null evidence.",
+  "type": "object",
+  "required": ["project", "features"],
+  "properties": {
+    "project": {
+      "type": "string",
+      "description": "Project identifier (kebab-case recommended)"
+    },
+    "description": {
+      "type": "string",
+      "description": "One- to two-sentence project description"
+    },
+    "features": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/feature" }
+    }
+  },
+  "definitions": {
+    "feature": {
+      "type": "object",
+      "required": ["id", "name", "description", "status", "done_criteria"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Stable kebab-case id; never rename"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "in-progress", "pass", "blocked"],
+          "description": "Default-FAIL: 'pass' requires non-null evidence"
+        },
+        "done_criteria": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Concrete, verifiable criteria"
+        },
+        "evidence": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["timestamp", "commit", "artifacts"],
+              "properties": {
+                "timestamp": { "type": "string", "format": "date-time" },
+                "commit": { "type": "string", "description": "git SHA" },
+                "artifacts": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Paths to build logs, test outputs, lint reports proving each done_criterion"
+                },
+                "notes": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "completedAt": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "format": "date-time" }
+          ]
+        },
+        "blockedReason": {
+          "type": "string",
+          "description": "Required when status='blocked'"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "pass" } } },
+          "then": {
+            "properties": {
+              "evidence": {
+                "type": "object",
+                "description": "Default-FAIL: status='pass' requires evidence object"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# UserPromptSubmit hook for harness-anchor.
+#
+# Detects scope-jump phrases in the user's prompt. If an active feature exists
+# in feature_list.json, surface a warning so the agent can confirm with user
+# before pivoting.
+#
+# Warn-only — never blocks the user's prompt.
+
+set -uo pipefail
+
+# Read stdin (the user's prompt arrives as JSON with a 'prompt' field).
+input="$(cat 2>/dev/null || true)"
+if [ -z "$input" ]; then
+    exit 0
+fi
+
+prompt_text=$(printf '%s' "$input" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get('prompt', ''))
+except Exception:
+    pass
+" 2>/dev/null || echo "")
+
+if [ -z "$prompt_text" ]; then
+    exit 0
+fi
+
+# Find project root.
+project_root=""
+search_dir="$(pwd)"
+while [ "$search_dir" != "/" ] && [ -n "$search_dir" ]; do
+    if [ -f "$search_dir/feature_list.json" ]; then
+        project_root="$search_dir"
+        break
+    fi
+    search_dir="$(dirname "$search_dir")"
+done
+
+if [ -z "$project_root" ]; then
+    exit 0
+fi
+
+# Identify scope-jump keywords (中英文混合).
+# Case-insensitive; whole-phrase or substring match.
+lower=$(printf '%s' "$prompt_text" | tr '[:upper:]' '[:lower:]')
+
+scope_jump=0
+for kw in "顺便" "另外" "再加" "还要" "by the way" "btw" " also " "while you're at it" "while you are at it" "let's also" "lets also"; do
+    case "$lower" in
+        *"$kw"*) scope_jump=1; break ;;
+    esac
+done
+
+# Special-case the bare Chinese 也 — it's very common as a particle, so we require
+# it to be followed by an action verb-like context. Heuristic: skip 也 alone unless
+# the prompt is short and starts with it.
+if [ "$scope_jump" -eq 0 ]; then
+    short_len=${#prompt_text}
+    if [ "$short_len" -lt 80 ] && printf '%s' "$prompt_text" | grep -q "^.\{0,5\}也"; then
+        scope_jump=1
+    fi
+fi
+
+if [ "$scope_jump" -eq 0 ]; then
+    exit 0
+fi
+
+# Check for active feature.
+active=$(python3 - "$project_root/feature_list.json" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    for feat in data.get('features', []):
+        if feat.get('status') == 'in-progress':
+            print(f"{feat['id']}: {feat.get('name','')}")
+            break
+except Exception:
+    pass
+PY
+)
+
+if [ -z "$active" ]; then
+    exit 0
+fi
+
+msg="Scope-jump phrasing detected. Active feature: $active. The new request may be out of scope. Confirm with the user whether to (a) finish active feature first, (b) pause and switch, or (c) record as a planned feature in feature_list.json."
+
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+escaped=$(escape_for_json "$msg")
+
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "UserPromptSubmit",\n    "additionalContext": "<harness-anchor scope-check>\\n%s\\n</harness-anchor scope-check>"\n  }\n}\n' "$escaped"
+
+exit 0

@@ -1,0 +1,79 @@
+---
+name: project-indexing
+description: Use when locating files, understanding project structure, or before reaching for Glob/find. Consults PROJECT-TOC.md (one-line index of every git-tracked file). Detects staleness via git commit anchor.
+---
+
+# Project Indexing
+
+`PROJECT-TOC.md` is the project's **machine-friendly index** — one line per file, ≤80 chars summary. Reading it is dramatically cheaper than `Glob`-ing the whole tree.
+
+## When to use
+
+- "Where is X defined?"
+- "Find the file that handles Y"
+- Before any `Glob '**/*.ext'` against more than a small directory
+- When starting work in an unfamiliar codebase
+
+## Reading flow
+
+1. **Check `PROJECT-TOC.md` exists.** If missing, the project is un-indexed. Suggest `/index-project` and fall back to Glob for the current question.
+
+2. **Check freshness.** The TOC header contains:
+
+   ```
+   <!-- generated-at-commit: <SHA> -->
+   ```
+
+   Stale if either:
+   - `git diff --name-only <SHA> HEAD` returns files
+   - `git status --porcelain` shows working-tree changes to tracked files
+
+   Note: the SessionStart hook already computes `toc_stale: true/false` and injects it. If stale, prefer `/index-project` before deep navigation; for one-off questions, fall back to Glob.
+
+3. **Search the TOC, not the filesystem.** A simple grep/scan of `PROJECT-TOC.md` typically answers "which file is about X" in one shot.
+
+4. **Open the file.** Only after locating via TOC.
+
+## When NOT to rely on TOC
+
+- TOC was just regenerated but agent hasn't seen it (mtime ≠ session start)
+- File you're looking for is *new* (not yet in git)
+- Question requires content search, not name search (use Grep then)
+
+## Rebuilding
+
+When you make significant structural changes (new directories, renames, large refactors):
+
+```bash
+node ${CLAUDE_PLUGIN_ROOT}/scripts/index-builder.mjs --target .
+```
+
+Or simply tell the user to run `/index-project`. Don't try to maintain the TOC by hand-editing — it's auto-generated.
+
+## TOC format expectations
+
+```markdown
+<!-- generated-at-commit: abc123 -->
+<!-- DO NOT EDIT BY HAND — run /index-project or scripts/index-builder.mjs -->
+
+# PROJECT TOC
+
+## Files
+- `src/main.cpp` — entry point, parses CLI args, initializes Engine
+- `src/util/log.h` — fmt-based logger
+- ...
+
+## Decisions
+- 2026-05-15: switched from X to Y (see docs/decisions/0001.md)
+```
+
+The `## Decisions` section is human-edited (long-lived architectural notes). The `## Files` section is mechanical.
+
+## Token economy
+
+`PROJECT-TOC.md` typically fits within a few thousand tokens even for medium projects. The SessionStart hook injects **only the first N lines** that fit the Tier 1 budget; the rest is read on demand. Don't ask the user to load the full TOC unless the budget allows.
+
+## Related
+
+- `using-harness-anchor` — overall navigation, points here when files are sought
+- `feature-state-keeper` — manages state files alongside the TOC

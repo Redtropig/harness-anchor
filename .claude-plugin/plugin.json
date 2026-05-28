@@ -1,0 +1,19 @@
+{
+  "name": "harness-anchor",
+  "description": "Runtime harness layer for Claude Code: state persistence, scope control, verification gates, C/C++ engineering. Companion to superpowers.",
+  "version": "0.1.0",
+  "author": {
+    "name": "redtropig"
+  },
+  "license": "MIT",
+  "keywords": [
+    "harness",
+    "agent",
+    "state",
+    "verification",
+    "scope-control",
+    "cpp",
+    "superpowers",
+    "context-engineering"
+  ]
+}

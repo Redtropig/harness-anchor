@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Stop hook for harness-anchor.
+#
+# Triggered when agent wants to stop. Warn-only — never blocks (no stopReason).
+# Purpose: nudge wrap-up rituals (update progress.md, write handoff).
+
+set -uo pipefail
+
+# Find project root via feature_list.json walk-up from CWD.
+project_root=""
+search_dir="$(pwd)"
+while [ "$search_dir" != "/" ] && [ -n "$search_dir" ]; do
+    if [ -f "$search_dir/feature_list.json" ]; then
+        project_root="$search_dir"
+        break
+    fi
+    search_dir="$(dirname "$search_dir")"
+done
+
+if [ -z "$project_root" ]; then
+    exit 0
+fi
+
+reminders=()
+
+# ---- Check 1: in-progress feature has no evidence ----
+in_progress_without_evidence=$(python3 - "$project_root/feature_list.json" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    for feat in data.get('features', []):
+        if feat.get('status') == 'in-progress':
+            ev = feat.get('evidence')
+            # not necessarily wrong (in-progress is allowed to lack evidence),
+            # but worth surfacing the active feature so wrap-up is clean
+            print(f"Active feature: '{feat['id']}' is still in-progress.")
+            break
+except Exception:
+    pass
+PY
+)
+if [ -n "$in_progress_without_evidence" ]; then
+    reminders+=("$in_progress_without_evidence")
+fi
+
+# ---- Check 2: progress.md staleness ----
+# If progress.md exists and hasn't been touched in this session, suggest /session-end.
+if [ -f "$project_root/progress.md" ]; then
+    # session start heuristic: file older than 30 minutes is "stale this session"
+    if find "$project_root/progress.md" -mmin +30 -print 2>/dev/null | grep -q .; then
+        reminders+=("progress.md may not have been updated this session. Consider /session-end to write handoff + log.")
+    fi
+fi
+
+# ---- Check 3: session-handoff.md staleness (>24h) ----
+if [ -f "$project_root/session-handoff.md" ]; then
+    if find "$project_root/session-handoff.md" -mtime +1 -print 2>/dev/null | grep -q .; then
+        reminders+=("session-handoff.md is >24h old. /session-end will refresh it.")
+    fi
+fi
+
+if [ "${#reminders[@]}" -eq 0 ]; then
+    exit 0
+fi
+
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+joined=""
+for r in "${reminders[@]}"; do
+    if [ -z "$joined" ]; then joined="$r"; else joined="$joined
+$r"; fi
+done
+escaped=$(escape_for_json "$joined")
+
+# NOTE: no "stopReason" — we never block stop. Just inject additionalContext.
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "Stop",\n    "additionalContext": "<harness-anchor Stop reminders>\\n%s\\n</harness-anchor Stop reminders>"\n  }\n}\n' "$escaped"
+
+exit 0

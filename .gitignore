@@ -1,0 +1,21 @@
+# harness-anchor runtime error sink (per plan §"失败恢复")
+.harness-anchor/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# Node (index-builder.mjs may pull deps in future)
+node_modules/
+
+# Test scratch
+/tmp/
+tests/**/.build/
+tests/**/build/
+tests/**/compile_commands.json

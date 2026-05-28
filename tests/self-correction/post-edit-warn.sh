@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Contract test for hooks/post-tool-use.
+#
+# Sets up a temp project with a feature_list.json containing a 'pass' feature,
+# then invokes post-tool-use with a synthetic Edit event on a source file.
+# Expects: hook stdout is valid JSON containing a 'Note:' regression warning.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+TMPDIR=$(mktemp -d)
+trap "rm -rf $TMPDIR" EXIT
+
+cd "$TMPDIR"
+mkdir -p src
+
+# Build a fixture project anchored with feature_list.json marking one feature pass.
+cat > feature_list.json <<'EOF'
+{
+  "project": "fixture",
+  "features": [
+    {
+      "id": "feat-a",
+      "name": "Feature A",
+      "description": "passed feature",
+      "status": "pass",
+      "done_criteria": ["build", "tests"],
+      "evidence": {
+        "timestamp": "2026-01-01T00:00:00Z",
+        "commit": "abc123",
+        "artifacts": [".build/build.log"]
+      }
+    }
+  ]
+}
+EOF
+
+echo 'int main(){return 0;}' > src/main.cpp
+
+# Simulate Claude Code's PostToolUse stdin payload.
+input_json=$(printf '{"tool_name":"Edit","tool_input":{"file_path":"%s/src/main.cpp"}}' "$TMPDIR")
+
+# Run the hook.
+output=$(printf '%s' "$input_json" | bash "$PLUGIN_ROOT/hooks/post-tool-use" 2>/dev/null || true)
+
+PASS=0
+FAIL=0
+
+assert_contains() {
+    if printf '%s' "$2" | grep -q "$1"; then
+        echo "  OK   contains: $1"
+        PASS=$((PASS+1))
+    else
+        echo "  FAIL missing: $1 (in: $(printf '%s' "$2" | head -c 200))"
+        FAIL=$((FAIL+1))
+    fi
+}
+
+assert_json_valid() {
+    if printf '%s' "$1" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
+        echo "  OK   valid JSON"
+        PASS=$((PASS+1))
+    else
+        echo "  FAIL invalid JSON output: $(printf '%s' "$1" | head -c 200)"
+        FAIL=$((FAIL+1))
+    fi
+}
+
+echo "=== post-tool-use contract test ==="
+echo "Output (truncated):"
+echo "${output:0:300}"
+echo "---"
+
+if [ -z "$output" ]; then
+    echo "  FAIL no output emitted; expected warning for pass-feature edit"
+    FAIL=$((FAIL+1))
+else
+    assert_json_valid "$output"
+    assert_contains "hookSpecificOutput" "$output"
+    assert_contains "PostToolUse" "$output"
+    assert_contains "feat-a" "$output"
+fi
+
+# Negative test: editing a file in NON-anchored dir should produce no output.
+TMPDIR2=$(mktemp -d)
+trap "rm -rf $TMPDIR $TMPDIR2" EXIT
+cd "$TMPDIR2"
+input_json2=$(printf '{"tool_name":"Edit","tool_input":{"file_path":"%s/foo.txt"}}' "$TMPDIR2")
+output2=$(printf '%s' "$input_json2" | bash "$PLUGIN_ROOT/hooks/post-tool-use" 2>/dev/null || true)
+
+echo ""
+echo "=== negative test (no anchor) ==="
+if [ -z "$output2" ]; then
+    echo "  OK   silent for non-anchored project"
+    PASS=$((PASS+1))
+else
+    echo "  FAIL expected silent, got: $(printf '%s' "$output2" | head -c 100)"
+    FAIL=$((FAIL+1))
+fi
+
+echo ""
+echo "==================================="
+echo " Pass: $PASS    Fail: $FAIL"
+if [ "$FAIL" -eq 0 ]; then
+    echo " STATUS: PASSED"
+    exit 0
+else
+    echo " STATUS: FAILED"
+    exit 1
+fi

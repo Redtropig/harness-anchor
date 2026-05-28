@@ -1,0 +1,1 @@
+Let's finish the authentication refactor we started. Also, while you're at it, can you fix the broken pagination on the search results page? It's been bugging me for weeks.

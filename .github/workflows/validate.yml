@@ -1,0 +1,77 @@
+# Security note: This workflow uses NO github.event.* inputs and NO ${{ ... }}
+# interpolation in `run:` blocks. All dynamic values come from GitHub-provided
+# safe env vars ($GITHUB_WORKSPACE) or hard-coded literals. No injection surface.
+
+name: validate
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  fast-tests:
+    name: Fast self-tests (no Claude session required)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Plugin self-consistency (validate-anchor)
+        run: bash scripts/validate-anchor.sh
+
+      - name: Hook contract (post-edit-warn)
+        run: bash tests/self-correction/post-edit-warn.sh
+
+      - name: cpp-detect — fixture coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          for fixture in cmake meson make bazel; do
+            echo "--- ${fixture}-fixture ---"
+            output=$(bash scripts/cpp-detect.sh --target "tests/cpp-detection/${fixture}-fixture")
+            echo "${output}" | python3 -m json.tool
+            EXPECTED_BS="${fixture}" \
+              python3 -c "
+          import json, sys, os
+          expected_bs = os.environ['EXPECTED_BS']
+          d = json.loads(sys.stdin.read())
+          assert d['is_cpp_project'] is True, f'{expected_bs}-fixture not detected as cpp project'
+          assert d['build_system'] == expected_bs, f'{expected_bs}-fixture wrong build_system: ' + d['build_system']
+          print(f'OK {expected_bs}-fixture: build_system={d[\"build_system\"]}')
+          " <<< "${output}"
+          done
+
+      - name: index-builder smoke test on temp repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          cd "${tmp}"
+          git init -q
+          git config user.email test@example.com
+          git config user.name test
+          echo "// main.c - hello" > main.c
+          git add -A
+          git commit -qm init
+          node "${GITHUB_WORKSPACE}/scripts/index-builder.mjs" --target .
+          test -f PROJECT-TOC.md
+          grep -q 'main.c' PROJECT-TOC.md
+          grep -q 'generated-at-commit' PROJECT-TOC.md
+          echo "OK index-builder smoke pass"
