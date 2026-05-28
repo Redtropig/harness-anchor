@@ -1,37 +1,167 @@
 #!/usr/bin/env bash
-# SessionStart hook for harness-anchor (Phase 1 — minimal).
+# SessionStart hook for harness-anchor — full version.
 #
-# Injects the using-harness-anchor SKILL.md content as additionalContext so the
-# agent boots aware of harness-anchor's strong-constraint runtime layer.
+# Per plan §"Hook 脚本具体行为", emits a state banner containing:
+#   - Active feature (from feature_list.json, "in-progress" entry)
+#   - TOC freshness (git-commit anchor algorithm)
+#   - Project type (cpp|generic, via scripts/cpp-detect.sh)
+#   - Session handoff head (first 10 lines of session-handoff.md)
+#   - using-harness-anchor SKILL.md body (the meta-skill)
 #
-# Phase 3 will extend this to also inject PROJECT-TOC.md slice, active feature
-# id, session-handoff.md head, and cpp-detect.sh JSON.
+# Hard constraints:
+#   - Token budget ≤ 2000 (~ 8000 chars). Skill body truncated to fit.
+#   - Defensive: every sub-check fails silently, never aborts the hook.
+#   - sub-commands wall-clocked to 3s where possible.
 
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-
 SKILL_FILE="${PLUGIN_ROOT}/skills/using-harness-anchor/SKILL.md"
 
-# Defensive: missing skill file → silent exit (warn-only philosophy, never
-# pollute agent context with our own infra errors).
-if [ ! -f "$SKILL_FILE" ]; then
-    exit 0
+# ---- Resolve project root (3-level fallback) ----
+# 1) CLAUDE_PROJECT_DIR (set by Claude Code for plugin hooks)
+# 2) git toplevel from CWD
+# 3) CWD itself
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
+if [ -z "$PROJECT_DIR" ] || [ ! -d "$PROJECT_DIR" ]; then
+    if git_top=$(git rev-parse --show-toplevel 2>/dev/null); then
+        PROJECT_DIR="$git_top"
+    else
+        PROJECT_DIR="$(pwd)"
+    fi
 fi
 
-skill_content="$(cat "$SKILL_FILE")"
+# ---- timeout shim (BSD/macOS may lack `timeout`; try `gtimeout`) ----
+to_cmd=""
+if   command -v timeout  >/dev/null 2>&1; then to_cmd="timeout 3"
+elif command -v gtimeout >/dev/null 2>&1; then to_cmd="gtimeout 3"
+fi
 
-# Token budget guard (per plan §1, Tier 1 ≤ 2000 tokens ≈ 8000 chars).
-# Hard truncate if oversized, with a pointer to the on-disk file.
+# ---- 1. Active feature from feature_list.json ----
+active_feature="none (run /anchor to scaffold)"
+flist="$PROJECT_DIR/feature_list.json"
+if [ -f "$flist" ]; then
+    af=$(python3 - "$flist" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+    for feat in d.get('features', []):
+        if feat.get('status') == 'in-progress':
+            print(f"{feat.get('id','?')}: {feat.get('name','')}")
+            break
+    else:
+        print("(no in-progress feature)")
+except Exception:
+    pass
+PY
+)
+    [ -n "$af" ] && active_feature="$af"
+fi
+
+# ---- 2. Project type via cpp-detect.sh ----
+project_type="generic"
+detect_script="${PLUGIN_ROOT}/scripts/cpp-detect.sh"
+if [ -x "$detect_script" ]; then
+    cpp_json=$($to_cmd bash "$detect_script" --target "$PROJECT_DIR" 2>/dev/null || true)
+    if [ -n "$cpp_json" ]; then
+        parsed=$(printf '%s' "$cpp_json" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    if d.get('is_cpp_project'):
+        bs = d.get('build_system', '?')
+        std = d.get('standard', '')
+        print(f'cpp ({bs}' + (f', {std}' if std and std != 'unknown' else '') + ')')
+    else:
+        print('generic')
+except Exception:
+    print('generic')
+" 2>/dev/null || echo "generic")
+        [ -n "$parsed" ] && project_type="$parsed"
+    fi
+fi
+
+# ---- 3. TOC freshness algorithm ----
+toc_status="absent (run /index-project to create PROJECT-TOC.md)"
+toc_file="$PROJECT_DIR/PROJECT-TOC.md"
+if [ -f "$toc_file" ]; then
+    anchor_commit=$(grep -oE 'generated-at-commit:[[:space:]]*[A-Za-z0-9]+' "$toc_file" 2>/dev/null | head -1 | awk '{print $NF}' || true)
+    if [ -z "$anchor_commit" ] || [ "$anchor_commit" = "PLACEHOLDER_COMMIT_SHA" ]; then
+        toc_status="present, no commit anchor (run /index-project)"
+    elif (cd "$PROJECT_DIR" && git rev-parse --git-dir >/dev/null 2>&1); then
+        # Both committed changes since anchor AND working-tree changes count.
+        cc=$(cd "$PROJECT_DIR" && git diff --name-only "$anchor_commit" HEAD 2>/dev/null | wc -l | tr -d ' ' || echo 0)
+        wc_=$(cd "$PROJECT_DIR" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ' || echo 0)
+        total=$((cc + wc_))
+        if [ "$total" -eq 0 ]; then
+            toc_status="fresh (anchor $anchor_commit)"
+        else
+            toc_status="stale ($total file(s) changed since anchor $anchor_commit; run /index-project)"
+        fi
+    else
+        toc_status="present, not a git repo (cannot verify freshness)"
+    fi
+fi
+
+# ---- 4. Session handoff head ----
+handoff_head=""
+handoff_file="$PROJECT_DIR/session-handoff.md"
+if [ -f "$handoff_file" ]; then
+    handoff_head=$(head -n 10 "$handoff_file" 2>/dev/null || true)
+fi
+
+# ---- 5. Assemble banner ----
+banner="<harness-anchor-state>
+Plugin:           harness-anchor v0.1.0
+Project root:     ${PROJECT_DIR}
+Active feature:   ${active_feature}
+Project type:     ${project_type}
+TOC freshness:    ${toc_status}"
+
+if [ -n "$handoff_head" ]; then
+    banner="${banner}
+Last session handoff (first 10 lines):
+${handoff_head}"
+else
+    banner="${banner}
+Last session handoff: (no session-handoff.md — run /anchor or /session-end)"
+fi
+
+banner="${banner}
+</harness-anchor-state>
+
+"
+
+# ---- 6. Read meta-skill body ----
+skill_content=""
+if [ -f "$SKILL_FILE" ]; then
+    skill_content="$(cat "$SKILL_FILE")"
+else
+    skill_content="(using-harness-anchor SKILL.md missing — plugin install incomplete)"
+fi
+
+# ---- 7. Combine + token budget hard cap (≤ ~2000 tokens ≈ 8000 chars) ----
+combined="${banner}${skill_content}"
 MAX_CHARS=8000
-if [ "${#skill_content}" -gt "$MAX_CHARS" ]; then
-    skill_content="${skill_content:0:$MAX_CHARS}
+if [ "${#combined}" -gt "$MAX_CHARS" ]; then
+    # Banner is small and authoritative; truncate the skill body to fit.
+    banner_len=${#banner}
+    marker="
 
 <truncated — see ${SKILL_FILE} for full content>"
+    marker_len=${#marker}
+    skill_budget=$((MAX_CHARS - banner_len - marker_len))
+    if [ "$skill_budget" -lt 0 ]; then
+        # Banner alone exceeds budget — emit it raw, drop skill body.
+        combined="${combined:0:$MAX_CHARS}"
+    else
+        combined="${banner}${skill_content:0:$skill_budget}${marker}"
+    fi
 fi
 
-# Pure-bash JSON escaping (no jq dependency).
+# ---- 8. JSON-escape (pure bash, no jq dependency) ----
 escape_for_json() {
     local s="$1"
     s="${s//\\/\\\\}"
@@ -42,18 +172,9 @@ escape_for_json() {
     printf '%s' "$s"
 }
 
-banner="<harness-anchor>
-harness-anchor v0.1.0 active — runtime constraint layer for agent state, scope, verification.
-Phase 1 skeleton: only meta-skill loaded. Run /anchor to scaffold project state files.
-</harness-anchor>
+context="$(escape_for_json "$combined")"
 
-"
-
-context="$(escape_for_json "${banner}${skill_content}")"
-
-# Output format per Claude Code Hooks Guide (2026):
-#   { "hookSpecificOutput": { "hookEventName": "SessionStart", "additionalContext": "<...>" } }
-# This is silently injected (no user-visible message as of Claude Code 2.1.0+).
+# ---- 9. Emit Claude Code SessionStart JSON (silently injected as additionalContext) ----
 printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
 
 exit 0
