@@ -1,6 +1,6 @@
 ---
 name: verification-runner
-description: Use when the user asks "verify this feature", invokes /verify, or when the calling agent needs an independent fresh-context evaluation of whether a feature/fix is truly done. Runs build + tests + lint, reports diagnosis with evidence paths. Read-only — never modifies code.
+description: Use when user invokes /verify or calling agent needs fresh-context evaluation of done-ness. Runs build/tests/lint, reports evidence paths. Read-only.
 tools: Read, Bash, Grep, Glob
 ---
 

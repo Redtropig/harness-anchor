@@ -24,6 +24,7 @@ Stop. Read this before doing anything.
 6. **Skill descriptions front-load distinctive trigger keywords.** First ~80 chars carry the load — Anthropic's skill listing budget is tight (see learn-harness `gotchas.md#12`).
 7. **Hooks must time out in ≤ 5 seconds** and fail silent on missing tools.
 8. **Default-FAIL evaluation contracts.** No skill or agent should mark anything "done" without an evidence path. This is the anti-hallucination invariant — do not soften it.
+9. **docs-lookup is the canonical procedure** for unfamiliar tools/APIs/errors/library behavior. New skills MUST reference it rather than inlining Context7 → WebSearch waterfalls — the failure-mode detection and calibrated-uncertainty fallback live in one place by design.
 
 ## Authoring a New Skill (when explicitly asked)
 

@@ -8,6 +8,7 @@ declare -a CASES=(
     "feature-state-keeper:state-drift.txt"
     "anti-hallucination-gates:claim-without-evidence.txt"
     "cpp-build-systems:cpp-build-failure.txt"
+    "docs-lookup:docs-lookup.txt"
 )
 # scope-jump.txt tests the UserPromptSubmit hook rather than skill invocation
 # (it doesn't map cleanly to a single skill).

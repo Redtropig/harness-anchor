@@ -1,6 +1,6 @@
 ---
 name: cpp-build-doctor
-description: Use when a C/C++ build fails — compiler error, linker error, CMake/Meson configure failure, missing-header, missing-package. Diagnoses root cause from build output without modifying code. Read-only.
+description: Use when C/C++ build fails — compile/link/configure error, missing header or package. Diagnoses root cause from build output. Read-only.
 tools: Read, Bash, Grep, Glob
 ---
 

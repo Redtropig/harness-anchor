@@ -1,6 +1,6 @@
 ---
 name: index-curator
-description: Use when PROJECT-TOC.md needs rebuilding or curating — after large refactors, file renames, or when SessionStart reports toc_stale. Runs scripts/index-builder.mjs and may edit PROJECT-TOC.md's Decisions section. Only allowed Write target is PROJECT-TOC.md.
+description: Use when PROJECT-TOC.md needs rebuilding — after refactors, renames, or SessionStart toc_stale. Runs index-builder.mjs. Writes only PROJECT-TOC.md.
 tools: Read, Bash, Grep, Glob, Write
 ---
 

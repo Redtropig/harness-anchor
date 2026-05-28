@@ -1,0 +1,1 @@
+What does CMake's CMP0148 policy actually control? I need to know the exact behavior before and after the policy is set NEW, and which CMake version introduced it. Be specific — this is going into a CMakeLists.txt comment.
