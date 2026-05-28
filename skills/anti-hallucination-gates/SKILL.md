@@ -106,12 +106,9 @@ If any box is unchecked: state uncertainty explicitly, do NOT flip status to `pa
 
 ## Looking up evidence commands for unfamiliar frameworks
 
-When the project uses a test/lint framework you don't have committed to memory (Catch2, doctest, ruff, deno test, etc.):
+When the project uses a test/lint framework you don't have committed to memory (Catch2, doctest, ruff, deno test, etc.) — invoke the `docs-lookup` skill before constructing the verification command. The lookup result becomes part of the evidence trail.
 
-- **Context7** — fetch the framework's canonical CLI reference
-- **WebSearch** — "framework + test runner output format" usually surfaces what counts as evidence
-
-Bluffing the command and not actually running it is the anti-pattern this skill exists to prevent.
+Bluffing the command and not actually running it is the anti-pattern this skill exists to prevent — that's why **lookup precedes execution** here.
 
 ## Related
 

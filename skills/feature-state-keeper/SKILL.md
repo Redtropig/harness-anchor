@@ -114,12 +114,9 @@ If the schema file is present, an external validator (e.g. `ajv-cli`) can verify
 
 ## Looking up JSON Schema constraints
 
-For non-trivial schema constructs (`allOf`, `oneOf`, `if/then`, regex patterns):
+For non-trivial schema constructs (`allOf`, `oneOf`, `if/then`, regex patterns) — invoke the `docs-lookup` skill. Don't guess schema syntax; `feature_list.schema.json` validation must stay correct, and a malformed schema silently disables enforcement.
 
-- **Context7** — `json schema` for the canonical draft-07 / draft-2020-12 spec
-- **WebSearch** — specific keyword + "json schema" for examples
-
-Don't guess schema syntax — `feature_list.schema.json` validation must stay correct.
+Typical entry query: `json schema <construct>` (e.g. `json schema if then else`).
 
 ## Related
 

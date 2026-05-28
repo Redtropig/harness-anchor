@@ -90,12 +90,9 @@ When the user asks "how much room do we have?", be honest about the estimate.
 
 ## Looking up context engineering research
 
-For specific patterns (e.g., compaction algorithms, attention windowing, RAG indexing strategies):
+For specific patterns (e.g., compaction algorithms, attention windowing, RAG indexing strategies) — invoke the `docs-lookup` skill. Pattern names evolve fast in this area; don't rely on memory.
 
-- **Context7** — Anthropic / OpenAI engineering blog references on harnesses
-- **WebSearch** — "context engineering 2026" surfaces recent practitioner reports
-
-Pattern names evolve fast in this area; don't rely on memory.
+Typical entry query: `context engineering 2026` or `<specific technique> llm`.
 
 ## Related
 

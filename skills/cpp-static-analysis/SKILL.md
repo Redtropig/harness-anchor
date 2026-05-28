@@ -102,12 +102,9 @@ If a warning is in code you didn't change (legacy area) and not a regression ris
 
 ## Looking up unfamiliar checks
 
-When you encounter a clang-tidy check name you don't recognize (e.g. `bugprone-suspicious-enum-usage`, `cert-err58-cpp`):
+When you encounter a clang-tidy check name you don't recognize (e.g. `bugprone-suspicious-enum-usage`, `cert-err58-cpp`), or an unfamiliar cppcheck ID / IWYU pragma — invoke the `docs-lookup` skill. It handles Context7 → WebSearch fallback (with explicit failure-mode detection) so you don't silently substitute a guess.
 
-- **Context7** — fetch canonical clang-tidy check documentation
-- **WebSearch** — search "clang-tidy <check-name>" for discussions on false positives / edge cases
-
-Same for cppcheck IDs and IWYU pragmas. Prefer Context7; WebSearch as fallback.
+Typical entry query: `clang-tidy <check-name>` or `cppcheck <id>`.
 
 ## Templates
 

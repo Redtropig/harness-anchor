@@ -75,12 +75,9 @@ The `## Decisions` section is human-edited (long-lived architectural notes). The
 
 ## Looking up indexing techniques
 
-For deeper context-engineering / progressive-disclosure indexing approaches not covered here:
+For deeper context-engineering / progressive-disclosure indexing approaches not covered here — invoke the `docs-lookup` skill. The current TOC algorithm is intentionally minimal; refinements (semantic chunks, embeddings) belong in a separate skill.
 
-- **Context7** — search "progressive disclosure llm agent" for harness research
-- **WebSearch** — recent agent harness blog posts and patterns
-
-The current TOC algorithm is intentionally minimal; refinements (semantic chunks, embeddings) belong in a separate skill.
+Typical entry query: `progressive disclosure llm agent` or `agent harness indexing 2026`.
 
 ## Related
 

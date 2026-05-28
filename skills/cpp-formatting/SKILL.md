@@ -77,9 +77,6 @@ If clang-format touched files you didn't change, your `.clang-format` may have d
 
 ## Looking up clang-format options
 
-For an unfamiliar `.clang-format` key (e.g. `PenaltyExcessCharacter`, `BreakInheritanceList`):
+For an unfamiliar `.clang-format` key (e.g. `PenaltyExcessCharacter`, `BreakInheritanceList`) — invoke the `docs-lookup` skill. It encodes the Context7 → WebSearch fallback and the "Context7 unavailable" detection rules.
 
-- **Context7** — fetch the official clang-format options reference
-- **WebSearch** — search "clang-format <option-name>" for usage examples
-
-Prefer Context7 for canonical documentation.
+Typical entry query: `clang-format <option-name>` or `clang-format style options`.

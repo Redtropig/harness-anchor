@@ -107,9 +107,6 @@ Run: `ASAN_OPTIONS=suppressions=asan-suppressions.txt ./your_test`
 
 ## Looking up unfamiliar signatures
 
-When a sanitizer report uses an error class outside `ub-failure-patterns.md`:
+When a sanitizer report uses an error class outside `ub-failure-patterns.md` — invoke the `docs-lookup` skill. It tries Context7 first, then WebSearch (best for recent regressions or platform-specific issues), then calibrated uncertainty if both fail.
 
-- **Context7** — query `clang sanitizers` or `address sanitizer` for canonical docs
-- **WebSearch** — search the exact error string for community reports
-
-Prefer Context7; WebSearch is best for recent regressions or platform-specific issues.
+Typical entry query: `clang sanitizer <error-class>` or paste the exact runtime error string.

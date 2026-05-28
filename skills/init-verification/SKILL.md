@@ -79,12 +79,9 @@ When it fails, list the specific failed step, not "init failed" alone.
 
 ## Looking up toolchain errors
 
-When `init.sh` fails with a cryptic toolchain message (e.g., CMake "could not find compiler", npm `ENOENT`, cargo "linker not found"):
+When `init.sh` fails with a cryptic toolchain message (e.g., CMake "could not find compiler", npm `ENOENT`, cargo "linker not found") — invoke the `docs-lookup` skill. Context7 is best for stable tool behavior; WebSearch surfaces recent platform-specific changes; calibrated uncertainty when neither helps.
 
-- **Context7** — fetch the tool's canonical docs (`cmake docs`, `npm docs`, `cargo book`)
-- **WebSearch** — the exact error string usually surfaces a known fix
-
-Prefer Context7 for stable behavior; WebSearch for recent platform-specific changes.
+Typical entry query: paste the exact error string in quotes + the tool name.
 
 ## Related
 

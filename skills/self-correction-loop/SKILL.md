@@ -48,7 +48,7 @@ This is **TDD's RED-GREEN-REFACTOR adapted for correction**:
 If you've iterated 3 times on the same signal without resolving it, **stop and escalate**:
 
 - Read more of the surrounding code than you have so far
-- Consult [Context7 / WebSearch] for the specific error class
+- Invoke `docs-lookup` skill for the specific error class (Context7 → WebSearch fallback)
 - Tell the user: *"I've tried 3 approaches to <issue>. Latest output: <...>. I need more context. Recommend either <option A> or <option B>?"*
 
 Looping > 5 times is almost always a sign of:

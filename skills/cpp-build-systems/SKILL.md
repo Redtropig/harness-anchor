@@ -114,9 +114,6 @@ If you propose a build fix you haven't verified by running the build:
 
 ## Looking up tool errors
 
-Unfamiliar CMake/Meson/Bazel error or missing-package message? Don't guess:
+Unfamiliar CMake/Meson/Bazel error or missing-package message? **Don't guess** — invoke the `docs-lookup` skill, which encodes the canonical Context7 → WebSearch → calibrated-uncertainty fallback chain (with explicit "Context7 is unavailable" detection so you don't silently degrade to guessing).
 
-- **Context7** — query `cmake docs`, `meson docs`, `bazel docs` for canonical reference (structured, reliable)
-- **WebSearch** — the exact error string often surfaces a Stack Overflow / GitHub issue with the fix (fallback)
-
-Prefer Context7 first; only fall back to WebSearch for recent ecosystem changes.
+Typical entry queries: `cmake find_package`, `meson dependency`, `bazel cc_binary`, exact error string in quotes.

@@ -35,6 +35,7 @@ If none exist, the project is **un-anchored**. Suggest the user run `/anchor` to
 - `self-correction-loop` — after edits that fail lint/build; iterate with evidence
 - `anti-hallucination-gates` — before claiming "done"; Default-FAIL evidence contract
 - `context-budget-discipline` — when context fills up; SELECT/WRITE/COMPRESS/ISOLATE
+- `docs-lookup` — when looking up unfamiliar tools/APIs/errors; Context7 → WebSearch → calibrated uncertainty fallback chain
 - `cpp-build-systems` — CMake/Meson/Make/Bazel project
 - `cpp-static-analysis` — clang-tidy / cppcheck / IWYU
 - `cpp-formatting` — clang-format
@@ -49,7 +50,7 @@ These are non-negotiable invariants:
 3. **State lives on disk, not in chat.** Update `feature_list.json` / `progress.md` / `session-handoff.md` rather than relying on conversation memory.
 4. **PROJECT-TOC.md before Glob.** It is cheaper for both you and the user.
 5. **Subagents are single-level.** Never invoke a subagent from within a subagent.
-6. **When stuck, search docs first.** Prefer Context7 (structured) over WebSearch (fallback) for unfamiliar tools, APIs, or error messages — don't guess.
+6. **When stuck, follow `docs-lookup`.** Never guess at unfamiliar tools/APIs/errors. The Context7 → WebSearch → calibrated-uncertainty fallback chain is canonical there.
 
 ## Commands
 
