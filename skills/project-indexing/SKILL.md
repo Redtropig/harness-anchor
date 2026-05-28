@@ -1,6 +1,6 @@
 ---
 name: project-indexing
-description: Use when locating files, understanding project structure, or before reaching for Glob/find. Consults PROJECT-TOC.md (one-line index of every git-tracked file). Detects staleness via git commit anchor.
+description: Use when locating files or understanding structure. Consults PROJECT-TOC.md (one-line index per file). Staleness via git commit anchor.
 ---
 
 # Project Indexing
@@ -72,6 +72,15 @@ The `## Decisions` section is human-edited (long-lived architectural notes). The
 ## Token economy
 
 `PROJECT-TOC.md` typically fits within a few thousand tokens even for medium projects. The SessionStart hook injects **only the first N lines** that fit the Tier 1 budget; the rest is read on demand. Don't ask the user to load the full TOC unless the budget allows.
+
+## Looking up indexing techniques
+
+For deeper context-engineering / progressive-disclosure indexing approaches not covered here:
+
+- **Context7** — search "progressive disclosure llm agent" for harness research
+- **WebSearch** — recent agent harness blog posts and patterns
+
+The current TOC algorithm is intentionally minimal; refinements (semantic chunks, embeddings) belong in a separate skill.
 
 ## Related
 

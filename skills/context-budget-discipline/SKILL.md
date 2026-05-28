@@ -1,6 +1,6 @@
 ---
 name: context-budget-discipline
-description: Use when sessions run long, when adding subagents, when the agent fetches large files, or when planning context-heavy work. Applies SELECT / WRITE / COMPRESS / ISOLATE operations from 2026 context engineering practice. Prevents lost-in-the-middle and reduces token cost.
+description: Use when sessions run long, adding subagents, fetching large files, or planning context-heavy work. SELECT/WRITE/COMPRESS/ISOLATE discipline.
 ---
 
 # Context Budget Discipline
@@ -87,6 +87,15 @@ You can roughly estimate context use by:
 - Your own multi-paragraph replies ≈ 200-500 tokens each
 
 When the user asks "how much room do we have?", be honest about the estimate.
+
+## Looking up context engineering research
+
+For specific patterns (e.g., compaction algorithms, attention windowing, RAG indexing strategies):
+
+- **Context7** — Anthropic / OpenAI engineering blog references on harnesses
+- **WebSearch** — "context engineering 2026" surfaces recent practitioner reports
+
+Pattern names evolve fast in this area; don't rely on memory.
 
 ## Related
 

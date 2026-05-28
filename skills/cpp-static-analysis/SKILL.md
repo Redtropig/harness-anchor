@@ -1,6 +1,6 @@
 ---
 name: cpp-static-analysis
-description: Use in C/C++ projects when reviewing changed code, before claiming a feature done, or when investigating bugs. Runs clang-tidy / cppcheck / include-what-you-use (IWYU). Requires compile_commands.json. Surface warnings on changed lines only — don't dump the world.
+description: Use in C/C++ projects when reviewing changes or hunting bugs. Runs clang-tidy/cppcheck/IWYU. Needs compile_commands.json. Changed lines only.
 ---
 
 # C/C++ Static Analysis
@@ -99,6 +99,15 @@ If a warning is wrong (false positive), file a one-line `// NOLINT(check-name) �
 ## When to defer
 
 If a warning is in code you didn't change (legacy area) and not a regression risk, defer it: note in `progress.md`, don't fix in this session. Scope discipline.
+
+## Looking up unfamiliar checks
+
+When you encounter a clang-tidy check name you don't recognize (e.g. `bugprone-suspicious-enum-usage`, `cert-err58-cpp`):
+
+- **Context7** — fetch canonical clang-tidy check documentation
+- **WebSearch** — search "clang-tidy <check-name>" for discussions on false positives / edge cases
+
+Same for cppcheck IDs and IWYU pragmas. Prefer Context7; WebSearch as fallback.
 
 ## Templates
 

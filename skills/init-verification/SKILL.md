@@ -1,6 +1,6 @@
 ---
 name: init-verification
-description: Use at the start of work in a project, after any environment change (deps, branch switch, OS update), or when something "used to work" stops working. Runs init.sh health check; treats failures as blocking. Implements Anthropic's "verify environment before agent does work" pattern.
+description: Use at start of work, after env changes (deps/branch/OS), or when something stops working. Runs init.sh health check; treats failures as blocking.
 ---
 
 # Init Verification
@@ -76,6 +76,15 @@ When it fails, list the specific failed step, not "init failed" alone.
 
 - Inside a subagent that was already given verified-healthy context
 - For trivial single-file edits where build/test aren't needed (rare; usually init still cheap enough to run)
+
+## Looking up toolchain errors
+
+When `init.sh` fails with a cryptic toolchain message (e.g., CMake "could not find compiler", npm `ENOENT`, cargo "linker not found"):
+
+- **Context7** — fetch the tool's canonical docs (`cmake docs`, `npm docs`, `cargo book`)
+- **WebSearch** — the exact error string usually surfaces a known fix
+
+Prefer Context7 for stable behavior; WebSearch for recent platform-specific changes.
 
 ## Related
 

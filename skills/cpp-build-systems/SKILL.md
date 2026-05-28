@@ -1,6 +1,6 @@
 ---
 name: cpp-build-systems
-description: Use in C/C++ projects when configuring builds, fixing build/configure errors, generating compile_commands.json, or selecting CMake/Meson/Make/Bazel commands. Always export compile_commands.json — it's required for static analysis and language tooling.
+description: Use in C/C++ projects for build configure/errors, compile_commands.json generation, or selecting CMake/Meson/Make/Bazel commands.
 ---
 
 # C/C++ Build Systems
@@ -111,3 +111,12 @@ Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-detect.sh --target .` to get a JSON 
 If you propose a build fix you haven't verified by running the build:
 
 > "I believe the fix is `<change>`. Please run `cmake -S . -B .build && cmake --build .build` and share the output before we mark this resolved."
+
+## Looking up tool errors
+
+Unfamiliar CMake/Meson/Bazel error or missing-package message? Don't guess:
+
+- **Context7** — query `cmake docs`, `meson docs`, `bazel docs` for canonical reference (structured, reliable)
+- **WebSearch** — the exact error string often surfaces a Stack Overflow / GitHub issue with the fix (fallback)
+
+Prefer Context7 first; only fall back to WebSearch for recent ecosystem changes.

@@ -1,6 +1,6 @@
 ---
 name: cpp-formatting
-description: Use in C/C++ projects to apply clang-format consistently. Run on changed lines only, never reformat unchanged code mid-feature. Use .clang-format from project root or LLVM baseline.
+description: Use in C/C++ projects for clang-format. Changed-lines-only; never reformat unchanged code mid-feature. .clang-format from root or LLVM baseline.
 ---
 
 # C/C++ Formatting (clang-format)
@@ -74,3 +74,12 @@ git diff --stat   # should show only changed lines' format
 ```
 
 If clang-format touched files you didn't change, your `.clang-format` may have drifted between machines (different versions produce different output). Pin clang-format major version in CI.
+
+## Looking up clang-format options
+
+For an unfamiliar `.clang-format` key (e.g. `PenaltyExcessCharacter`, `BreakInheritanceList`):
+
+- **Context7** — fetch the official clang-format options reference
+- **WebSearch** — search "clang-format <option-name>" for usage examples
+
+Prefer Context7 for canonical documentation.

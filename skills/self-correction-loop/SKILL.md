@@ -1,6 +1,6 @@
 ---
 name: self-correction-loop
-description: Use when a hook or tool returns a warning, lint error, type error, build error, or test failure after your edit. Iterate evidence-first instead of guessing. Stop when verification passes; do not loop forever.
+description: Use when a hook/tool returns a warning, lint/type/build error, or test failure after your edit. Iterate evidence-first; stop when verification passes.
 ---
 
 # Self-Correction Loop

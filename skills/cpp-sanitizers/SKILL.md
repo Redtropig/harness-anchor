@@ -1,6 +1,6 @@
 ---
 name: cpp-sanitizers
-description: Use in C/C++ projects when debugging crashes, hangs, undefined behavior, data races, or memory errors. ASan/UBSan/TSan are runtime checkers — they catch what static analysis misses. Build sanitizer config separately; don't mix with release config.
+description: Use in C/C++ projects for crashes, hangs, UB, data races, memory errors. ASan/UBSan/TSan runtime checks. Build sanitizer config separately.
 ---
 
 # C/C++ Sanitizers — Runtime Bug Catchers
@@ -104,3 +104,12 @@ Run: `ASAN_OPTIONS=suppressions=asan-suppressions.txt ./your_test`
 - Before any release / merge to main → run full ASan+UBSan suite
 
 ## See `ub-failure-patterns.md` for common UBSan signatures and their fixes.
+
+## Looking up unfamiliar signatures
+
+When a sanitizer report uses an error class outside `ub-failure-patterns.md`:
+
+- **Context7** — query `clang sanitizers` or `address sanitizer` for canonical docs
+- **WebSearch** — search the exact error string for community reports
+
+Prefer Context7; WebSearch is best for recent regressions or platform-specific issues.

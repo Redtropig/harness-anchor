@@ -1,6 +1,6 @@
 ---
 name: feature-state-keeper
-description: Use when starting, advancing, finishing, or blocking a feature. Manages feature_list.json scope record and progress.md/session-handoff.md state files. Enforces Default-FAIL: status='pass' requires non-null evidence.
+description: Use when starting, advancing, finishing, or blocking a feature. Manages feature_list.json + progress.md + session-handoff.md. Default-FAIL enforced.
 ---
 
 # Feature State Keeper
@@ -111,6 +111,15 @@ Aim for ≤ 300 words. The next session should be able to resume from this alone
 - `evidence` MUST be non-null when `status == "pass"` (Default-FAIL invariant)
 
 If the schema file is present, an external validator (e.g. `ajv-cli`) can verify. The agent need not run it — write valid JSON the first time by following the shape above.
+
+## Looking up JSON Schema constraints
+
+For non-trivial schema constructs (`allOf`, `oneOf`, `if/then`, regex patterns):
+
+- **Context7** — `json schema` for the canonical draft-07 / draft-2020-12 spec
+- **WebSearch** — specific keyword + "json schema" for examples
+
+Don't guess schema syntax — `feature_list.schema.json` validation must stay correct.
 
 ## Related
 

@@ -1,6 +1,6 @@
 ---
 name: anti-hallucination-gates
-description: Use before claiming a feature/fix/task is "done", "fixed", "complete", "working", "passing". Enforces Default-FAIL contract — every done criterion needs concrete evidence path. Express calibrated uncertainty when evidence is missing.
+description: Use before claiming "done", "fixed", "complete", "passing". Default-FAIL contract — every criterion needs evidence; express uncertainty if missing.
 ---
 
 # Anti-Hallucination Gates
@@ -103,6 +103,15 @@ If any box is unchecked: state uncertainty explicitly, do NOT flip status to `pa
 - You're about to update `feature_list.json` `status` to `"pass"`
 - You're about to say "the fix should work"
 - The PostToolUse hook injected warnings — do NOT silently ignore them; surface and address per `self-correction-loop`
+
+## Looking up evidence commands for unfamiliar frameworks
+
+When the project uses a test/lint framework you don't have committed to memory (Catch2, doctest, ruff, deno test, etc.):
+
+- **Context7** — fetch the framework's canonical CLI reference
+- **WebSearch** — "framework + test runner output format" usually surfaces what counts as evidence
+
+Bluffing the command and not actually running it is the anti-pattern this skill exists to prevent.
 
 ## Related
 

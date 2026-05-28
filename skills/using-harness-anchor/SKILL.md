@@ -1,6 +1,6 @@
 ---
 name: using-harness-anchor
-description: Use whenever working in a project — establishes state/scope/verification discipline. Auto-loaded at every session start. Defers to user instructions and superpowers; complements rather than overrides.
+description: Use whenever working in a project. Establishes state/scope/verification discipline. Auto-loaded at session start. Complements superpowers.
 ---
 
 # Using harness-anchor
@@ -49,6 +49,7 @@ These are non-negotiable invariants:
 3. **State lives on disk, not in chat.** Update `feature_list.json` / `progress.md` / `session-handoff.md` rather than relying on conversation memory.
 4. **PROJECT-TOC.md before Glob.** It is cheaper for both you and the user.
 5. **Subagents are single-level.** Never invoke a subagent from within a subagent.
+6. **When stuck, search docs first.** Prefer Context7 (structured) over WebSearch (fallback) for unfamiliar tools, APIs, or error messages — don't guess.
 
 ## Commands
 
