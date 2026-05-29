@@ -1,11 +1,12 @@
 # harness-anchor tests
 
-Four test layers, in order of cost:
+Five test layers, in order of cost:
 
 | Layer | What it tests | Speed | Requires Claude session? |
 |---|---|---|---|
-| `scripts/validate-anchor.sh` | Plugin self-consistency: file structure, JSON validity, skill/agent/command frontmatter, hook output shape | <1s | No |
+| `scripts/validate-anchor.sh` | Plugin self-consistency: file structure, JSON validity, skill/agent/command frontmatter (incl. `allowed-tools` shape), hook output shape | <1s | No |
 | `tests/hook-contracts/` | Hook **contract**: given synthetic stdin, hook produces expected JSON | <5s | No |
+| `tests/bench/` | Hook **timing**: wall-clock per hook vs. the 5s budget (invariant #7) | <10s | No |
 | `tests/cpp-detection/` | **Build system detection**: `cpp-detect.sh` correctly identifies CMake/Meson/Make/Bazel | <1s | No |
 | `tests/skill-triggering/` | Skill **triggering**: real Claude session run with naive prompts, verify skill is invoked | 30s-5min per case | **Yes** (claude CLI) |
 
@@ -18,6 +19,7 @@ bash tests/hook-contracts/session-start-banner.sh
 bash tests/hook-contracts/session-start-timeout.sh
 bash tests/hook-contracts/stop-wrap-up.sh
 bash tests/hook-contracts/user-prompt-submit-scope-jump.sh
+bash tests/bench/hook-timing.sh
 for fix in cmake meson make bazel; do
   bash scripts/cpp-detect.sh --target "tests/cpp-detection/$fix-fixture"
 done
@@ -64,6 +66,7 @@ bash tests/skill-triggering/run-all.sh
 - `tests/cpp-detection/{cmake,meson,make,bazel}-fixture/` — minimal projects for verifying `cpp-detect.sh` build-system detection
 - `tests/e2e-cpp-fixture/` — slightly fuller minimal CMake project for `/anchor` + `/cpp-init` + `/verify` end-to-end flow
 - `tests/manifest-fixtures/` — negative JSON fixtures for validating `validate-manifests.sh` error paths
+- `tests/command-fixtures/` — `good-*`/`bad-*` command files for validating `check-allowed-tools.sh` (R4) accept/reject paths
 
 ## CI
 
