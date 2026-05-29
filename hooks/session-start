@@ -86,35 +86,24 @@ except Exception:
         fi
     fi
 
-    # ---- 3. TOC freshness algorithm ----
-    toc_status="absent (run /index-project to create PROJECT-TOC.md)"
+    # ---- 3. TOC freshness (delegated to scripts/toc-freshness.sh, DD5) ----
     toc_file="$PROJECT_DIR/PROJECT-TOC.md"
-    if [ -f "$toc_file" ]; then
-        anchor_commit=$(grep -oE 'generated-at-commit:[[:space:]]*[A-Za-z0-9_]+' "$toc_file" 2>/dev/null | head -1 | awk '{print $NF}' || true)
-        if [ -z "$anchor_commit" ] || [ "$anchor_commit" = "PLACEHOLDER_COMMIT_SHA" ]; then
-            toc_status="present, no commit anchor (run /index-project)"
-        elif (cd "$PROJECT_DIR" && git rev-parse --git-dir >/dev/null 2>&1); then
-            # Verify the anchor commit exists in this repo before diffing.
-            if (cd "$PROJECT_DIR" && git cat-file -t "$anchor_commit" >/dev/null 2>&1); then
-                # Both committed changes since anchor AND working-tree changes count.
-                # Use || default OUTSIDE $() to avoid double-output on pipefail.
-                cc=$(cd "$PROJECT_DIR" && git diff --name-only "$anchor_commit" HEAD 2>/dev/null | wc -l | tr -d ' ') || cc=0
-                wc_=$(cd "$PROJECT_DIR" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ') || wc_=0
-                # Sanitize: ensure numeric-only (strip any stray whitespace/newlines).
-                cc=$(printf '%s' "$cc" | tr -cd '0-9') ; cc="${cc:-0}"
-                wc_=$(printf '%s' "$wc_" | tr -cd '0-9') ; wc_="${wc_:-0}"
-                total=$((cc + wc_))
-                if [ "$total" -eq 0 ]; then
-                    toc_status="fresh (anchor $anchor_commit)"
-                else
-                    toc_status="stale ($total file(s) changed since anchor $anchor_commit; run /index-project)"
-                fi
-            else
-                toc_status="present, stale anchor commit (run /index-project)"
-            fi
-        else
-            toc_status="present, not a git repo (cannot verify freshness)"
-        fi
+    freshness_script="${PLUGIN_ROOT}/scripts/toc-freshness.sh"
+    toc_status=""
+    if [ -x "$freshness_script" ]; then
+        raw_status=$($to_cmd bash "$freshness_script" "$PROJECT_DIR" 2>/dev/null || true)
+        case "$raw_status" in
+            absent*)    toc_status="absent (run /index-project to create PROJECT-TOC.md)" ;;
+            no-anchor*) toc_status="present, no valid commit anchor (run /index-project)" ;;
+            not-git*)   toc_status="present, not a git repo (cannot verify freshness)" ;;
+            fresh*)     toc_status="$raw_status" ;;
+            stale*)     # Add "; run /index-project" before the closing paren.
+                         toc_status="${raw_status%)}; run /index-project)" ;;
+            *)          toc_status="present (freshness unknown)" ;;
+        esac
+    fi
+    if [ -z "$toc_status" ]; then
+        toc_status="absent (run /index-project to create PROJECT-TOC.md)"
     fi
 
     # ---- 4. Session handoff head ----
