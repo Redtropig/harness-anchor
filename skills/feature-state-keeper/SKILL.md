@@ -123,3 +123,13 @@ Typical entry query: `json schema <construct>` (e.g. `json schema if then else`)
 - For evidence-gathering procedure → `anti-hallucination-gates` skill
 - For end-of-session ritual → `/session-end` command
 - For project index → `project-indexing` skill
+- For quick read-only overview → `/status` command
+
+## Committing as features advance
+
+Each feature status flip (planned → in-progress → pass / blocked) should be its own commit:
+
+1. **Commit on status change.** When you update `feature_list.json` to flip a feature's status, commit immediately with a message like `feat(engine-init): start` or `feat(engine-init): mark pass`.
+2. **Never bundle unrelated changes.** A status-flip commit should only contain `feature_list.json` + `progress.md` (if updated). Code changes go in their own commits. (Mirrors CLAUDE.md: "never bundle unrelated layers in one commit".)
+3. **Branch/PR discipline is superpowers' domain.** Don't reinvent — defer to superpowers' `requesting-code-review` and `finishing-a-development-branch` skills for branching, PRs, and merge strategies.
+4. **Unfamiliar git commands?** Use `docs-lookup` skill — don't guess flags or syntax.

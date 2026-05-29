@@ -58,6 +58,7 @@ These are non-negotiable invariants:
 - `/index-project` — (re)build PROJECT-TOC.md
 - `/verify` — run full verification suite (build / lint / tests)
 - `/session-end` — write structured handoff for next session
+- `/status` — read-only project overview (active feature, counts, git tree, TOC freshness, handoff head)
 - `/cpp-init` — initialize C/C++ project-specific config (clang-format/.clang-tidy)
 
 ## When to NOT use this

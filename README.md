@@ -90,6 +90,7 @@ bash init.sh     # health-check the environment
 | `/index-project` | (Re)builds `PROJECT-TOC.md` from git-tracked sources |
 | `/verify` | Dispatches `verification-runner` for fresh-context evaluation |
 | `/session-end` | Writes structured handoff + appends `progress.md` + offers commit |
+| `/status` | Read-only project overview: active feature, counts, git tree, TOC freshness, handoff head |
 
 ## Hooks (4 — all warn-only, never block)
 
