@@ -53,16 +53,15 @@ chmod +x "$REAL_DETECT"
 # ---- Create a PATH that shadows timeout/gtimeout (disable per-command shim) ----
 NO_TIMEOUT_DIR=$(mktemp -d)
 
-# no-op timeout wrapper: just runs the command with no time limit
+# no-op timeout wrapper: runs the command with no time limit.
+# Strip ONLY a leading numeric duration (the "3" in `timeout 3 bash script`),
+# then exec the rest verbatim. (The old `shift; shift` also dropped the command
+# word and only worked incidentally because the script was directly executable.)
 cat > "$NO_TIMEOUT_DIR/timeout" <<'NOOP'
 #!/usr/bin/env bash
-# Shadow: run the command with no time limit — shift past the duration arg
-while [ $# -gt 0 ]; do
-    case "$1" in
-        [0-9]*) shift; shift ;;   # skip "3" (duration) then the real command starts after
-        *) break ;;
-    esac
-done
+case "${1:-}" in
+    [0-9]*) shift ;;
+esac
 exec "$@"
 NOOP
 chmod +x "$NO_TIMEOUT_DIR/timeout"
