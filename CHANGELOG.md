@@ -34,7 +34,7 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 - **Layer E — E2E fixture + observability:**
   - Expanded `tests/e2e-cpp-fixture/`: 3 features (planned/in-progress/pass), C++ sources, gtest, full state files, `.clang-format`/`.clang-tidy` (`d64eab5`)
   - `tests/e2e-cpp-fixture/bootstrap.sh` — creates isolated git repo from fixture (`d64eab5`)
-  - `scripts/measure-context.sh` — measures SessionStart output vs 8000-char cap (currently 62%) (`d64eab5`)
+  - `scripts/measure-context.sh` — measures SessionStart output against the 8000-char cap (exit 1 if exceeded, warn at 90%) (`d64eab5`)
 
 - **Layer F — Docs:**
   - `CHANGELOG.md` (this file) — Keep-a-Changelog format
