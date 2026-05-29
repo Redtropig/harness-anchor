@@ -45,6 +45,9 @@ jobs:
       - name: Manifest negative fixtures
         run: bash scripts/validate-manifests.sh --fixtures tests/manifest-fixtures
 
+      - name: Command frontmatter negative fixtures
+        run: bash scripts/check-allowed-tools.sh --fixtures tests/command-fixtures
+
       - name: Hook contracts
         run: |
           bash tests/hook-contracts/post-tool-use-warn.sh
@@ -85,6 +88,9 @@ jobs:
 
       - name: Context budget measurement
         run: bash scripts/measure-context.sh
+
+      - name: Hook timing benchmark
+        run: bash tests/bench/hook-timing.sh
 
       - name: cpp-detect — fixture coverage
         shell: bash

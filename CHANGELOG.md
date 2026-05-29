@@ -4,6 +4,13 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-29
+
+### Added
+
+- **R4 — command `allowed-tools` shape validation:** `scripts/check-allowed-tools.sh` is the single source of truth for the rule that every `commands/*.md` must declare an `allowed-tools:` line shaped as a comma-separated list of tool-name tokens (identifier + optional `(scope)`, e.g. `Bash(git diff:*)`; MCP names allowed). It validates *shape, not membership* — no hard-coded tool registry to go stale. Wired into `validate-anchor.sh [6/9]` for real commands; negative fixtures under `tests/command-fixtures/` exercised by a new CI step.
+- **P1 — hook wall-clock benchmark:** `tests/bench/hook-timing.sh` bootstraps the e2e fixture and times all four hooks against a time budget (warn ≥2s, fail ≥5s), guarding invariant #7 the way `measure-context.sh` guards the byte budget (invariant #2). Runs on both CI arms.
+
 ## [0.2.0] - 2026-05-29
 
 ### Added
@@ -73,6 +80,7 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Redtropig/harness-anchor/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Redtropig/harness-anchor/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Redtropig/harness-anchor/releases/tag/v0.1.0
