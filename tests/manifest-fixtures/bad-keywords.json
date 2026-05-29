@@ -1,0 +1,6 @@
+{
+  "name": "bad-keywords",
+  "description": "keywords contain non-strings",
+  "version": "1.0.0",
+  "keywords": ["valid", 123, true]
+}

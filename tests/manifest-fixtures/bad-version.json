@@ -1,0 +1,5 @@
+{
+  "name": "bad-version",
+  "description": "version not semver",
+  "version": "v1.0"
+}

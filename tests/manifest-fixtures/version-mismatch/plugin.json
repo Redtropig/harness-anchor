@@ -1,0 +1,5 @@
+{
+  "name": "version-mismatch-plugin",
+  "description": "plugin.json version differs from marketplace",
+  "version": "1.0.0"
+}

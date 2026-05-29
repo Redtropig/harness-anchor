@@ -1,0 +1,12 @@
+{
+  "name": "version-mismatch-marketplace",
+  "description": "marketplace version differs from plugin.json",
+  "plugins": [
+    {
+      "name": "version-mismatch-plugin",
+      "description": "marketplace has different version",
+      "version": "2.0.0",
+      "source": "./"
+    }
+  ]
+}

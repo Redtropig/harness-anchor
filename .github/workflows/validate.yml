@@ -15,9 +15,12 @@ permissions:
 
 jobs:
   fast-tests:
-    name: Fast self-tests (no Claude session required)
-    runs-on: ubuntu-latest
+    name: Fast self-tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 5
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
 
     steps:
       - name: Checkout
@@ -36,8 +39,22 @@ jobs:
       - name: Plugin self-consistency (validate-anchor)
         run: bash scripts/validate-anchor.sh
 
-      - name: Hook contract (post-tool-use-warn)
-        run: bash tests/hook-contracts/post-tool-use-warn.sh
+      - name: Manifest validation (validate-manifests)
+        run: bash scripts/validate-manifests.sh
+
+      - name: Manifest negative fixtures
+        run: bash scripts/validate-manifests.sh --fixtures tests/manifest-fixtures
+
+      - name: Hook contracts
+        run: |
+          bash tests/hook-contracts/post-tool-use-warn.sh
+          bash tests/hook-contracts/session-start-banner.sh
+          bash tests/hook-contracts/session-start-timeout.sh
+          bash tests/hook-contracts/stop-wrap-up.sh
+          bash tests/hook-contracts/user-prompt-submit-scope-jump.sh
+
+      - name: POSIX compatibility
+        run: bash tests/posix-compat.sh
 
       - name: cpp-detect — fixture coverage
         shell: bash
