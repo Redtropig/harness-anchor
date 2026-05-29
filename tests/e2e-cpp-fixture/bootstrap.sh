@@ -25,13 +25,19 @@ PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Create a temp directory with a meaningful prefix
 TARGET=$(mktemp -d "${TMPDIR:-/tmp}/harness-anchor-e2e.XXXXXX")
 
-# Copy fixture files (exclude bootstrap.sh and .DS_Store)
+# Copy fixture files (exclude bootstrap.sh and .DS_Store).
+# dotglob is REQUIRED: the default glob '*' skips names beginning with '.',
+# which would silently drop dotfiles the fixture ships (.clang-format,
+# .clang-tidy) and make the CI E2E structural check fail. nullglob guards
+# against a literal '*' if the directory were ever empty.
+shopt -s dotglob nullglob
 for f in "$SCRIPT_DIR"/*; do
     case "$(basename "$f")" in
         bootstrap.sh|.DS_Store) continue ;;
     esac
     cp -R "$f" "$TARGET/"
 done
+shopt -u dotglob nullglob
 
 # Initialize git repo
 cd "$TARGET"
