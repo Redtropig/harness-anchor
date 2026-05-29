@@ -1,7 +1,7 @@
 {
   "name": "harness-anchor",
   "description": "Runtime harness layer for Claude Code: state persistence, scope control, verification gates, C/C++ engineering. Companion to superpowers.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "redtropig"
   },
