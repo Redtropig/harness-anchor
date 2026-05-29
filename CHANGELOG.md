@@ -73,6 +73,6 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/placeholder/harness-anchor/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/placeholder/harness-anchor/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/placeholder/harness-anchor/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Redtropig/harness-anchor/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Redtropig/harness-anchor/releases/tag/v0.1.0
