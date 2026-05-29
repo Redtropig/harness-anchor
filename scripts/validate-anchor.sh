@@ -111,7 +111,7 @@ fi
 echo ""
 
 # ---- 6. Command frontmatter (description, no name required) ----
-echo "[6/9] Command frontmatter (description, ≤500 chars desc)..."
+echo "[6/9] Command frontmatter (description ≤500 chars + allowed-tools shape)..."
 if [ -d commands ]; then
     while IFS= read -r cmd; do
         [ -e "$cmd" ] || continue
@@ -127,6 +127,14 @@ if [ -d commands ]; then
             fail "$cmd: description ${#desc} chars > 500"
         else
             ok "$cmd description ${#desc} chars"
+        fi
+        # allowed-tools shape (R4) — delegate to the shared single-source validator
+        # so the rule can never drift from the negative-fixture CI check.
+        at_result=$(bash scripts/check-allowed-tools.sh "$cmd" 2>/dev/null)
+        if printf '%s' "$at_result" | grep -q '^PASS'; then
+            ok "$cmd allowed-tools shape"
+        else
+            fail "$cmd allowed-tools: ${at_result#FAIL: }"
         fi
     done < <(find commands -name '*.md' 2>/dev/null)
 else
