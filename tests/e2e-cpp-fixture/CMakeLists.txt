@@ -8,13 +8,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_compile_options(-Wall -Wextra)
 
-# Main application
-add_executable(e2e_app
-    src/main.cpp
-    src/engine.cpp
-)
+# Engine as a library — compiled once, linked by BOTH the app and the tests.
+# (PUBLIC include dir propagates to every consumer, so they need no extra
+#  target_include_directories.)
+add_library(engine STATIC src/engine.cpp)
+target_include_directories(engine PUBLIC include)
 
-target_include_directories(e2e_app PRIVATE include)
+# Main application
+add_executable(e2e_app src/main.cpp)
+target_link_libraries(e2e_app PRIVATE engine)
 
 # Test executable (gtest via FetchContent)
 include(FetchContent)
@@ -28,9 +30,9 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
+# Tests link the engine library (so Engine symbols resolve) + gtest_main.
 add_executable(e2e_test tests/test_engine.cpp)
-target_link_libraries(e2e_test GTest::gtest_main)
-target_include_directories(e2e_test PRIVATE include)
+target_link_libraries(e2e_test PRIVATE engine GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(e2e_test)
