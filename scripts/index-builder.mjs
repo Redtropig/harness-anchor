@@ -18,7 +18,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, statSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { resolve, join, basename } from 'node:path';
 import { argv, exit } from 'node:process';
 
@@ -110,15 +110,13 @@ function readDecisionsSection(existingPath) {
 }
 
 // ---- error log helper (Layer D) ----
-import { mkdirSync, unlinkSync, writeFileSync as writeFileSyncErr } from 'node:fs';
-
 const ERROR_LOG_DIR = join(TARGET, '.harness-anchor');
 const ERROR_LOG_PATH = join(ERROR_LOG_DIR, 'last-error.log');
 
 function writeErrorLog(message) {
     try {
         mkdirSync(ERROR_LOG_DIR, { recursive: true });
-        writeFileSyncErr(ERROR_LOG_PATH, `[${new Date().toISOString()}] ${message}\n`);
+        writeFileSync(ERROR_LOG_PATH, `[${new Date().toISOString()}] ${message}\n`);
     } catch { /* best effort — never let logging failure mask the real error */ }
 }
 
