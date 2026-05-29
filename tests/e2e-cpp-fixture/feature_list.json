@@ -1,0 +1,51 @@
+{
+  "project": "e2e-cpp-fixture",
+  "description": "Portable CMake fixture demonstrating full harness-anchor lifecycle",
+  "features": [
+    {
+      "id": "cli-parser",
+      "name": "CLI Parser",
+      "description": "Parse command-line arguments for the e2e application",
+      "status": "planned",
+      "done_criteria": [
+        "Parses --help flag",
+        "Returns non-zero on invalid input",
+        "Unit tests pass"
+      ],
+      "evidence": null
+    },
+    {
+      "id": "engine-init",
+      "name": "Engine Initialization",
+      "description": "Initialize and manage the Engine lifecycle",
+      "status": "in-progress",
+      "done_criteria": [
+        "Engine::initialize() returns true",
+        "Engine::shutdown() clears state",
+        "RAII destructor calls shutdown",
+        "Unit tests pass"
+      ],
+      "evidence": null
+    },
+    {
+      "id": "logging",
+      "name": "Logging Infrastructure",
+      "description": "Add fmt-based logging to Engine",
+      "status": "pass",
+      "done_criteria": [
+        "Log messages at info/warn/error levels",
+        "Log output to stderr",
+        "No performance regression (>1ms overhead per call)"
+      ],
+      "evidence": {
+        "timestamp": "2026-05-28T10:30:00Z",
+        "commit": "a1b2c3d4e5f6",
+        "artifacts": [
+          ".build/last-build.log",
+          "test-results/logging.txt"
+        ],
+        "notes": "All logging tests pass; benchmark shows <0.1ms overhead"
+      }
+    }
+  ]
+}

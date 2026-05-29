@@ -1,4 +1,4 @@
-# E2E fixture — a small CMake project for verifying full /anchor + /cpp-init + /verify flow.
+# E2E fixture — portable CMake project for full /anchor → /cpp-init → work → /verify → /session-end lifecycle.
 cmake_minimum_required(VERSION 3.20)
 project(e2e_cpp_fixture CXX)
 
@@ -8,4 +8,29 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_compile_options(-Wall -Wextra)
 
-add_executable(e2e_app src/main.cpp)
+# Main application
+add_executable(e2e_app
+    src/main.cpp
+    src/engine.cpp
+)
+
+target_include_directories(e2e_app PRIVATE include)
+
+# Test executable (gtest via FetchContent)
+include(FetchContent)
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG        v1.14.0
+)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+enable_testing()
+
+add_executable(e2e_test tests/test_engine.cpp)
+target_link_libraries(e2e_test GTest::gtest_main)
+target_include_directories(e2e_test PRIVATE include)
+
+include(GoogleTest)
+gtest_discover_tests(e2e_test)

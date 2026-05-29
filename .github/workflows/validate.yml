@@ -56,6 +56,36 @@ jobs:
       - name: POSIX compatibility
         run: bash tests/posix-compat.sh
 
+      - name: E2E fixture structural checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          FIXTURE_DIR=$(bash tests/e2e-cpp-fixture/bootstrap.sh)
+          echo "Fixture: $FIXTURE_DIR"
+          # Verify key files exist
+          for f in feature_list.json AGENTS.md init.sh PROJECT-TOC.md session-handoff.md progress.md .clang-format .clang-tidy CMakeLists.txt; do
+            test -f "$FIXTURE_DIR/$f"
+            echo "OK $f present"
+          done
+          # Verify feature_list.json parses and validates
+          python3 -c "
+          import json, re, sys
+          with open('$FIXTURE_DIR/feature_list.json') as f:
+              data = json.load(f)
+          assert data.get('project'), 'missing project'
+          assert len(data.get('features', [])) == 3, 'expected 3 features'
+          for feat in data['features']:
+              for field in ['id', 'name', 'description', 'status', 'done_criteria']:
+                  assert field in feat, f'missing {field} in {feat.get(\"id\")}'
+              assert re.match(r'^[a-z0-9][a-z0-9-]*$', feat['id']), f'bad id: {feat[\"id\"]}'
+              if feat['status'] == 'pass':
+                  assert feat.get('evidence') is not None, f'{feat[\"id\"]} pass but evidence null'
+          print('OK feature_list.json valid')
+          "
+
+      - name: Context budget measurement
+        run: bash scripts/measure-context.sh
+
       - name: cpp-detect — fixture coverage
         shell: bash
         run: |
