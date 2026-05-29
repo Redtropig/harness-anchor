@@ -41,7 +41,7 @@ Hooks are the **most dangerous** component because they fire automatically. Befo
 1. State why this can't be a skill instead.
 2. Provide a concrete failure mode being prevented.
 3. Implement timeout, silent fail, and bounded output.
-4. Add a contract test under `tests/self-correction/`.
+4. Add a contract test under `tests/hook-contracts/`.
 
 ## Authoring a Subagent
 

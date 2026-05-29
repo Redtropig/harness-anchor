@@ -128,7 +128,7 @@ bash init.sh     # health-check the environment
 
 ```bash
 bash scripts/validate-anchor.sh        # 53 self-consistency checks
-bash tests/self-correction/post-edit-warn.sh  # PostToolUse hook contract
+bash tests/hook-contracts/post-tool-use-warn.sh  # PostToolUse hook contract
 bash scripts/cpp-detect.sh --target tests/cpp-detection/cmake-fixture
                                        # cpp-detect on a known fixture
 ```

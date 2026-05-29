@@ -12,6 +12,7 @@
 #   - Token budget ≤ 2000 (~ 8000 chars). Skill body truncated to fit.
 #   - Defensive: every sub-check fails silently, never aborts the hook.
 #   - sub-commands wall-clocked to 3s where possible.
+#   - Total watchdog: 5s cap (R1). On timeout, emit nothing, exit 0 (warn-only).
 
 set -uo pipefail
 
@@ -38,11 +39,13 @@ if   command -v timeout  >/dev/null 2>&1; then to_cmd="timeout 3"
 elif command -v gtimeout >/dev/null 2>&1; then to_cmd="gtimeout 3"
 fi
 
-# ---- 1. Active feature from feature_list.json ----
-active_feature="none (run /anchor to scaffold)"
-flist="$PROJECT_DIR/feature_list.json"
-if [ -f "$flist" ]; then
-    af=$(python3 - "$flist" <<'PY' 2>/dev/null || true
+# ---- main() — assembles full output, writes to tempfile ----
+main() {
+    # ---- 1. Active feature from feature_list.json ----
+    active_feature="none (run /anchor to scaffold)"
+    flist="$PROJECT_DIR/feature_list.json"
+    if [ -f "$flist" ]; then
+        af=$(python3 - "$flist" <<'PY' 2>/dev/null || true
 import json, sys
 try:
     with open(sys.argv[1]) as f:
@@ -57,16 +60,16 @@ except Exception:
     pass
 PY
 )
-    [ -n "$af" ] && active_feature="$af"
-fi
+        [ -n "$af" ] && active_feature="$af"
+    fi
 
-# ---- 2. Project type via cpp-detect.sh ----
-project_type="generic"
-detect_script="${PLUGIN_ROOT}/scripts/cpp-detect.sh"
-if [ -x "$detect_script" ]; then
-    cpp_json=$($to_cmd bash "$detect_script" --target "$PROJECT_DIR" 2>/dev/null || true)
-    if [ -n "$cpp_json" ]; then
-        parsed=$(printf '%s' "$cpp_json" | python3 -c "
+    # ---- 2. Project type via cpp-detect.sh ----
+    project_type="generic"
+    detect_script="${PLUGIN_ROOT}/scripts/cpp-detect.sh"
+    if [ -x "$detect_script" ]; then
+        cpp_json=$($to_cmd bash "$detect_script" --target "$PROJECT_DIR" 2>/dev/null || true)
+        if [ -n "$cpp_json" ]; then
+            parsed=$(printf '%s' "$cpp_json" | python3 -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -79,145 +82,192 @@ try:
 except Exception:
     print('generic')
 " 2>/dev/null || echo "generic")
-        [ -n "$parsed" ] && project_type="$parsed"
-    fi
-fi
-
-# ---- 3. TOC freshness algorithm ----
-toc_status="absent (run /index-project to create PROJECT-TOC.md)"
-toc_file="$PROJECT_DIR/PROJECT-TOC.md"
-if [ -f "$toc_file" ]; then
-    anchor_commit=$(grep -oE 'generated-at-commit:[[:space:]]*[A-Za-z0-9]+' "$toc_file" 2>/dev/null | head -1 | awk '{print $NF}' || true)
-    if [ -z "$anchor_commit" ] || [ "$anchor_commit" = "PLACEHOLDER_COMMIT_SHA" ]; then
-        toc_status="present, no commit anchor (run /index-project)"
-    elif (cd "$PROJECT_DIR" && git rev-parse --git-dir >/dev/null 2>&1); then
-        # Both committed changes since anchor AND working-tree changes count.
-        cc=$(cd "$PROJECT_DIR" && git diff --name-only "$anchor_commit" HEAD 2>/dev/null | wc -l | tr -d ' ' || echo 0)
-        wc_=$(cd "$PROJECT_DIR" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ' || echo 0)
-        total=$((cc + wc_))
-        if [ "$total" -eq 0 ]; then
-            toc_status="fresh (anchor $anchor_commit)"
-        else
-            toc_status="stale ($total file(s) changed since anchor $anchor_commit; run /index-project)"
+            [ -n "$parsed" ] && project_type="$parsed"
         fi
-    else
-        toc_status="present, not a git repo (cannot verify freshness)"
     fi
-fi
 
-# ---- 4. Session handoff head ----
-handoff_head=""
-handoff_file="$PROJECT_DIR/session-handoff.md"
-if [ -f "$handoff_file" ]; then
-    handoff_head=$(head -n 10 "$handoff_file" 2>/dev/null || true)
-fi
+    # ---- 3. TOC freshness algorithm ----
+    toc_status="absent (run /index-project to create PROJECT-TOC.md)"
+    toc_file="$PROJECT_DIR/PROJECT-TOC.md"
+    if [ -f "$toc_file" ]; then
+        anchor_commit=$(grep -oE 'generated-at-commit:[[:space:]]*[A-Za-z0-9_]+' "$toc_file" 2>/dev/null | head -1 | awk '{print $NF}' || true)
+        if [ -z "$anchor_commit" ] || [ "$anchor_commit" = "PLACEHOLDER_COMMIT_SHA" ]; then
+            toc_status="present, no commit anchor (run /index-project)"
+        elif (cd "$PROJECT_DIR" && git rev-parse --git-dir >/dev/null 2>&1); then
+            # Verify the anchor commit exists in this repo before diffing.
+            if (cd "$PROJECT_DIR" && git cat-file -t "$anchor_commit" >/dev/null 2>&1); then
+                # Both committed changes since anchor AND working-tree changes count.
+                # Use || default OUTSIDE $() to avoid double-output on pipefail.
+                cc=$(cd "$PROJECT_DIR" && git diff --name-only "$anchor_commit" HEAD 2>/dev/null | wc -l | tr -d ' ') || cc=0
+                wc_=$(cd "$PROJECT_DIR" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ') || wc_=0
+                # Sanitize: ensure numeric-only (strip any stray whitespace/newlines).
+                cc=$(printf '%s' "$cc" | tr -cd '0-9') ; cc="${cc:-0}"
+                wc_=$(printf '%s' "$wc_" | tr -cd '0-9') ; wc_="${wc_:-0}"
+                total=$((cc + wc_))
+                if [ "$total" -eq 0 ]; then
+                    toc_status="fresh (anchor $anchor_commit)"
+                else
+                    toc_status="stale ($total file(s) changed since anchor $anchor_commit; run /index-project)"
+                fi
+            else
+                toc_status="present, stale anchor commit (run /index-project)"
+            fi
+        else
+            toc_status="present, not a git repo (cannot verify freshness)"
+        fi
+    fi
 
-# ---- 5. Assemble banner ----
-banner="<harness-anchor-state>
-Plugin:           harness-anchor v0.1.0
+    # ---- 4. Session handoff head ----
+    handoff_head=""
+    handoff_file="$PROJECT_DIR/session-handoff.md"
+    if [ -f "$handoff_file" ]; then
+        handoff_head=$(head -n 10 "$handoff_file" 2>/dev/null || true)
+    fi
+
+    # ---- 5. Assemble banner ----
+    # Read version from plugin.json at runtime (DD1 — de-hardcode version).
+    plugin_version="unknown"
+    if [ -f "${PLUGIN_ROOT}/.claude-plugin/plugin.json" ]; then
+        pv=$(python3 -c "
+import json, sys
+try:
+    with open('${PLUGIN_ROOT}/.claude-plugin/plugin.json') as f:
+        print(json.load(f).get('version', 'unknown'))
+except Exception:
+    pass
+" 2>/dev/null || true)
+        [ -n "$pv" ] && plugin_version="$pv"
+    fi
+
+    banner="<harness-anchor-state>
+Plugin:           harness-anchor v${plugin_version}
 Project root:     ${PROJECT_DIR}
 Active feature:   ${active_feature}
 Project type:     ${project_type}
 TOC freshness:    ${toc_status}"
 
-if [ -n "$handoff_head" ]; then
-    banner="${banner}
+    if [ -n "$handoff_head" ]; then
+        banner="${banner}
 Last session handoff (first 10 lines):
 ${handoff_head}"
-else
-    banner="${banner}
+    else
+        banner="${banner}
 Last session handoff: (no session-handoff.md — run /anchor or /session-end)"
-fi
+    fi
 
-banner="${banner}
+    banner="${banner}
 </harness-anchor-state>
 
 "
 
-# ---- 6. Read PROJECT-TOC.md "## Files" section (Tier 1 navigation index) ----
-# Per plan §1: Tier 1 should include "PROJECT-TOC.md 前 N 行（每文件一行，N 动态调整使总和 < 上限）"
-toc_block=""
-toc_files_section=""
-if [ -f "$toc_file" ]; then
-    # Extract lines between "## Files" header and the next "## " header (or EOF).
-    toc_files_section=$(awk '/^## Files/{flag=1; next} /^## /{flag=0} flag' "$toc_file" 2>/dev/null || true)
-    # Strip leading/trailing blank lines
-    toc_files_section=$(printf '%s' "$toc_files_section" | awk 'NF{p=1} p' | awk 'BEGIN{lines=""} {lines=lines $0 "\n"} END{sub(/\n+$/, "", lines); print lines}')
-    if [ -n "$toc_files_section" ]; then
-        toc_block="<project-toc>
+    # ---- 6. Read PROJECT-TOC.md "## Files" section (Tier 1 navigation index) ----
+    # Per plan §1: Tier 1 should include "PROJECT-TOC.md 前 N 行（每文件一行，N 动态调整使总和 < 上限）"
+    toc_block=""
+    toc_files_section=""
+    if [ -f "$toc_file" ]; then
+        # Extract lines between "## Files" header and the next "## " header (or EOF).
+        toc_files_section=$(awk '/^## Files/{flag=1; next} /^## /{flag=0} flag' "$toc_file" 2>/dev/null || true)
+        # Strip leading/trailing blank lines
+        toc_files_section=$(printf '%s' "$toc_files_section" | awk 'NF{p=1} p' | awk 'BEGIN{lines=""} {lines=lines $0 "\n"} END{sub(/\n+$/, "", lines); print lines}')
+        if [ -n "$toc_files_section" ]; then
+            toc_block="<project-toc>
 ${toc_files_section}
 </project-toc>
 
 "
+        fi
     fi
-fi
 
-# ---- 7. Read meta-skill body ----
-skill_content=""
-if [ -f "$SKILL_FILE" ]; then
-    skill_content="$(cat "$SKILL_FILE")"
-else
-    skill_content="(using-harness-anchor SKILL.md missing — plugin install incomplete)"
-fi
+    # ---- 7. Read meta-skill body ----
+    skill_content=""
+    if [ -f "$SKILL_FILE" ]; then
+        skill_content="$(cat "$SKILL_FILE")"
+    else
+        skill_content="(using-harness-anchor SKILL.md missing — plugin install incomplete)"
+    fi
 
-# ---- 8. Combine + token budget hard cap (≤ ~2000 tokens ≈ 8000 chars) ----
-# Priority for truncation: banner (always full) → skill body → toc head (drop first).
-MAX_CHARS=8000
-banner_len=${#banner}
-skill_len=${#skill_content}
+    # ---- 8. Combine + token budget hard cap (≤ ~2000 tokens ≈ 8000 chars) ----
+    # Priority for truncation: banner (always full) → skill body → toc head (drop first).
+    MAX_CHARS=8000
+    banner_len=${#banner}
+    skill_len=${#skill_content}
 
-# Compute budget for TOC = remaining after banner + skill + 200-char buffer for markers
-toc_budget=$((MAX_CHARS - banner_len - skill_len - 200))
+    # Compute budget for TOC = remaining after banner + skill + 200-char buffer for markers
+    toc_budget=$((MAX_CHARS - banner_len - skill_len - 200))
 
-if [ -n "$toc_block" ]; then
-    if [ "$toc_budget" -lt 250 ]; then
-        # Not enough room for meaningful TOC head; drop it.
-        toc_block=""
-    elif [ "${#toc_block}" -gt "$toc_budget" ]; then
-        # Truncate TOC content to fit budget; preserve block wrapper + add pointer.
-        truncated_files="${toc_files_section:0:$toc_budget}"
-        # Trim to last complete line so we don't cut mid-entry
-        truncated_files="${truncated_files%$'\n'*}"
-        toc_block="<project-toc>
+    if [ -n "$toc_block" ]; then
+        if [ "$toc_budget" -lt 250 ]; then
+            # Not enough room for meaningful TOC head; drop it.
+            toc_block=""
+        elif [ "${#toc_block}" -gt "$toc_budget" ]; then
+            # Truncate TOC content to fit budget; preserve block wrapper + add pointer.
+            truncated_files="${toc_files_section:0:$toc_budget}"
+            # Trim to last complete line so we don't cut mid-entry
+            truncated_files="${truncated_files%$'\n'*}"
+            toc_block="<project-toc>
 ${truncated_files}
 <see PROJECT-TOC.md for full index>
 </project-toc>
 
 "
+        fi
     fi
-fi
 
-combined="${banner}${toc_block}${skill_content}"
+    combined="${banner}${toc_block}${skill_content}"
 
-# Final safety: if skill body itself is enormous, truncate it.
-if [ "${#combined}" -gt "$MAX_CHARS" ]; then
-    marker="
+    # Final safety: if skill body itself is enormous, truncate it.
+    if [ "${#combined}" -gt "$MAX_CHARS" ]; then
+        marker="
 
 <truncated — see ${SKILL_FILE} for full content>"
-    marker_len=${#marker}
-    skill_budget=$((MAX_CHARS - banner_len - ${#toc_block} - marker_len))
-    if [ "$skill_budget" -gt 0 ]; then
-        combined="${banner}${toc_block}${skill_content:0:$skill_budget}${marker}"
-    else
-        # Worst-case: even banner+TOC alone exceeds cap. Emit raw cap.
-        combined="${combined:0:$MAX_CHARS}"
+        marker_len=${#marker}
+        skill_budget=$((MAX_CHARS - banner_len - ${#toc_block} - marker_len))
+        if [ "$skill_budget" -gt 0 ]; then
+            combined="${banner}${toc_block}${skill_content:0:$skill_budget}${marker}"
+        else
+            # Worst-case: even banner+TOC alone exceeds cap. Emit raw cap.
+            combined="${combined:0:$MAX_CHARS}"
+        fi
     fi
-fi
 
-# ---- 9. JSON-escape (pure bash, no jq dependency) ----
-escape_for_json() {
-    local s="$1"
-    s="${s//\\/\\\\}"
-    s="${s//\"/\\\"}"
-    s="${s//$'\n'/\\n}"
-    s="${s//$'\r'/\\r}"
-    s="${s//$'\t'/\\t}"
-    printf '%s' "$s"
+    # ---- 9. JSON-escape (pure bash, no jq dependency) ----
+    escape_for_json() {
+        local s="$1"
+        s="${s//\\/\\\\}"
+        s="${s//\"/\\\"}"
+        s="${s//$'\n'/\\n}"
+        s="${s//$'\r'/\\r}"
+        s="${s//$'\t'/\\t}"
+        printf '%s' "$s"
+    }
+
+    context="$(escape_for_json "$combined")"
+
+    # ---- 10. Emit to stdout (parent captures via redirect for R1) ----
+    printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
 }
 
-context="$(escape_for_json "$combined")"
+# ---- R1: Total watchdog (5s cap, tempfile-guarded) ----
+# Run main() with stdout redirected to a tempfile; if it exceeds 5s, kill it
+# and emit nothing. Only emit the tempfile if main() exited cleanly (rc=0).
+# This avoids the partial-JSON pitfall: a mid-write kill would produce truncated
+# JSON, so we buffer to file and only release the full output on success.
+OUTPUT_FILE=$(mktemp)
+main > "$OUTPUT_FILE" 2>/dev/null &
+main_pid=$!
 
-# ---- 10. Emit Claude Code SessionStart JSON (silently injected as additionalContext) ----
-printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
+# Watchdog: kill main after 5 seconds
+( sleep 5 && kill -TERM $main_pid 2>/dev/null ) &
+watchdog_pid=$!
+
+wait $main_pid 2>/dev/null
+main_rc=$?
+kill $watchdog_pid 2>/dev/null
+wait $watchdog_pid 2>/dev/null
+
+if [ "$main_rc" -eq 0 ] && [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then
+    cat "$OUTPUT_FILE"
+fi
+rm -f "$OUTPUT_FILE" 2>/dev/null
 
 exit 0

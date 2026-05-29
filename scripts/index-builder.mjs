@@ -109,40 +109,57 @@ function readDecisionsSection(existingPath) {
     return m ? m[0] : '';
 }
 
-// ---- main ----
-if (!inGitRepo()) {
-    console.error('FATAL: target is not a git repository:', TARGET);
-    exit(2);
-}
+// ---- error log helper (Layer D) ----
+import { mkdirSync, unlinkSync, writeFileSync as writeFileSyncErr } from 'node:fs';
 
-const head = git('rev-parse', 'HEAD').slice(0, 12);
-const files = git('ls-files').split('\n').filter(Boolean);
+const ERROR_LOG_DIR = join(TARGET, '.harness-anchor');
+const ERROR_LOG_PATH = join(ERROR_LOG_DIR, 'last-error.log');
 
-const entries = [];
-let skipped = 0;
-for (const rel of files) {
-    if (shouldSkip(rel)) { skipped++; continue; }
-    const abs = join(TARGET, rel);
+function writeErrorLog(message) {
     try {
-        const st = statSync(abs);
-        if (!st.isFile()) continue;
-        if (st.size > MAX_BYTES) { skipped++; continue; }
-        const buf = readFileSync(abs);
-        if (isProbablyBinary(buf)) { skipped++; continue; }
-        const content = buf.toString('utf8');
-        const summary = extractSummary(content, rel);
-        entries.push({ rel, summary });
-    } catch {
-        skipped++;
-    }
+        mkdirSync(ERROR_LOG_DIR, { recursive: true });
+        writeFileSyncErr(ERROR_LOG_PATH, `[${new Date().toISOString()}] ${message}\n`);
+    } catch { /* best effort — never let logging failure mask the real error */ }
 }
 
-entries.sort((a, b) => a.rel.localeCompare(b.rel));
+function clearErrorLog() {
+    try { unlinkSync(ERROR_LOG_PATH); } catch { /* not present = fine */ }
+}
 
-const decisionsSection = readDecisionsSection(OUTPUT) ||
-    '## Decisions\n\n<!-- Long-lived design decisions; one line each.\n- 2026-05-15: example decision (see docs/decisions/0001.md)\n-->\n';
+// ---- main ----
+try {
+    if (!inGitRepo()) {
+        throw new Error(`target is not a git repository: ${TARGET}`);
+    }
 
-const header = `<!-- generated-at-commit: ${head} -->
+    const head = git('rev-parse', 'HEAD').slice(0, 12);
+    const files = git('ls-files').split('\n').filter(Boolean);
+
+    const entries = [];
+    let skipped = 0;
+    for (const rel of files) {
+        if (shouldSkip(rel)) { skipped++; continue; }
+        const abs = join(TARGET, rel);
+        try {
+            const st = statSync(abs);
+            if (!st.isFile()) continue;
+            if (st.size > MAX_BYTES) { skipped++; continue; }
+            const buf = readFileSync(abs);
+            if (isProbablyBinary(buf)) { skipped++; continue; }
+            const content = buf.toString('utf8');
+            const summary = extractSummary(content, rel);
+            entries.push({ rel, summary });
+        } catch {
+            skipped++;
+        }
+    }
+
+    entries.sort((a, b) => a.rel.localeCompare(b.rel));
+
+    const decisionsSection = readDecisionsSection(OUTPUT) ||
+        '## Decisions\n\n<!-- Long-lived design decisions; one line each.\n- 2026-05-15: example decision (see docs/decisions/0001.md)\n-->\n';
+
+    const header = `<!-- generated-at-commit: ${head} -->
 <!-- DO NOT EDIT BY HAND — run /index-project or scripts/index-builder.mjs -->
 
 # PROJECT TOC
@@ -155,5 +172,11 @@ ${entries.map(e => `- \`${e.rel}\` — ${e.summary}`).join('\n')}
 
 ${decisionsSection}`;
 
-writeFileSync(OUTPUT, header);
-console.log(`PROJECT-TOC.md regenerated: ${entries.length} files indexed, ${skipped} skipped. Anchor commit: ${head}`);
+    writeFileSync(OUTPUT, header);
+    console.log(`PROJECT-TOC.md regenerated: ${entries.length} files indexed, ${skipped} skipped. Anchor commit: ${head}`);
+    clearErrorLog();  // success → remove stale error log
+} catch (err) {
+    console.error('FATAL:', err.message);
+    writeErrorLog(`index-builder.mjs fatal: ${err.message}\nStack: ${err.stack}`);
+    exit(2);
+}

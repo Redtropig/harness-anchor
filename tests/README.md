@@ -1,24 +1,41 @@
 # harness-anchor tests
 
-Three test layers, in order of cost:
+Four test layers, in order of cost:
 
 | Layer | What it tests | Speed | Requires Claude session? |
 |---|---|---|---|
-| `scripts/validate-anchor.sh` | Plugin self-consistency: file structure, JSON validity, skill frontmatter, hook output shape | <1s | No |
-| `tests/self-correction/` | Hook **contract**: given synthetic stdin, hook produces expected JSON | <2s | No |
+| `scripts/validate-anchor.sh` | Plugin self-consistency: file structure, JSON validity, skill/agent/command frontmatter, hook output shape | <1s | No |
+| `tests/hook-contracts/` | Hook **contract**: given synthetic stdin, hook produces expected JSON | <5s | No |
+| `tests/cpp-detection/` | **Build system detection**: `cpp-detect.sh` correctly identifies CMake/Meson/Make/Bazel | <1s | No |
 | `tests/skill-triggering/` | Skill **triggering**: real Claude session run with naive prompts, verify skill is invoked | 30s-5min per case | **Yes** (claude CLI) |
 
 ## Quick test (no Claude required)
 
 ```bash
 bash scripts/validate-anchor.sh
-bash tests/self-correction/post-edit-warn.sh
+bash tests/hook-contracts/post-tool-use-warn.sh
+bash tests/hook-contracts/session-start-banner.sh
+bash tests/hook-contracts/session-start-timeout.sh
+bash tests/hook-contracts/stop-wrap-up.sh
+bash tests/hook-contracts/user-prompt-submit-scope-jump.sh
 for fix in cmake meson make bazel; do
   bash scripts/cpp-detect.sh --target "tests/cpp-detection/$fix-fixture"
 done
 ```
 
-All three should report PASSED with zero failures.
+All should report PASSED with zero failures.
+
+## Hook contract tests
+
+Each script under `tests/hook-contracts/` tests one hook's behavior:
+
+| Test | Hook | What it verifies |
+|---|---|---|
+| `post-tool-use-warn.sh` | PostToolUse | Regression warning on pass-feature edit; silent for non-anchored dir |
+| `session-start-banner.sh` | SessionStart | Valid JSON with state block; valid JSON even for non-anchored dir |
+| `session-start-timeout.sh` | SessionStart | Total watchdog (R1): caps at ~5s, emits no truncated JSON on timeout |
+| `stop-wrap-up.sh` | Stop | In-progress feature reminder; silent for non-anchored dir |
+| `user-prompt-submit-scope-jump.sh` | UserPromptSubmit | Scope-jump keyword + active feature triggers warning; benign prompt silent |
 
 ## Skill triggering (needs Claude CLI)
 
@@ -46,7 +63,8 @@ bash tests/skill-triggering/run-all.sh
 
 - `tests/cpp-detection/{cmake,meson,make,bazel}-fixture/` — minimal projects for verifying `cpp-detect.sh` build-system detection
 - `tests/e2e-cpp-fixture/` — slightly fuller minimal CMake project for `/anchor` + `/cpp-init` + `/verify` end-to-end flow
+- `tests/manifest-fixtures/` — negative JSON fixtures for validating `validate-manifests.sh` error paths
 
 ## CI
 
-`.github/workflows/validate.yml` runs the **fast** layers (validate-anchor + self-correction + cpp-detection) on every push. Skill-triggering tests are slow and require a Claude session; run them manually before tagging a release.
+`.github/workflows/validate.yml` runs the **fast** layers (validate-anchor + hook-contracts + cpp-detection) on every push. Skill-triggering tests are slow and require a Claude session; run them manually before tagging a release.

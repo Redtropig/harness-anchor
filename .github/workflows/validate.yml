@@ -36,8 +36,8 @@ jobs:
       - name: Plugin self-consistency (validate-anchor)
         run: bash scripts/validate-anchor.sh
 
-      - name: Hook contract (post-edit-warn)
-        run: bash tests/self-correction/post-edit-warn.sh
+      - name: Hook contract (post-tool-use-warn)
+        run: bash tests/hook-contracts/post-tool-use-warn.sh
 
       - name: cpp-detect — fixture coverage
         shell: bash

@@ -29,7 +29,7 @@ echo "Root: $PLUGIN_ROOT"
 echo ""
 
 # ---- 1. Required files ----
-echo "[1/7] Required files..."
+echo "[1/9] Required files..."
 for f in \
     .claude-plugin/plugin.json \
     .claude-plugin/marketplace.json \
@@ -47,8 +47,8 @@ done
 echo ""
 
 # ---- 2. JSON validity ----
-echo "[2/7] JSON parse..."
-for f in $(find . -name '*.json' -not -path './node_modules/*' -not -path './.harness-anchor/*' 2>/dev/null); do
+echo "[2/9] JSON parse..."
+for f in $(find . -name '*.json' -not -path './node_modules/*' -not -path './.harness-anchor/*' -not -path './tests/manifest-fixtures/*' 2>/dev/null); do
     if python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
         ok "parse $f"
     else
@@ -58,7 +58,7 @@ done
 echo ""
 
 # ---- 3 & 4. SKILL.md frontmatter ----
-echo "[3-4/7] SKILL.md frontmatter (name + description, ≤500 chars desc)..."
+echo "[3-4/9] SKILL.md frontmatter (name + description, ≤500 chars desc)..."
 while IFS= read -r skill; do
     if ! head -1 "$skill" | grep -q '^---$'; then
         fail "$skill: missing frontmatter opener"
@@ -81,8 +81,61 @@ while IFS= read -r skill; do
 done < <(find skills -name SKILL.md 2>/dev/null)
 echo ""
 
-# ---- 5. SessionStart hook smoke test ----
-echo "[5/7] SessionStart hook smoke test..."
+# ---- 5. Agent frontmatter (name + description) ----
+echo "[5/9] Agent frontmatter (name + description, ≤500 chars desc)..."
+if [ -d agents ]; then
+    while IFS= read -r agent; do
+        [ -e "$agent" ] || continue
+        if ! head -1 "$agent" | grep -q '^---$'; then
+            fail "$agent: missing frontmatter opener"
+            continue
+        fi
+        name=$(awk '/^---$/{c++; next} c==1 && /^name:/{sub(/^name:[[:space:]]*/,""); print; exit}' "$agent")
+        desc=$(awk '/^---$/{c++; next} c==1 && /^description:/{sub(/^description:[[:space:]]*/,""); print; exit}' "$agent")
+        if [ -z "$name" ]; then
+            fail "$agent: name missing"
+        else
+            ok "$agent name=$name"
+        fi
+        if [ -z "$desc" ]; then
+            fail "$agent: description missing"
+        elif [ "${#desc}" -gt 500 ]; then
+            fail "$agent: description ${#desc} chars > 500"
+        else
+            ok "$agent description ${#desc} chars"
+        fi
+    done < <(find agents -name '*.md' 2>/dev/null)
+else
+    warn "no agents/ directory"
+fi
+echo ""
+
+# ---- 6. Command frontmatter (description, no name required) ----
+echo "[6/9] Command frontmatter (description, ≤500 chars desc)..."
+if [ -d commands ]; then
+    while IFS= read -r cmd; do
+        [ -e "$cmd" ] || continue
+        if ! head -1 "$cmd" | grep -q '^---$'; then
+            fail "$cmd: missing frontmatter opener"
+            continue
+        fi
+        # Commands do NOT have a `name` field — the filename IS the name.
+        desc=$(awk '/^---$/{c++; next} c==1 && /^description:/{sub(/^description:[[:space:]]*/,""); print; exit}' "$cmd")
+        if [ -z "$desc" ]; then
+            fail "$cmd: description missing"
+        elif [ "${#desc}" -gt 500 ]; then
+            fail "$cmd: description ${#desc} chars > 500"
+        else
+            ok "$cmd description ${#desc} chars"
+        fi
+    done < <(find commands -name '*.md' 2>/dev/null)
+else
+    warn "no commands/ directory"
+fi
+echo ""
+
+# ---- 7. SessionStart hook smoke test ----
+echo "[7/9] SessionStart hook smoke test..."
 if [ -x hooks/session-start ]; then
     if out=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash hooks/session-start 2>/dev/null) && \
        echo "$out" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'hookSpecificOutput' in d, 'missing hookSpecificOutput'; assert d['hookSpecificOutput'].get('hookEventName')=='SessionStart'" 2>/dev/null; then
@@ -95,8 +148,8 @@ else
 fi
 echo ""
 
-# ---- 6. Commands referenced ----
-echo "[6/7] Commands directory consistency..."
+# ---- 8. Commands referenced ----
+echo "[8/9] Commands directory consistency..."
 if [ -d commands ]; then
     for cmd in commands/*.md; do
         [ -e "$cmd" ] || continue
@@ -108,8 +161,8 @@ else
 fi
 echo ""
 
-# ---- 7. Templates referenced in /anchor exist ----
-echo "[7/7] Templates referenced by /anchor..."
+# ---- 9. Templates referenced in /anchor exist ----
+echo "[9/9] Templates referenced by /anchor..."
 if [ -f commands/anchor.md ]; then
     while IFS= read -r tpl; do
         # Skip directory references (trailing slash) and empty matches
