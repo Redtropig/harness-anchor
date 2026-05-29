@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # validate-anchor.sh — Self-consistency check for the harness-anchor plugin.
-# Run inside the plugin root (or pass --plugin-root <path>).
+# Run inside the plugin root, or pass the plugin root as the first positional
+# argument (validate-anchor.sh [plugin-root]); it defaults to the repo root.
 #
-# Checks:
-#   1. Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
-#   2. JSON files parse
-#   3. Every SKILL.md has YAML frontmatter with name + description
-#   4. Description front-matter is ≤ 500 chars (per learn-harness gotchas #12)
-#   5. SessionStart hook is executable and produces valid JSON when run
-#   6. Every command referenced in commands/ exists as a file
-#   7. Every template referenced from commands/anchor.md exists
+# Checks (labelled [1/9]..[9/9] in the output):
+#   [1/9]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
+#   [2/9]   JSON files parse
+#   [3-4/9] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
+#   [5/9]   Every agent has name + description frontmatter (description ≤500 chars)
+#   [6/9]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
+#   [7/9]   SessionStart hook is executable and produces valid JSON when run
+#   [8/9]   Commands directory consistency (each commands/*.md is a usable /command)
+#   [9/9]   Every template referenced from commands/anchor.md exists
 
 set -uo pipefail   # no -e so we report all failures, not abort on first
 
