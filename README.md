@@ -129,15 +129,27 @@ bash init.sh     # health-check the environment
 
 ```bash
 bash scripts/validate-anchor.sh        # self-consistency checks (count printed on run)
+bash scripts/validate-manifests.sh     # manifest validation (name, version, sync)
 bash tests/hook-contracts/post-tool-use-warn.sh  # PostToolUse hook contract
 bash scripts/cpp-detect.sh --target tests/cpp-detection/cmake-fixture
                                        # cpp-detect on a known fixture
+bash scripts/measure-context.sh        # SessionStart context budget vs 8000-char cap
 ```
 
-CI runs all three on push/PR — see `.github/workflows/validate.yml`.
+CI runs all of these on push/PR (ubuntu + macos) — see `.github/workflows/validate.yml`.
+
+Troubleshooting? See [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ---
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
+## v0.1.0 retrospective
+
+See [docs/v0.1.0-plan-addendum.md](docs/v0.1.0-plan-addendum.md) for post-plan reality and lessons learned.
