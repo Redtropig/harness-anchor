@@ -4,6 +4,14 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-30
+
+### Added
+
+- **`/sanitize` command (Tier 2):** `commands/sanitize.md` builds a C/C++ project under ASan+UBSan (TSan separately) and runs its tests, reporting in `verification-runner`-style fixed sections with a mandatory `.harness-anchor/sanitize-*.log` evidence path. Reuses `templates/cpp/sanitizer-build.sh.tpl`; refuses on non-C/C++ projects via `cpp-detect.sh`. `skills/cpp-sanitizers` references it.
+- **PostToolUse `/sanitize` nudge:** the hook appends a one-line "consider /sanitize" suggestion to an *existing* warning on a C/C++ source edit — bounded, never standalone, never runs sanitizers inline (invariants #4/#7).
+- **`/verify --fix` auto-fix loop (Tier 2):** opt-in only; on a NOT READY verdict it applies the verification-runner's `### Recommendation`-scoped fixes, then re-verifies with a *fresh* verification-runner, max 2 cycles, stopping on pass or budget exhaustion. Every change is surfaced; pass is never asserted without a fresh PASS (invariant #8). `commands/verify.md` gains `Edit, Write` for this path.
+
 ## [0.2.1] - 2026-05-29
 
 ### Added
@@ -80,7 +88,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Redtropig/harness-anchor/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Redtropig/harness-anchor/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Redtropig/harness-anchor/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Redtropig/harness-anchor/releases/tag/v0.1.0
