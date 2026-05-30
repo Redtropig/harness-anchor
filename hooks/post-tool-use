@@ -133,6 +133,18 @@ $tidy_out")
             ;;
     esac
 
+    # ---- C/C++ runtime-check nudge (v0.3.0) ----
+    # Bounded: PostToolUse may at most *suggest* /sanitize after a C/C++ change — never run
+    # sanitizers inline (they exceed the 5s budget). Rides an existing warning, so it never
+    # fires standalone (no per-edit noise).
+    case "$file_path" in
+        *.c|*.cc|*.cpp|*.cxx|*.h|*.hpp|*.hh)
+            if [ "${#warnings[@]}" -gt 0 ]; then
+                warnings+=("Runtime check: consider /sanitize (ASan+UBSan) to exercise this C/C++ change under instrumentation.")
+            fi
+            ;;
+    esac
+
     # ---- Emit output ----
     if [ "${#warnings[@]}" -eq 0 ]; then
         return 0

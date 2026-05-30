@@ -16,6 +16,14 @@ Sanitizers are compiler-instrumented runtime checks. They catch what static anal
 
 Note: ASan + UBSan are combinable. TSan is **mutually exclusive** with ASan/MSan.
 
+## The `/sanitize` command
+
+`/sanitize` automates the ASan+UBSan build+test flow below and reports findings in a fixed
+structure (Build / Tests / Findings / Verdict / Recommendation) with a `.harness-anchor/sanitize-*.log`
+evidence path. Reach for it for a one-shot run; read on to understand what it does, how to
+read the output, and how to suppress known third-party noise. Run TSan separately — it cannot
+share a build with ASan.
+
 ## Prerequisites
 
 - Clang or recent GCC (`-fsanitize=` family supported since GCC 4.8 / Clang 3.1+)
