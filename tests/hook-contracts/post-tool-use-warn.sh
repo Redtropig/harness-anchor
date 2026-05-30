@@ -81,6 +81,7 @@ else
     assert_contains "hookSpecificOutput" "$output"
     assert_contains "PostToolUse" "$output"
     assert_contains "feat-a" "$output"
+    assert_contains "/sanitize" "$output"
 fi
 
 # Negative test: editing a file in NON-anchored dir should produce no output.
