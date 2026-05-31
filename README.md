@@ -88,7 +88,8 @@ bash init.sh     # health-check the environment
 | `/anchor` | Scaffolds harness state files into the current project (overwrites only with explicit approval) |
 | `/cpp-init` | C/C++ project: tunes `init.sh`, drops `.clang-format` / `.clang-tidy` / `sanitizer-build.sh` |
 | `/index-project` | (Re)builds `PROJECT-TOC.md` from git-tracked sources |
-| `/verify` | Dispatches `verification-runner` for fresh-context evaluation |
+| `/verify` | Dispatches `verification-runner` for fresh-context evaluation; opt-in `--fix` runs a bounded (≤ 2-cycle) auto-fix loop |
+| `/sanitize` | C/C++ project: builds under ASan+UBSan (TSan separately), runs tests, reports findings in fixed sections with a `.harness-anchor/sanitize-*.log` evidence path |
 | `/session-end` | Writes structured handoff + appends `progress.md` + offers commit |
 | `/status` | Read-only project overview: active feature, counts, git tree, TOC freshness, handoff head |
 
@@ -97,7 +98,7 @@ bash init.sh     # health-check the environment
 | Hook | Purpose |
 |---|---|
 | SessionStart | Injects state banner: active feature, project type, TOC freshness, handoff head, meta-skill body (≤ 2000 token budget) |
-| PostToolUse | After Edit/Write: regression-warn on pass-feature files; clang-tidy on C/C++ files when `compile_commands.json` present |
+| PostToolUse | After Edit/Write: regression-warn on pass-feature files; clang-tidy on C/C++ files when `compile_commands.json` present; one-line `/sanitize` nudge on C/C++ edits (never runs sanitizers inline) |
 | Stop | Nudges progress.md update, session-handoff refresh; never blocks |
 | UserPromptSubmit | Detects scope-jump phrases ("顺便", "also", "by the way"); surfaces active feature for confirmation |
 
