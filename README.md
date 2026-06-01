@@ -93,6 +93,8 @@ bash init.sh     # health-check the environment
 | `/session-end` | Writes structured handoff + appends `progress.md` + offers commit |
 | `/status` | Read-only project overview: active feature, counts, git tree, TOC freshness, handoff head |
 
+📖 **Full command reference:** [docs/commands.md](docs/commands.md) — when to reach for each command, its arguments, prerequisites, outputs, and how the harness recommends it.
+
 ## Hooks (4 — all warn-only, never block)
 
 | Hook | Purpose |
