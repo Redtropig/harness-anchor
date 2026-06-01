@@ -4,6 +4,16 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-01
+
+### Added
+
+- **SessionStart `/cpp-init` recommendation:** the state banner now recommends `/cpp-init` when a project is detected as C/C++ and is already anchored (`feature_list.json` present) but lacks `.clang-format`/`.clang-tidy` — the same "missing artifact → run the command" pattern already used for `/anchor` and `/index-project`. Manual commands never auto-trigger, so the hook surfaces this one at the moment it is needed. Warn-only; fires only on that precise state (no nagging when the config exists or the project is un-anchored). A new C/C++ fixture in `tests/hook-contracts/session-start-banner.sh` asserts the hint fires when clang config is absent and is suppressed once it exists.
+
+### Changed
+
+- **`using-harness-anchor` command catalog → when-to-recommend guidance:** the meta-skill that SessionStart injects every session now frames each command by *when to recommend it* (parallel to its `## Sibling Skills` section) instead of a flat what-it-does list, and back-fills the missing `/sanitize` entry (shipped in v0.3.0 but never cataloged).
+
 ## [0.3.0] - 2026-05-30
 
 ### Added
@@ -88,7 +98,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/Redtropig/harness-anchor/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Redtropig/harness-anchor/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Redtropig/harness-anchor/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Redtropig/harness-anchor/compare/v0.1.0...v0.2.0
