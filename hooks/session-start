@@ -86,6 +86,26 @@ except Exception:
         fi
     fi
 
+    # ---- 2b. C/C++ tooling-not-initialized hint → recommend /cpp-init ----
+    # Parallels the /anchor (no feature_list) and /index-project (no TOC) nudges:
+    # surface the command that CREATES the missing artifact, at the moment it is missing.
+    # Fire only when ALL hold, to avoid nagging:
+    #   - this IS a C/C++ project (cpp-detect said so), AND
+    #   - it is already anchored (feature_list.json present — /cpp-init refuses without it), AND
+    #   - the C/C++ config layer is absent (no .clang-format AND no .clang-tidy).
+    # Un-anchored projects already get the /anchor nudge; a project that already has the
+    # config doesn't need this (and /cpp-init's overwrite-guard would handle it anyway).
+    cpp_init_hint=""
+    case "$project_type" in
+        cpp*)
+            if [ -f "$flist" ] \
+               && [ ! -f "$PROJECT_DIR/.clang-format" ] \
+               && [ ! -f "$PROJECT_DIR/.clang-tidy" ]; then
+                cpp_init_hint="not initialized (no .clang-format/.clang-tidy) — run /cpp-init"
+            fi
+            ;;
+    esac
+
     # ---- 3. TOC freshness (delegated to scripts/toc-freshness.sh, DD5) ----
     toc_file="$PROJECT_DIR/PROJECT-TOC.md"
     freshness_script="${PLUGIN_ROOT}/scripts/toc-freshness.sh"
@@ -134,6 +154,11 @@ Project root:     ${PROJECT_DIR}
 Active feature:   ${active_feature}
 Project type:     ${project_type}
 TOC freshness:    ${toc_status}"
+
+    if [ -n "$cpp_init_hint" ]; then
+        banner="${banner}
+C/C++ setup:      ${cpp_init_hint}"
+    fi
 
     if [ -n "$handoff_head" ]; then
         banner="${banner}

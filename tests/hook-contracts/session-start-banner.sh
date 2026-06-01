@@ -105,6 +105,45 @@ else
     assert_contains "SessionStart" "$output2"
 fi
 
+# ---- /cpp-init recommendation: anchored C/C++ project missing clang config ----
+# A C/C++ project that is anchored but has no .clang-format/.clang-tidy is exactly the
+# state where /cpp-init is the right next step. The banner must surface it.
+# Discriminator is the banner-only field "C/C++ setup:" — NOT the bare string "/cpp-init",
+# which also appears in the injected meta-skill body regardless of the hint.
+TMPDIR3=$(mktemp -d)
+trap "rm -rf $TMPDIR $TMPDIR2 $TMPDIR3" EXIT
+
+cd "$TMPDIR3"
+printf '{ "project": "cpp-test", "features": [] }\n' > feature_list.json
+printf 'cmake_minimum_required(VERSION 3.16)\nproject(cpp_test CXX)\n' > CMakeLists.txt
+mkdir -p src
+printf 'int main() { return 0; }\n' > src/main.cpp
+# deliberately NO .clang-format / .clang-tidy → the un-initialized state
+
+echo ""
+echo "=== session-start (anchored C/C++ project, no clang config → expect /cpp-init hint) ==="
+output3=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR3" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
+if [ -z "$output3" ]; then
+    echo "  FAIL no output emitted"
+    FAIL=$((FAIL+1))
+else
+    assert_json_valid "$output3"
+    assert_contains "C/C++ setup:" "$output3"
+fi
+
+# ---- negative: same project WITH clang config → banner hint must disappear ----
+touch "$TMPDIR3/.clang-format" "$TMPDIR3/.clang-tidy"
+echo ""
+echo "=== session-start (C/C++ project WITH clang config → expect NO hint) ==="
+output4=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR3" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
+if printf '%s' "$output4" | grep -q "C/C++ setup:"; then
+    echo "  FAIL cpp-init hint still present after clang config added"
+    FAIL=$((FAIL+1))
+else
+    echo "  OK   hint correctly suppressed when clang config present"
+    PASS=$((PASS+1))
+fi
+
 echo ""
 echo "==================================="
 echo " Pass: $PASS    Fail: $FAIL"

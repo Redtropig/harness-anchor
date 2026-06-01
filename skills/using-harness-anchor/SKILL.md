@@ -52,14 +52,19 @@ These are non-negotiable invariants:
 5. **Subagents are single-level.** Never invoke a subagent from within a subagent.
 6. **When stuck, follow `docs-lookup`.** Never guess at unfamiliar tools/APIs/errors. The Context7 → WebSearch → calibrated-uncertainty fallback chain is canonical there.
 
-## Commands
+## Commands — recommend them at the right moment
 
-- `/anchor` — scaffold AGENTS.md / feature_list.json / init.sh into current project
-- `/index-project` — (re)build PROJECT-TOC.md
-- `/verify` — run full verification suite (build / lint / tests)
-- `/session-end` — write structured handoff for next session
-- `/status` — read-only project overview (active feature, counts, git tree, TOC freshness, handoff head)
-- `/cpp-init` — initialize C/C++ project-specific config (clang-format/.clang-tidy)
+Commands are **user-invoked and never auto-trigger** (unlike skills, which you load by
+description). Surfacing the right one at the right time is part of your job: suggest it,
+say why in one line, and let the user run it.
+
+- `/anchor` — project is un-anchored (no `feature_list.json`): scaffolds the state files.
+- `/cpp-init` — a C/C++ project has no `.clang-format`/`.clang-tidy` (run right after `/anchor`): drops C/C++ config + sanitizer build, tunes `init.sh`.
+- `/index-project` — `PROJECT-TOC.md` is absent or stale, or before a broad file search: (re)builds the one-line-per-file index.
+- `/verify` — before you claim a feature passes or flip its status to `pass`: build + lint + tests in a fresh-context subagent. `--fix` runs a bounded (≤ 2-cycle) auto-fix loop.
+- `/sanitize` — after a C/C++ source change, or before merging C/C++: ASan+UBSan run (TSan separately), findings in fixed sections with an evidence log.
+- `/status` — whenever the user asks "where am I / what's the state": read-only snapshot, writes nothing.
+- `/session-end` — at a stopping point or before ending: writes handoff, appends `progress.md`, offers a commit.
 
 ## When to NOT use this
 
