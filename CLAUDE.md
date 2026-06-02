@@ -16,7 +16,7 @@ Stop. Read this before doing anything.
 
 ## Design Invariants (do not break)
 
-1. **Warn-only hooks.** No PostToolUse / Stop / UserPromptSubmit hook may produce JSON with `"permissionDecision": "deny"` or `"stopReason"`. Output is always `additionalContext` for self-correction.
+1. **Warn-only hooks.** No PostToolUse / Stop / UserPromptSubmit hook may produce JSON with `"permissionDecision": "deny"` or `"stopReason"`. PostToolUse / UserPromptSubmit / SessionStart surface `additionalContext` for self-correction; the **Stop** event has no `additionalContext` channel, so its reminder uses `systemMessage` (still non-blocking — never `decision: "block"`).
 2. **SessionStart token budget ≤ 2000 tokens.** Roughly 8000 chars of injected content. Hard-truncate with a pointer to the on-disk file.
 3. **Subagents are single-level.** Every subagent prompt must end with: *"Do not invoke other subagents from this one."*
 4. **State files are git-tracked by default.** `.harness-anchor/` (error log dir) is the only gitignored runtime path.
