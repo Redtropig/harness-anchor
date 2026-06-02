@@ -1,5 +1,8 @@
 # Command Manual — harness-anchor
 
+<!-- doc-align: 9801eacb02d6fd316829be3b56b8af1bc31cc809 · 2026-06-03 · harness-anchor v0.3.2 -->
+> **Aligned with commit** [`9801eac`](https://github.com/Redtropig/harness-anchor/commit/9801eacb02d6fd316829be3b56b8af1bc31cc809) (harness-anchor v0.3.2, 2026-06-03). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
+
 Reference for every slash command shipped by harness-anchor: what it does, **when to
 reach for it**, its arguments, prerequisites, outputs, and how the harness reminds you to
 use it.

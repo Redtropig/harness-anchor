@@ -1,5 +1,7 @@
-<!-- generated 2026-06-02 — component call/relationship graph for harness-anchor v0.3.2 -->
+<!-- doc-align: 9801eacb02d6fd316829be3b56b8af1bc31cc809 · 2026-06-03 · harness-anchor v0.3.2 -->
 # harness-anchor — Component Relationship Graph
+
+> **Aligned with commit** [`9801eac`](https://github.com/Redtropig/harness-anchor/commit/9801eacb02d6fd316829be3b56b8af1bc31cc809) (harness-anchor v0.3.2, 2026-06-03). Verified against the plugin sources — `hooks/`, `commands/`, `skills/`, `agents/`, `scripts/`, `templates/` — at this commit; re-verify and bump this marker if they change.
 
 How the plugin's components (**hooks · commands · skills · agents · scripts · templates**) call
 and trigger one another, with **trigger conditions**, **effects**, and the **state/info** each
@@ -444,6 +446,7 @@ default **except `.harness-anchor/`** (runtime logs — the only gitignored path
 3. **Single-level subagents** — agents are leaf nodes (no agent→agent edges); each is dispatched by a command or skill, never from within another subagent.
 4. **State is git-tracked except `.harness-anchor/`** — see §7.
 5. **C/C++ gated by `cpp-detect.sh`** — every C/C++ command/skill routes through it.
+6. *(Skill descriptions front-load trigger keywords — an authoring rule from CLAUDE.md, not something the call graph expresses; kept here only to preserve the canonical numbering.)*
 7. **Hooks ≤ 5 s, fail-silent** — heavy work (`/sanitize`, `/verify --fix`) is a *command*, never a hook.
 8. **Default-FAIL** — `/verify` → `verification-runner` (read-only, fresh context) is the only path to `status=pass`.
 9. **docs-lookup is canonical** — every skill funnels lookups through it (§4).

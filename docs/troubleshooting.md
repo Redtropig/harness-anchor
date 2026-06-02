@@ -1,5 +1,8 @@
 # Troubleshooting — harness-anchor
 
+<!-- doc-align: 9801eacb02d6fd316829be3b56b8af1bc31cc809 · 2026-06-03 · harness-anchor v0.3.2 -->
+> **Aligned with commit** [`9801eac`](https://github.com/Redtropig/harness-anchor/commit/9801eacb02d6fd316829be3b56b8af1bc31cc809) (harness-anchor v0.3.2, 2026-06-03). Verified against the hooks and scripts at this commit; re-verify and bump this marker if they change.
+
 Common failure modes with diagnosis and fix steps.
 
 ---
@@ -113,3 +116,15 @@ Common failure modes with diagnosis and fix steps.
 **Fix:**
 - Update both files simultaneously: `plugin.json` → `version` and `marketplace.json` → `plugins[0].version`.
 - Run `bash scripts/validate-manifests.sh` to confirm sync.
+
+---
+
+## 8. Stop hook: "Hook JSON output validation failed"
+
+**Symptom:** When the agent wraps up, Claude Code reports a Stop-hook JSON validation error (or the wrap-up reminder never appears), pointing at `hooks/stop`.
+
+**Cause:** The **Stop** event accepts only top-level fields — it has **no `hookSpecificOutput` / `additionalContext` channel** (unlike SessionStart, PostToolUse, and UserPromptSubmit). harness-anchor before v0.3.2 emitted `hookSpecificOutput`, which the Stop schema rejects.
+
+**Fix:**
+- Upgrade to **v0.3.2+**: `hooks/stop` now emits a non-blocking `systemMessage` (warn-only — never `decision: "block"` or `stopReason`, per design invariant #1).
+- Verify your copy: `bash tests/hook-contracts/stop-wrap-up.sh` should report `STATUS: PASSED`. As of v0.3.2 that test asserts the full Stop output schema, not just JSON validity — so it catches this class of regression.

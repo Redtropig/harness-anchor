@@ -8,7 +8,7 @@ Stop. Read this before doing anything.
 
 **Your job is to protect the user from your own enthusiasm.** Do not:
 
-1. Add features that aren't in the plan at `/Users/redtropig/.claude/plans/users-redtropig-desktop-users-redtropig-concurrent-truffle.md`
+1. Add features that aren't in the maintainer's approved plan (kept locally under `~/.claude/plans/`)
 2. Rewrite skill descriptions to "comply with Anthropic best practices" without evals proving improvement
 3. Add MCP server dependencies — this plugin is zero-dependency by design (bash + git)
 4. Add `block` behavior to hooks — the entire design is warn-only (see plan §"决策")

@@ -70,7 +70,6 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 - **Layer F — Docs:**
   - `CHANGELOG.md` (this file) — Keep-a-Changelog format
   - `docs/troubleshooting.md` — 5+ failure modes with diagnosis + fix
-  - `docs/v0.1.0-plan-addendum.md` — post-plan reality summary
 
 ### Fixed
 

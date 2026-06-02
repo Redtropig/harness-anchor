@@ -25,8 +25,8 @@ Together they form a complete harness based on Anthropic's [Effective Harnesses 
 ## Installation (local dev marketplace)
 
 ```bash
-# 1. Register the local dev marketplace
-claude /plugin marketplace add /Users/redtropig/Desktop/harness-anchor
+# 1. Register the marketplace (from the published GitHub repo)
+claude /plugin marketplace add Redtropig/harness-anchor
 
 # 2. Install
 claude /plugin install harness-anchor@harness-anchor-local
@@ -153,7 +153,3 @@ MIT — see [LICENSE](LICENSE).
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
-
-## v0.1.0 retrospective
-
-See [docs/v0.1.0-plan-addendum.md](docs/v0.1.0-plan-addendum.md) for post-plan reality and lessons learned.
