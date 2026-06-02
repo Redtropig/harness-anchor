@@ -35,6 +35,30 @@ assert_contains() {
     fi
 }
 
+# Validate against Claude Code's ACTUAL Stop-event output schema. The Stop event
+# accepts only top-level fields (NO hookSpecificOutput channel), and harness-anchor
+# is warn-only, so no blocking fields (stopReason / decision:block / permissionDecision:deny).
+# This is the assertion that would have caught the hookSpecificOutput regression.
+assert_valid_stop_schema() {
+    if python3 -c '
+import json, sys
+d = json.loads(sys.argv[1])
+allowed = {"continue", "suppressOutput", "stopReason", "decision", "reason",
+           "systemMessage", "terminalSequence", "permissionDecision"}
+assert set(d).issubset(allowed), "unexpected Stop keys: %s" % (set(d) - allowed)
+assert "hookSpecificOutput" not in d, "Stop event has no hookSpecificOutput channel"
+assert "stopReason" not in d, "warn-only: must not set stopReason"
+assert d.get("decision") != "block", "warn-only: must not block the stop"
+assert d.get("permissionDecision") != "deny", "warn-only: must not deny"
+' "$1" 2>/dev/null; then
+        echo "  OK   valid warn-only Stop schema"
+        PASS=$((PASS+1))
+    else
+        echo "  FAIL invalid Stop schema: $(printf '%s' "$1" | head -c 200)"
+        FAIL=$((FAIL+1))
+    fi
+}
+
 # ---- Happy path: anchored project with in-progress feature ----
 TMPDIR=$(mktemp -d)
 trap "rm -rf $TMPDIR" EXIT
@@ -83,7 +107,8 @@ fi
 
 if [ -n "$output" ]; then
     assert_json_valid "$output"
-    assert_contains "Stop" "$output"
+    assert_valid_stop_schema "$output"
+    assert_contains "systemMessage" "$output"
     assert_contains "feat-active" "$output"
 else
     fail "no output emitted; expected wrap-up reminder for in-progress feature"

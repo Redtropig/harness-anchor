@@ -8,7 +8,7 @@
     {
       "name": "harness-anchor",
       "description": "Runtime harness layer for Claude Code (companion to superpowers): state, scope, verification gates, C/C++ engineering",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "source": "./",
       "author": {
         "name": "redtropig"

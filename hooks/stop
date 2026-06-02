@@ -81,7 +81,9 @@ $r"; fi
 done
 escaped=$(escape_for_json "$joined")
 
-# NOTE: no "stopReason" — we never block stop. Just inject additionalContext.
-printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "Stop",\n    "additionalContext": "<harness-anchor Stop reminders>\\n%s\\n</harness-anchor Stop reminders>"\n  }\n}\n' "$escaped"
+# Warn-only: the Stop event has NO additionalContext channel, and decision:"block"
+# / stopReason would *block* the stop (forbidden by design invariant #1). systemMessage
+# is the non-blocking, schema-valid way to surface a wrap-up reminder.
+printf '{\n  "systemMessage": "harness-anchor wrap-up reminder:\\n%s"\n}\n' "$escaped"
 
 exit 0

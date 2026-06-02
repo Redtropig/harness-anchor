@@ -4,6 +4,12 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-06-02
+
+### Fixed
+
+- **Stop hook emitted JSON invalid for the Stop event.** `hooks/stop` wrapped its wrap-up reminder in `hookSpecificOutput` / `additionalContext` — valid for PostToolUse / UserPromptSubmit / SessionStart, but the **Stop** event has no `additionalContext` channel, so Claude Code rejected the output (`Hook JSON output validation failed — (root): Invalid input`) and the reminder never surfaced. The reminder now uses a top-level `systemMessage` — non-blocking and schema-valid (still never `decision:"block"` / `stopReason`, per invariant #1). The `tests/hook-contracts/stop-wrap-up.sh` contract test gained a real Stop-schema assertion (rejects `hookSpecificOutput` and any blocking field); it previously checked only JSON syntax + substrings, which is why the bad shape shipped.
+
 ## [0.3.1] - 2026-06-01
 
 ### Added
@@ -98,7 +104,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/Redtropig/harness-anchor/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/Redtropig/harness-anchor/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Redtropig/harness-anchor/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Redtropig/harness-anchor/compare/v0.2.0...v0.2.1
