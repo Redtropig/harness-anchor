@@ -13,6 +13,10 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
   - `tests/skill-triggering/` — 7 new adversarial prompts (11/11 sibling skills now covered) + `check-coverage.sh`, a no-LLM CI guard enforcing the "one prompt per skill" authoring rule.
   - CI (`validate.yml`): runs the new unit / coverage / negative-fixture steps on the ubuntu+macOS matrix, plus a `shellcheck` job. All hooks/scripts/tests were brought **shellcheck-clean at `warning`** — fixed `SC2064` (trap expanded at set-time, not signal-time) and `SC2164` (unguarded `cd`) across the test scripts, and `for`-over-`find` → `while read` in `validate-anchor.sh` — so the gate runs at `--severity=warning` (notes/style surfaced informationally).
 
+### Fixed
+
+- `hooks/post-tool-use`: quote the prefix in `rel_path="${file_path#"$project_root"/}"` (`SC2295`) so the relative-path computation does **literal** prefix removal instead of glob-pattern matching — robust to project paths containing `[ ] * ?`. Behavior-identical for normal paths (post-tool-use contract test 6/0); the shell suite is now shellcheck-clean at all severities.
+
 ## [0.3.3] - 2026-06-04
 
 ### Changed

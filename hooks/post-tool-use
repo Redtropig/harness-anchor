@@ -63,7 +63,7 @@ except Exception:
     # ---- Check 1: regression-warn ----
     # If the edited file is referenced in evidence.artifacts of a feature marked
     # status='pass', that's a regression risk. Surface a one-line warning.
-    rel_path="${file_path#$project_root/}"
+    rel_path="${file_path#"$project_root"/}"
     regression=$(python3 - "$project_root/feature_list.json" "$rel_path" <<'PY' 2>/dev/null || true
 import json, sys, os
 flist_path, rel = sys.argv[1], sys.argv[2]
