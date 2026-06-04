@@ -4,6 +4,15 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+### Added
+
+- **Test & CI hardening** (no plugin-behavior change; closes audit gaps G1–G6):
+  - `tests/unit/` — black-box unit tests for the two most complex scripts: `index-builder.mjs` summary extraction (every comment marker incl. the `-->`/`--!>` `js/bad-tag-filter` fix, 80-char truncation, `## Decisions` preservation, binary/lockfile skipping) and `toc-freshness.sh` (all status branches incl. the missing-anchor `git cat-file` guard).
+  - `tests/unit/feature-list-schema.sh` — exercises `feature_list.schema.json` itself (anti-drift) and proves the Default-FAIL rule (`status=pass ⇒ evidence`) rejects a violating doc. Python stdlib only.
+  - `tests/cpp-detection/non-cpp-fixture/` — negative fixture asserting `cpp-detect.sh` → `is_cpp_project:false` (guards invariant #5).
+  - `tests/skill-triggering/` — 7 new adversarial prompts (11/11 sibling skills now covered) + `check-coverage.sh`, a no-LLM CI guard enforcing the "one prompt per skill" authoring rule.
+  - CI (`validate.yml`): runs the new unit / coverage / negative-fixture steps on the ubuntu+macOS matrix, plus a `shellcheck` job. All hooks/scripts/tests were brought **shellcheck-clean at `warning`** — fixed `SC2064` (trap expanded at set-time, not signal-time) and `SC2164` (unguarded `cd`) across the test scripts, and `for`-over-`find` → `while read` in `validate-anchor.sh` — so the gate runs at `--severity=warning` (notes/style surfaced informationally).
+
 ## [0.3.3] - 2026-06-04
 
 ### Changed

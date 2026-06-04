@@ -1,0 +1,1 @@
+Before I merge this C++ patch, give it a real once-over for the usual landmines — uninitialized members, null derefs, use-after-move — not just an eyeball read of the diff.

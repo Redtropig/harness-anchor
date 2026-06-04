@@ -50,13 +50,13 @@ echo ""
 
 # ---- 2. JSON validity ----
 echo "[2/9] JSON parse..."
-for f in $(find . -name '*.json' -not -path './node_modules/*' -not -path './.harness-anchor/*' -not -path './tests/manifest-fixtures/*' 2>/dev/null); do
+while IFS= read -r f; do
     if python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
         ok "parse $f"
     else
         fail "invalid JSON: $f"
     fi
-done
+done < <(find . -name '*.json' -not -path './node_modules/*' -not -path './.harness-anchor/*' -not -path './tests/manifest-fixtures/*' 2>/dev/null)
 echo ""
 
 # ---- 3 & 4. SKILL.md frontmatter ----

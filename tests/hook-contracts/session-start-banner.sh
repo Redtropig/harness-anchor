@@ -34,9 +34,9 @@ assert_contains() {
 
 # ---- Happy path: anchored project ----
 TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+trap 'rm -rf "$TMPDIR"' EXIT
 
-cd "$TMPDIR"
+cd "$TMPDIR" || exit 1
 git init -q
 git config user.email test@example.com
 git config user.name test
@@ -91,7 +91,7 @@ fi
 
 # ---- Negative: non-anchored dir ----
 TMPDIR2=$(mktemp -d)
-trap "rm -rf $TMPDIR $TMPDIR2" EXIT
+trap 'rm -rf "$TMPDIR" "$TMPDIR2"' EXIT
 
 echo ""
 echo "=== session-start banner (non-anchored) ==="
@@ -111,9 +111,9 @@ fi
 # Discriminator is the banner-only field "C/C++ setup:" — NOT the bare string "/cpp-init",
 # which also appears in the injected meta-skill body regardless of the hint.
 TMPDIR3=$(mktemp -d)
-trap "rm -rf $TMPDIR $TMPDIR2 $TMPDIR3" EXIT
+trap 'rm -rf "$TMPDIR" "$TMPDIR2" "$TMPDIR3"' EXIT
 
-cd "$TMPDIR3"
+cd "$TMPDIR3" || exit 1
 printf '{ "project": "cpp-test", "features": [] }\n' > feature_list.json
 printf 'cmake_minimum_required(VERSION 3.16)\nproject(cpp_test CXX)\n' > CMakeLists.txt
 mkdir -p src

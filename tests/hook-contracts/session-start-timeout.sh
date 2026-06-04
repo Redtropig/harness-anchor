@@ -35,6 +35,7 @@ fi
 
 cp "$REAL_DETECT" "$BACKUP_DETECT"
 
+# shellcheck disable=SC2329  # invoked indirectly via 'trap cleanup EXIT' below
 cleanup() {
     # Restore original cpp-detect.sh
     mv "$BACKUP_DETECT" "$REAL_DETECT" 2>/dev/null || true
@@ -71,7 +72,7 @@ export PATH="$NO_TIMEOUT_DIR:$PATH"
 
 # ---- Set up a temp project ----
 TMPDIR=$(mktemp -d)
-cd "$TMPDIR"
+cd "$TMPDIR" || exit 1
 git init -q
 git config user.email test@example.com
 git config user.name test

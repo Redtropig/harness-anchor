@@ -1,0 +1,1 @@
+The lines I just edited in this C++ file have messy indentation and inconsistent braces compared to the rest of the file. Tidy up the formatting on my changes — but leave the code I didn't touch alone.

@@ -1,0 +1,1 @@
+My C++ test binary segfaults maybe one run in five and passes the rest. I think something is corrupting memory but I can't reproduce it reliably. How do I track it down?

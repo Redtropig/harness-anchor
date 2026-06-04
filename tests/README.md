@@ -1,19 +1,25 @@
 # harness-anchor tests
 
-Five test layers, in order of cost:
+Test layers, in order of cost:
 
 | Layer | What it tests | Speed | Requires Claude session? |
 |---|---|---|---|
 | `scripts/validate-anchor.sh` | Plugin self-consistency: file structure, JSON validity, skill/agent/command frontmatter (incl. `allowed-tools` shape), hook output shape | <1s | No |
+| `tests/unit/` | **Script unit tests**: `index-builder` summary extraction (every comment marker + truncation + `## Decisions` preservation + binary/lockfile skip), `toc-freshness` status branches, `feature_list.schema.json` enforcement | <2s | No |
 | `tests/hook-contracts/` | Hook **contract**: given synthetic stdin, hook produces expected JSON | <5s | No |
 | `tests/bench/` | Hook **timing**: wall-clock per hook vs. the 5s budget (invariant #7) | <10s | No |
-| `tests/cpp-detection/` | **Build system detection**: `cpp-detect.sh` correctly identifies CMake/Meson/Make/Bazel | <1s | No |
+| `tests/cpp-detection/` | **Build system detection**: `cpp-detect.sh` identifies CMake/Meson/Make/Bazel, plus a negative `non-cpp-fixture` → `is_cpp_project:false` (invariant #5) | <1s | No |
+| `tests/skill-triggering/check-coverage.sh` | **Coverage guard**: every sibling skill has a triggering case registered (structural) | <1s | No |
 | `tests/skill-triggering/` | Skill **triggering**: real Claude session run with naive prompts, verify skill is invoked | 30s-5min per case | **Yes** (claude CLI) |
 
 ## Quick test (no Claude required)
 
 ```bash
 bash scripts/validate-anchor.sh
+bash tests/unit/index-builder-summary.sh
+bash tests/unit/toc-freshness.sh
+bash tests/unit/feature-list-schema.sh
+bash tests/skill-triggering/check-coverage.sh
 bash tests/hook-contracts/post-tool-use-warn.sh
 bash tests/hook-contracts/session-start-banner.sh
 bash tests/hook-contracts/session-start-timeout.sh
@@ -63,11 +69,11 @@ bash tests/skill-triggering/run-all.sh
 
 ## Fixtures
 
-- `tests/cpp-detection/{cmake,meson,make,bazel}-fixture/` — minimal projects for verifying `cpp-detect.sh` build-system detection
+- `tests/cpp-detection/{cmake,meson,make,bazel}-fixture/` — minimal projects for verifying `cpp-detect.sh` build-system detection; `non-cpp-fixture/` covers the detect-**false** path (invariant #5)
 - `tests/e2e-cpp-fixture/` — slightly fuller minimal CMake project for `/anchor` + `/cpp-init` + `/verify` end-to-end flow
 - `tests/manifest-fixtures/` — negative JSON fixtures for validating `validate-manifests.sh` error paths
 - `tests/command-fixtures/` — `good-*`/`bad-*` command files for validating `check-allowed-tools.sh` (R4) accept/reject paths
 
 ## CI
 
-`.github/workflows/validate.yml` runs the **fast** layers (validate-anchor + hook-contracts + cpp-detection) on every push. Skill-triggering tests are slow and require a Claude session; run them manually before tagging a release.
+`.github/workflows/validate.yml` runs the **fast** layers on every push (matrix: ubuntu + macOS): validate-anchor, manifest + command negative fixtures, all hook contracts, POSIX-compat, e2e structural, context-budget + hook-timing budgets, cpp-detect (positive ×4 + negative), the `tests/unit/` script tests, and the skill-triggering **coverage** guard. A separate `shellcheck` job lints all shell — the suite is shellcheck-clean at `warning`, so the job **gates at `--severity=warning`** (notes/style surfaced informationally). Skill-triggering **invocation** tests are slow and need a Claude session — run `tests/skill-triggering/run-all.sh` manually before tagging a release.

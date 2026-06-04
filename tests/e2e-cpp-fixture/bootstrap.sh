@@ -40,7 +40,7 @@ done
 shopt -u dotglob nullglob
 
 # Initialize git repo
-cd "$TARGET"
+cd "$TARGET" || exit 1
 git init -q
 git config user.email test@example.com
 git config user.name test

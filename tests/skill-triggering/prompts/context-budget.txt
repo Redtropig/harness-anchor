@@ -1,0 +1,1 @@
+I need you to comb through this 50,000-line CSV plus the entire logs/ directory and tell me the most common failure reasons. It's a huge amount of data — handle it so we don't run out of room.

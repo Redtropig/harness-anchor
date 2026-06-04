@@ -61,9 +61,9 @@ assert d.get("permissionDecision") != "deny", "warn-only: must not deny"
 
 # ---- Happy path: anchored project with in-progress feature ----
 TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+trap 'rm -rf "$TMPDIR"' EXIT
 
-cd "$TMPDIR"
+cd "$TMPDIR" || exit 1
 
 cat > feature_list.json <<'EOF'
 {
@@ -116,7 +116,7 @@ fi
 
 # ---- Negative: non-anchored dir ----
 TMPDIR2=$(mktemp -d)
-trap "rm -rf $TMPDIR $TMPDIR2" EXIT
+trap 'rm -rf "$TMPDIR" "$TMPDIR2"' EXIT
 
 echo ""
 echo "=== stop hook (non-anchored) ==="

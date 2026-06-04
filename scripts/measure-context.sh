@@ -21,7 +21,7 @@ if [ -z "$FIXTURE_DIR" ] || [ ! -d "$FIXTURE_DIR" ]; then
     echo "FAIL: bootstrap.sh did not produce a temp dir"
     exit 1
 fi
-trap "rm -rf '$FIXTURE_DIR'" EXIT
+trap 'rm -rf "$FIXTURE_DIR"' EXIT
 echo "Fixture: $FIXTURE_DIR"
 
 # ---- 2. Invoke session-start hook ----

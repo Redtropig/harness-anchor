@@ -1,0 +1,1 @@
+I just switched branches and pulled the latest changes. Before we write any new code, make sure the project still builds and the basic checks pass — I don't want to debug on top of an already-broken tree.

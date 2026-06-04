@@ -37,9 +37,9 @@ assert_contains() {
 
 # ---- Set up anchored project with in-progress feature ----
 TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+trap 'rm -rf "$TMPDIR"' EXIT
 
-cd "$TMPDIR"
+cd "$TMPDIR" || exit 1
 
 cat > feature_list.json <<'EOF'
 {
@@ -96,8 +96,8 @@ fi
 
 # ---- Negative: no active feature ----
 TMPDIR2=$(mktemp -d)
-trap "rm -rf $TMPDIR $TMPDIR2" EXIT
-cd "$TMPDIR2"
+trap 'rm -rf "$TMPDIR" "$TMPDIR2"' EXIT
+cd "$TMPDIR2" || exit 1
 
 cat > feature_list.json <<'EOF'
 {

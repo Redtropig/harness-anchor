@@ -11,9 +11,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+trap 'rm -rf "$TMPDIR"' EXIT
 
-cd "$TMPDIR"
+cd "$TMPDIR" || exit 1
 mkdir -p src
 
 # Build a fixture project anchored with feature_list.json marking one feature pass.
@@ -86,8 +86,8 @@ fi
 
 # Negative test: editing a file in NON-anchored dir should produce no output.
 TMPDIR2=$(mktemp -d)
-trap "rm -rf $TMPDIR $TMPDIR2" EXIT
-cd "$TMPDIR2"
+trap 'rm -rf "$TMPDIR" "$TMPDIR2"' EXIT
+cd "$TMPDIR2" || exit 1
 input_json2=$(printf '{"tool_name":"Edit","tool_input":{"file_path":"%s/foo.txt"}}' "$TMPDIR2")
 output2=$(printf '%s' "$input_json2" | bash "$PLUGIN_ROOT/hooks/post-tool-use" 2>/dev/null || true)
 
