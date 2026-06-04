@@ -56,6 +56,10 @@ End the current session cleanly. Implements the "clean restart path" lifecycle p
 
    If Yes: stage the state files only and commit with message: `chore(harness): session N handoff — <active feature id>`. **Do not commit source code changes** — those are the user's call.
 
+## Scope — a session-pause checkpoint, not branch completion
+
+`/session-end` only **persists harness state** (handoff / progress / feature_list / TOC) and may commit **those state files**. It deliberately does not handle code integration. When the *feature or branch itself* is finished — merge, PR, worktree cleanup, or discard — that is **`superpowers:finishing-a-development-branch`** (preceded by `requesting-code-review`). They compose cleanly: finish the branch with superpowers, then run `/session-end` to record the handoff. The Stop-hook nudge for `/session-end` is about checkpointing a pause, not a substitute for that branch-completion flow.
+
 ## Why these steps in this order
 
 - Verification before handoff so the handoff reflects ground truth, not optimism.

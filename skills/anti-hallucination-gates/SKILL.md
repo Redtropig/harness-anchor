@@ -112,6 +112,7 @@ Bluffing the command and not actually running it is the anti-pattern this skill 
 
 ## Related
 
+- `verification-before-completion` (superpowers) — the same Iron Law (no completion claim without fresh evidence). This skill is its harness-anchor counterpart and **superset**: it adds the on-disk evidence record (`feature_list.json`) and the `/verify` subagent. One verification run satisfies both gates — capture the evidence once, don't re-verify.
 - `feature-state-keeper` — actual writes to feature_list.json
 - `self-correction-loop` — what to do when evidence shows failure
 - `/verify` command — full automated verification pass via `verification-runner` subagent

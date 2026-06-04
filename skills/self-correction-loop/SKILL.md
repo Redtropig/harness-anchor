@@ -45,8 +45,11 @@ This is **TDD's RED-GREEN-REFACTOR adapted for correction**:
 
 ## Loop budget
 
+This loop is for **surface signals** that a quick minimal fix resolves. If a minimal fix doesn't clear the signal within **1–2 iterations** — or the failure spans components / needs backward root-cause tracing — **switch to `superpowers:systematic-debugging`** (its 4-phase root-cause process). Don't keep thrashing minimal fixes here.
+
 If you've iterated 3 times on the same signal without resolving it, **stop and escalate**:
 
+- Switch to `superpowers:systematic-debugging` for structured root-cause investigation (its budget also caps at 3 fixes → then question the architecture; the two thresholds are intentionally aligned)
 - Read more of the surrounding code than you have so far
 - Invoke `docs-lookup` skill for the specific error class (Context7 → WebSearch fallback)
 - Tell the user: *"I've tried 3 approaches to <issue>. Latest output: <...>. I need more context. Recommend either <option A> or <option B>?"*

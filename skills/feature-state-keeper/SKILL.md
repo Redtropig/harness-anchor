@@ -13,6 +13,22 @@ You maintain the **machine-readable scope record** of this project. Three files 
 | `progress.md` | Append-only session history |
 | `session-handoff.md` | Single-page "what's the state right now" |
 
+## Altitude — feature ledger vs superpowers' execution records
+
+When `superpowers` is also active, **two record systems coexist by altitude — keep them from drifting:**
+
+| Record | Owner | Altitude |
+|---|---|---|
+| `feature_list.json` | harness-anchor (this skill) | **project feature ledger** — one entry per feature, status + evidence; the durable **source of truth** for "is feature X done" |
+| `progress.md` | harness-anchor | session-level history (summaries), append-only |
+| `docs/superpowers/plans/*.md` (`- [ ]` steps) + **TodoWrite** | superpowers (`writing-plans` / `subagent-driven-development`) | **execution detail** for the *one* in-progress feature — ephemeral scaffolding for the current build |
+
+**Sync contract (prevents double-bookkeeping and drift):**
+
+1. Superpowers' plan-doc checkboxes and TodoWrite drive **step-level** execution. Do **not** mirror individual steps into `feature_list.json` or `progress.md`.
+2. When a superpowers plan/feature finishes (final review passes), **reflect it back once**: flip that feature's `status` in `feature_list.json` with the evidence object. That single write is the durable record it's done.
+3. `feature_list.json` answers "what features exist / which is active / is it done"; the plan-doc + TodoWrite answer "what are the steps to build the active one." If they disagree, **`feature_list.json` (with evidence) wins.**
+
 ## When to use
 
 - Starting a session: read all three, identify the active feature

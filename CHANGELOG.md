@@ -4,6 +4,16 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-06-04
+
+### Changed
+
+- **Made `superpowers` complementarity explicit.** An audit of harness-anchor against `superpowers` found a few overlapping process/record seams; this closes the one with real drift risk and cross-references the rest. Additive only — no skill `description` changed, so triggering is unaffected.
+  - `skills/feature-state-keeper`: added an **"altitude" reconciliation contract** so harness-anchor's `feature_list.json` (durable project feature ledger / source of truth) and superpowers' plan-docs + `TodoWrite` (ephemeral step-level execution) don't drift or double-book — on disagreement, `feature_list.json` (with evidence) wins.
+  - `skills/anti-hallucination-gates`: cross-references `superpowers:verification-before-completion` — same Iron Law; one verification run satisfies both gates (don't re-verify).
+  - `skills/self-correction-loop`: names the switch threshold to `superpowers:systematic-debugging` (1–2 minimal fixes → switch; the cap-at-3 budgets are intentionally aligned).
+  - `commands/session-end.md`: clarifies it is a session-pause checkpoint; branch/PR/merge belongs to `superpowers:finishing-a-development-branch`.
+
 ## [0.3.2] - 2026-06-02
 
 ### Fixed
@@ -103,7 +113,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/Redtropig/harness-anchor/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/Redtropig/harness-anchor/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/Redtropig/harness-anchor/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Redtropig/harness-anchor/compare/v0.2.1...v0.3.0
