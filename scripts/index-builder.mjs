@@ -92,7 +92,7 @@ function extractSummary(content, relPath) {
             .replace(/^--\s*/, '')
             .replace(/^"""\s*/, '')
             .replace(/^<!--\s*/, '')
-            .replace(/\s*-->$/, '')
+            .replace(/\s*--!?>$/, '') // strips --> and --!> (both HTML comment-end forms)
             .trim();
 
         if (summary.length === 0) continue;
