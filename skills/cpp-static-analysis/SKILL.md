@@ -85,6 +85,35 @@ Reports: which includes are unused, which symbols come from indirect includes (s
 
 Note: IWYU has false positives; review suggestions, don't auto-apply.
 
+## Clang Static Analyzer — you're already running it
+
+The `clang-analyzer-*` checks in the baseline `.clang-tidy` **are** the Clang Static Analyzer
+(path-sensitive, inter-procedural symbolic execution), run per translation unit. clang-tidy
+already gives you CSA coverage — don't treat a separate analyzer run as "new" findings.
+
+`scan-build` is the *same engine* driven across a **whole build**: it wraps your compiler
+(no `compile_commands.json` needed) and emits browsable HTML reports tracing each bug's path.
+
+```bash
+scan-build --view make            # wraps the build; --view opens the HTML report
+```
+
+Reach for `scan-build` only for whole-program / cross-TU findings or HTML triage — otherwise
+the per-file clang-tidy path (including the PostToolUse hook) already covers you.
+
+## GCC -fanalyzer (C only)
+
+GCC 10+ ships its own static analyzer — a **different engine** from clang-tidy, so it's a
+genuine second opinion: double-free, use-after-free, leaks, null derefs, taint, fd misuse.
+
+```bash
+gcc -fanalyzer -c path/to/file.c    # warnings on stderr; uses the compiler you already have
+```
+
+**Caveat (important):** the GCC manual states `-fanalyzer` is "only suitable for use on C
+code" — **C++ is not officially supported**. For C++, stay on clang-tidy + cppcheck. Use
+`-fanalyzer` as a free extra pass on **C** builds.
+
 ## Warn-only philosophy
 
 The PostToolUse hook surfaces clang-tidy warnings as `additionalContext`. You see them on the next turn. You decide whether to fix each one — there are legitimate reasons to suppress (e.g., `// NOLINT(specific-check)` with a comment).

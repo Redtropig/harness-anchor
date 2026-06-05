@@ -12,10 +12,16 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
   - `tests/cpp-detection/non-cpp-fixture/` — negative fixture asserting `cpp-detect.sh` → `is_cpp_project:false` (guards invariant #5).
   - `tests/skill-triggering/` — 7 new adversarial prompts (11/11 sibling skills now covered) + `check-coverage.sh`, a no-LLM CI guard enforcing the "one prompt per skill" authoring rule.
   - CI (`validate.yml`): runs the new unit / coverage / negative-fixture steps on the ubuntu+macOS matrix, plus a `shellcheck` job. All hooks/scripts/tests were brought **shellcheck-clean at `warning`** — fixed `SC2064` (trap expanded at set-time, not signal-time) and `SC2164` (unguarded `cd`) across the test scripts, and `for`-over-`find` → `while read` in `validate-anchor.sh` — so the gate runs at `--severity=warning` (notes/style surfaced informationally).
+- **C/C++ analysis-tool coverage made honest + selective expansion** (`skills/cpp-static-analysis` + `skills/cpp-sanitizers`; no `description` changed, so triggering is unaffected):
+  - `cpp-sanitizers`: documented **LeakSanitizer** as ASan's already-running leak component — on by default on Linux, `ASAN_OPTIONS=detect_leaks=1` on macOS (supported, off by default), plus the lighter standalone `-fsanitize=leak` mode and `LSAN_OPTIONS` suppression.
+  - `cpp-static-analysis`: clarified that clang-tidy's `clang-analyzer-*` **is** the Clang Static Analyzer (per-TU), so `scan-build` is only for whole-build / HTML / cross-TU passes — preventing redundant "new analyzer" runs.
+  - `cpp-static-analysis`: added **GCC `-fanalyzer`** (GCC 10+) as a different-engine second opinion, explicitly flagged **C-only** (the manual: "only suitable for use on C code") so it is never misapplied to C++. Mirrored in `tool-comparison.md`.
+  - Deliberately rejected to stay lean: RealtimeSanitizer (niche), an MSan build recipe (high-friction), valgrind helgrind/DRD, and CodeChecker / Infer / PVS-Studio (heavyweight / commercial).
 
 ### Fixed
 
 - `hooks/post-tool-use`: quote the prefix in `rel_path="${file_path#"$project_root"/}"` (`SC2295`) so the relative-path computation does **literal** prefix removal instead of glob-pattern matching — robust to project paths containing `[ ] * ?`. Behavior-identical for normal paths (post-tool-use contract test 6/0); the shell suite is now shellcheck-clean at all severities.
+- `templates/cpp/sanitizer-build.sh.tpl`: corrected a factually-wrong comment claiming "macOS doesn't support leak detection" — macOS *does* support ASan leak detection (off by default; `detect_leaks=1` enables it, which the script already sets). Comment-only; build behavior unchanged.
 
 ## [0.3.3] - 2026-06-04
 

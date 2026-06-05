@@ -7,7 +7,8 @@ BUILD_DIR=".build/asan"
 
 echo "=== harness-anchor: sanitizer build (ASan + UBSan) ==="
 
-# ASAN_OPTIONS: detect_leaks=1 (Linux default; macOS doesn't support leak detection)
+# ASAN_OPTIONS: detect_leaks=1 — on by default on Linux; on macOS supported but off by
+# default, so we set it explicitly here (no-op on platforms without LeakSanitizer).
 export ASAN_OPTIONS="${ASAN_OPTIONS:-abort_on_error=1:halt_on_error=1:detect_leaks=1:check_initialization_order=1}"
 export UBSAN_OPTIONS="${UBSAN_OPTIONS:-print_stacktrace=1:halt_on_error=1}"
 

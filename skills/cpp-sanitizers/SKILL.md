@@ -50,6 +50,26 @@ meson setup builddir-asan -Db_sanitize=address,undefined -Db_lundef=false
 meson test -C builddir-asan
 ```
 
+### LeakSanitizer (LSan) — the leak half of ASan
+
+ASan's "leaks" row above **is** LeakSanitizer — you're already running it. Leak detection is
+**on by default on Linux**; on **macOS** it's supported but **off by default**, enabled with
+`ASAN_OPTIONS=detect_leaks=1` (the generated `scripts/sanitizer-build.sh` already sets it).
+
+When you want leaks *without* ASan's memory-error overhead, link the **standalone** detector:
+
+```bash
+clang -fsanitize=leak -g -O1 your_prog.c -o your_prog   # lighter than full ASan
+```
+
+Suppress known third-party leaks with the same `leak:` syntax as ASan, via LSan's own var:
+
+```bash
+LSAN_OPTIONS=suppressions=lsan-suppressions.txt ./your_test   # file holds e.g. leak:libfoo
+```
+
+For the in-code opt-out API (disabling leak checks for a region), invoke `docs-lookup` rather than guessing the symbol names.
+
 ### TSan (separately)
 
 ```bash

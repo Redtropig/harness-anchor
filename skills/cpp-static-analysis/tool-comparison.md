@@ -36,3 +36,13 @@ Each has blind spots:
 - Neither focuses on include hygiene like IWYU
 
 In a serious project, all three should be in CI. In hobby projects, clang-tidy alone is 80% of the value.
+
+## Beyond the big three
+
+Two more engines, for when the three above aren't enough:
+
+- **Clang Static Analyzer** — already on via clang-tidy's `clang-analyzer-*` (per-TU). Use
+  `scan-build` only for a whole-build pass with HTML path reports, or when you can't produce
+  `compile_commands.json` (scan-build wraps the build instead).
+- **GCC `-fanalyzer`** (**C only** — not C++) — a different engine; a free second opinion on
+  C builds (double-free, UAF, leaks, taint). For C++ it adds nothing; stick with the above.
