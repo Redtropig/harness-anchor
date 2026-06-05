@@ -123,7 +123,7 @@ bash init.sh     # health-check the environment
 | Plugin | Role | Required? |
 |---|---|---|
 | [`superpowers`](https://github.com/obra/superpowers) | Process methodology | Recommended |
-| `context7` MCP | Library docs lookup | Optional (docs-lookup skill falls back to WebSearch) |
+| `context7` / first-party docs MCP (e.g. Microsoft Learn) | Library & ecosystem docs lookup | Optional (`docs-lookup` prefers first-party when relevant, else WebSearch) |
 
 `harness-anchor` is **zero-dependency at runtime** (bash + git; Node.js only for `scripts/index-builder.mjs`).
 
