@@ -7,7 +7,7 @@ description: Use in C/C++ projects when reviewing changes or hunting bugs. Runs 
 
 Static analysis catches an enormous class of bugs at zero runtime cost: null derefs, leaks, dangling refs, integer overflow, missing initializers, unused includes, banned APIs.
 
-Three tools cover most needs:
+Three core tools cover most needs:
 
 | Tool | What it catches | Cost |
 |---|---|---|

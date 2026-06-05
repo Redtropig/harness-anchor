@@ -16,7 +16,7 @@
 ## Recommended workflow
 
 1. **On every edit** → clang-tidy (incremental, via PostToolUse hook)
-2. **Before claiming pass** → clang-tidy full + cppcheck second-opinion
+2. **Before claiming pass** → clang-tidy full + cppcheck second-opinion *(C projects: also `gcc -fanalyzer`)*
 3. **Quarterly / before release** → IWYU pass + clang-tidy modernize-*
 
 ## Quick decisions
