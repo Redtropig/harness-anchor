@@ -8,7 +8,7 @@ description: Use when looking up unfamiliar tools, APIs, errors, library behavio
 When you need authoritative information about an unfamiliar **tool / API / error message / library behavior**, follow this fallback chain. Each step has explicit success and failure criteria so the agent never silently degrades to guessing.
 
 ```
-Step 1: Context7      (structured library docs, version-aware)
+Step 1: Structured docs MCP   (Context7; or Microsoft Learn for .NET/Azure/Windows/MSVC)
    ↓ (unavailable / no match / wrong content / tool error)
 Step 2: WebSearch     (broader web, recent ecosystem changes)
    ↓ (unavailable / no useful results / paywalled)
@@ -19,7 +19,7 @@ Step 3: Calibrated uncertainty (tell user what you tried + what's needed)
 
 ---
 
-## Step 1: Context7 (preferred)
+## Step 1: Structured docs MCP — Context7, or a first-party MCP for its ecosystem
 
 **When it's the right tool**: API references, configuration options, well-known libraries (React, CMake, Clang, etc.), version-specific behavior.
 
@@ -31,6 +31,8 @@ Step 3: Calibrated uncertainty (tell user what you tried + what's needed)
 ```
 
 (Tool names vary by harness: `mcp__Context7__*`, `mcp__plugin_context7_context7__*`, `mcp__73bcda44-…__query-docs`, etc. Use whatever resolves to "Context7" in your tool inventory.)
+
+**First-party ecosystem docs MCP — prefer it over Context7 when the topic matches.** Context7 is the general default for libraries, but if the question is about a specific vendor ecosystem **and** that vendor's docs MCP is in your inventory, it is higher-signal (first-party). The prime example: **Microsoft Learn** (`microsoft_docs_search` → `microsoft_docs_fetch`; `microsoft_code_sample_search` for snippets) for **.NET / Azure / Windows / MSVC / Win32** topics — including MSVC compiler errors and Windows-SDK headers in C/C++ work. Same two-call shape (search → fetch) and the same failure-mode handling below; if it is absent or returns nothing useful, fall through to Context7 → WebSearch as normal. *(General principle — prefer the first-party MCP for its ecosystem; not a hard dependency.)*
 
 **Context7 "doesn't work" — what to watch for**:
 
