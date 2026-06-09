@@ -1,7 +1,7 @@
-<!-- doc-align: 9801eacb02d6fd316829be3b56b8af1bc31cc809 · 2026-06-03 · harness-anchor v0.3.2 -->
+<!-- doc-align: b260770355e4d5ae1aa5ad91eb0bc3a25ce26147 · 2026-06-09 · harness-anchor v0.4.0 -->
 # harness-anchor — Component Relationship Graph
 
-> **Aligned with commit** [`9801eac`](https://github.com/Redtropig/harness-anchor/commit/9801eacb02d6fd316829be3b56b8af1bc31cc809) (harness-anchor v0.3.2, 2026-06-03). Verified against the plugin sources — `hooks/`, `commands/`, `skills/`, `agents/`, `scripts/`, `templates/` — at this commit; re-verify and bump this marker if they change.
+> **Aligned with commit** [`b260770`](https://github.com/Redtropig/harness-anchor/commit/b260770355e4d5ae1aa5ad91eb0bc3a25ce26147) (harness-anchor v0.4.0, 2026-06-09). Verified against the plugin sources — `hooks/`, `commands/`, `skills/`, `agents/`, `scripts/`, `templates/` — at this commit; re-verify and bump this marker if they change.
 
 How the plugin's components (**hooks · commands · skills · agents · scripts · templates**) call
 and trigger one another, with **trigger conditions**, **effects**, and the **state/info** each
@@ -457,4 +457,4 @@ default **except `.harness-anchor/`** (runtime logs — the only gitignored path
 8. **Default-FAIL** — `/verify` → `verification-runner` (read-only, fresh context) is the only path to `status=pass`.
 9. **docs-lookup is canonical** — every skill funnels lookups through it (§4).
 
-*Generated for harness-anchor v0.3.2. Source of truth: `hooks/`, `commands/`, `skills/`, `agents/`, `scripts/`, `templates/`.*
+*Generated for harness-anchor v0.4.0. Source of truth: `hooks/`, `commands/`, `skills/`, `agents/`, `scripts/`, `templates/`.*
