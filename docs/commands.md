@@ -131,16 +131,18 @@ a build system first).
 
 ## `/index-project`
 
-**Purpose.** (Re)build `PROJECT-TOC.md` — a one-line-per-file index of every git-tracked
-source file, with a git-commit freshness anchor.
+**Purpose.** (Re)build `PROJECT-TOC.md` — a `## Directory map` (per-directory file/subdir
+counts) over a one-line-per-file `## Files` index of every git-tracked source file, with a
+git-commit freshness anchor.
 
 **When to use.** When `PROJECT-TOC.md` is absent or **stale** (its commit anchor no longer
 matches `HEAD`), or before a broad file-finding sweep so the agent consults the index instead
 of `Glob`.
 
 **What it does.** Runs `scripts/index-builder.mjs`, which reads `git ls-files`, skips
-binaries / files > 100 KB / build dirs, extracts a ≤ 80-char summary per file, **preserves
-the human-edited `## Decisions` section**, and stamps
+binaries / files > 100 KB / build dirs, extracts a ≤ 80-char summary per file, **emits a
+`## Directory map`** (per-directory counts) above `## Files`, **preserves the human-edited
+`## Decisions` section**, and stamps
 `<!-- generated-at-commit: <HEAD SHA> -->`. Then reports the diff (N added / M removed / K
 updated) and suggests `git commit -m 'chore: refresh project index'`.
 
@@ -294,9 +296,10 @@ can resume from disk, not from chat memory.
 2. Runs `init.sh` to capture ground-truth build/test state.
 3. **Overwrites** `session-handoff.md` (timestamp, active feature, what's in flight,
    build/test/lint state, the ONE next action, risks; ≤ 300 words).
-4. **Prepends** a dated entry to `progress.md` (append-only history).
+4. **Prepends** a dated entry to `progress.md` (append-only history) — via
+   `progress-prepend.mjs`, which inserts after the header without loading the whole file.
 5. Updates `feature_list.json` status if warranted (`pass` only with evidence; else
-   `blocked` / stays `in-progress`).
+   `blocked` / stays `in-progress`), then keeps it **actionable-first** via `feature-list-sort.mjs`.
 6. Offers a `PROJECT-TOC.md` refresh if structure changed.
 7. Offers to commit **state files only** (`chore(harness): session N handoff — <feature id>`).
 

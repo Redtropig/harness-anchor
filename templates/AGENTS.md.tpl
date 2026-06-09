@@ -9,7 +9,7 @@ Before writing or modifying any code, complete these steps in order:
 
 1. **Read this file completely.**
 2. **Read `feature_list.json`** — identify the single active feature (`status: "in-progress"`). Work only on that.
-3. **Read `PROJECT-TOC.md`** — navigate by index, not by `Glob` everywhere.
+3. **Read `PROJECT-TOC.md`** — navigate by index, not by `Glob` everywhere. Start with its **`## Directory map`** (the forest) to locate the right directory, then drill into the **`## Files`** entries beneath it.
 4. **Read `session-handoff.md`** — pick up from where the previous session left off.
 5. **Run `bash init.sh`** — verify environment is healthy before doing anything else. Fix any reported issues first.
 

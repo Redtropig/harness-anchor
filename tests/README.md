@@ -5,7 +5,7 @@ Test layers, in order of cost:
 | Layer | What it tests | Speed | Requires Claude session? |
 |---|---|---|---|
 | `scripts/validate-anchor.sh` | Plugin self-consistency: file structure, JSON validity, skill/agent/command frontmatter (incl. `allowed-tools` shape), hook output shape | <1s | No |
-| `tests/unit/` | **Script unit tests**: `index-builder` summary extraction (every comment marker + truncation + `## Decisions` preservation + binary/lockfile skip), `toc-freshness` status branches, `feature_list.schema.json` enforcement | <2s | No |
+| `tests/unit/` | **Script unit tests**: `index-builder` summary extraction (every comment marker + truncation + `## Decisions` preservation + binary/lockfile skip) and **`## Directory map`**, `toc-freshness` status branches, `feature_list.schema.json` enforcement, **`feature-list-sort` actionable-first reorder** (idempotent + lossless), **`progress-prepend` newest-first insert** | <2s | No |
 | `tests/hook-contracts/` | Hook **contract**: given synthetic stdin, hook produces expected JSON | <5s | No |
 | `tests/bench/` | Hook **timing**: wall-clock per hook vs. the 5s budget (invariant #7) | <10s | No |
 | `tests/cpp-detection/` | **Build system detection**: `cpp-detect.sh` identifies CMake/Meson/Make/Bazel, plus a negative `non-cpp-fixture` → `is_cpp_project:false` (invariant #5) | <1s | No |
@@ -17,8 +17,11 @@ Test layers, in order of cost:
 ```bash
 bash scripts/validate-anchor.sh
 bash tests/unit/index-builder-summary.sh
+bash tests/unit/index-builder-dirmap.sh
 bash tests/unit/toc-freshness.sh
 bash tests/unit/feature-list-schema.sh
+bash tests/unit/feature-list-sort.sh
+bash tests/unit/progress-prepend.sh
 bash tests/skill-triggering/check-coverage.sh
 bash tests/hook-contracts/post-tool-use-warn.sh
 bash tests/hook-contracts/session-start-banner.sh

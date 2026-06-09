@@ -110,7 +110,7 @@ bash init.sh     # health-check the environment
 
 - **Warn-only hooks.** PostToolUse / Stop / UserPromptSubmit hooks **never block** — they inject `additionalContext` for self-correction per Anthropic's "feedback loops > gates" guidance.
 - **Default-FAIL contracts.** Done criteria start `false`; the agent must produce a concrete evidence path (build log, test output, lint report) to flip them to `true`. See `skills/anti-hallucination-gates/`.
-- **Progressive Disclosure.** SessionStart injects ≤ 2000 tokens (banner + TOC head + meta-skill). Deeper references live in skill subfolders, loaded on demand.
+- **Progressive Disclosure.** SessionStart injects ≤ 2000 tokens (banner + an adaptive `PROJECT-TOC` view — the directory map, or the full file list on a small repo — + meta-skill). Deeper references live in skill subfolders, loaded on demand.
 - **docs-lookup is canonical.** No inline Context7 → WebSearch waterfalls in other skills — they all reference `docs-lookup` for the procedure (including failure-mode detection and calibrated-uncertainty fallback).
 - **Fresh-context evaluator.** `/verify` dispatches `verification-runner` in a subagent with read-only tools; mitigates "self-grading" leniency per Anthropic's March 2026 three-agent architecture.
 - **Heavy ops are explicit commands, not auto-fired hooks.** Sanitizer builds (`/sanitize`) and the opt-in auto-fix loop (`/verify --fix`, bounded to ≤ 2 fresh-evaluated cycles) far exceed the ≤ 5s warn-only hook budget — a hook may *suggest* `/sanitize`, but never runs it inline.
@@ -125,7 +125,7 @@ bash init.sh     # health-check the environment
 | [`superpowers`](https://github.com/obra/superpowers) | Process methodology | Recommended |
 | `context7` / first-party docs MCP (e.g. Microsoft Learn) | Library & ecosystem docs lookup | Optional (`docs-lookup` prefers first-party when relevant, else WebSearch) |
 
-`harness-anchor` is **zero-dependency at runtime** (bash + git; Node.js only for `scripts/index-builder.mjs`).
+`harness-anchor` is **zero-dependency at runtime** (bash + git; Node.js for the `scripts/*.mjs` index/state tools; python3 used inline by the hooks, with graceful fallback).
 
 ---
 

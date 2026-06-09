@@ -22,6 +22,7 @@ Rebuild the project's PROJECT-TOC.md index by scanning git-tracked files and ext
    - Skips binaries (magic-byte heuristic) and files >100KB
    - Skips `PROJECT-TOC.md` itself, `.harness-anchor/`, common build dirs
    - Extracts a one-line summary per file (first non-empty comment/docstring/first line of content, truncated to 80 chars)
+   - Emits a **`## Directory map`** (one line per directory — direct-file + subdir counts) above `## Files`: the "forest" view the SessionStart hook injects for large repos
    - Preserves the existing `## Decisions` section (human-edited)
    - Writes header `<!-- generated-at-commit: <current HEAD SHA> -->`
 

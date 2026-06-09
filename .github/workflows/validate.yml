@@ -129,11 +129,14 @@ jobs:
           grep -q 'generated-at-commit' PROJECT-TOC.md
           echo "OK index-builder smoke pass"
 
-      - name: Script unit tests (index-builder summary, toc-freshness, schema)
+      - name: Script unit tests (index-builder summary+dirmap, toc-freshness, schema, feature-list-sort, progress-prepend)
         run: |
           bash tests/unit/index-builder-summary.sh
+          bash tests/unit/index-builder-dirmap.sh
           bash tests/unit/toc-freshness.sh
           bash tests/unit/feature-list-schema.sh
+          bash tests/unit/feature-list-sort.sh
+          bash tests/unit/progress-prepend.sh
 
       - name: cpp-detect — negative fixture (non-C/C++ stays dormant)
         shell: bash

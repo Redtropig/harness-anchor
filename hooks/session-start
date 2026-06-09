@@ -174,22 +174,17 @@ Last session handoff: (no session-handoff.md — run /anchor or /session-end)"
 
 "
 
-    # ---- 6. Read PROJECT-TOC.md "## Files" section (Tier 1 navigation index) ----
-    # Per plan §1: Tier 1 should include "PROJECT-TOC.md 前 N 行（每文件一行，N 动态调整使总和 < 上限）"
-    toc_block=""
+    # ---- 6. Read PROJECT-TOC.md navigation sections (Tier 1) ----
+    # Extract both the "## Files" (per-file leaves) and "## Directory map" (forest) sections.
+    # The ADAPTIVE choice of which to inject — given the token budget — happens in step 8.
     toc_files_section=""
+    toc_dirmap_section=""
     if [ -f "$toc_file" ]; then
-        # Extract lines between "## Files" header and the next "## " header (or EOF).
+        # Lines between a "## X" header and the next "## " header (or EOF), blanks trimmed.
         toc_files_section=$(awk '/^## Files/{flag=1; next} /^## /{flag=0} flag' "$toc_file" 2>/dev/null || true)
-        # Strip leading/trailing blank lines
         toc_files_section=$(printf '%s' "$toc_files_section" | awk 'NF{p=1} p' | awk 'BEGIN{lines=""} {lines=lines $0 "\n"} END{sub(/\n+$/, "", lines); print lines}')
-        if [ -n "$toc_files_section" ]; then
-            toc_block="<project-toc>
-${toc_files_section}
-</project-toc>
-
-"
-        fi
+        toc_dirmap_section=$(awk '/^## Directory map/{flag=1; next} /^## /{flag=0} flag' "$toc_file" 2>/dev/null || true)
+        toc_dirmap_section=$(printf '%s' "$toc_dirmap_section" | awk 'NF{p=1} p' | awk 'BEGIN{lines=""} {lines=lines $0 "\n"} END{sub(/\n+$/, "", lines); print lines}')
     fi
 
     # ---- 7. Read meta-skill body ----
@@ -201,22 +196,58 @@ ${toc_files_section}
     fi
 
     # ---- 8. Combine + token budget hard cap (≤ ~2000 tokens ≈ 8000 chars) ----
-    # Priority for truncation: banner (always full) → skill body → toc head (drop first).
+    # Priority: banner (always full) → skill body → TOC (adaptive; dropped first).
     MAX_CHARS=8000
     banner_len=${#banner}
     skill_len=${#skill_content}
 
-    # Compute budget for TOC = remaining after banner + skill + 200-char buffer for markers
+    # Budget for the TOC block = remaining after banner + skill + 200-char marker buffer.
     toc_budget=$((MAX_CHARS - banner_len - skill_len - 200))
 
-    if [ -n "$toc_block" ]; then
-        if [ "$toc_budget" -lt 250 ]; then
-            # Not enough room for meaningful TOC head; drop it.
-            toc_block=""
-        elif [ "${#toc_block}" -gt "$toc_budget" ]; then
-            # Truncate TOC content to fit budget; preserve block wrapper + add pointer.
+    # ---- Adaptive Tier-1 TOC injection ----
+    #  (a) full "## Files" fits          → inject it (small-repo UX unchanged)
+    #  (b) else "## Directory map" fits   → inject the forest view + pointer
+    #  (c) even the map is too big        → shallowest dirs first, truncated + pointer
+    #  (d) no map present (old TOC)       → legacy alphabetical Files truncation
+    toc_block=""
+    if [ "$toc_budget" -ge 250 ]; then
+        files_block=""
+        if [ -n "$toc_files_section" ]; then
+            files_block="<project-toc>
+${toc_files_section}
+</project-toc>
+
+"
+        fi
+
+        if [ -n "$files_block" ] && [ "${#files_block}" -le "$toc_budget" ]; then
+            toc_block="$files_block"                                    # (a)
+        elif [ -n "$toc_dirmap_section" ]; then
+            dirmap_block="<project-toc>
+${toc_dirmap_section}
+<see PROJECT-TOC.md ## Files for the full per-file index>
+</project-toc>
+
+"
+            if [ "${#dirmap_block}" -le "$toc_budget" ]; then
+                toc_block="$dirmap_block"                              # (b)
+            else
+                # (c) shallowest dirs first (sort by '/'-depth, stable), then truncate.
+                shallow=$(printf '%s\n' "$toc_dirmap_section" \
+                    | awk '{ d=gsub(/\//,"/"); printf "%d\t%s\n", d, $0 }' \
+                    | sort -n -s -k1,1 | cut -f2-)
+                shallow="${shallow:0:$toc_budget}"
+                shallow="${shallow%$'\n'*}"
+                toc_block="<project-toc>
+${shallow}
+<see PROJECT-TOC.md ## Directory map for the full map>
+</project-toc>
+
+"
+            fi
+        elif [ -n "$toc_files_section" ]; then
+            # (d) legacy fallback — no Directory map in this (old) TOC.
             truncated_files="${toc_files_section:0:$toc_budget}"
-            # Trim to last complete line so we don't cut mid-entry
             truncated_files="${truncated_files%$'\n'*}"
             toc_block="<project-toc>
 ${truncated_files}

@@ -109,6 +109,49 @@ function readDecisionsSection(existingPath) {
     return m ? m[0] : '';
 }
 
+/**
+ * Build the `## Directory map` body from the (already path-sorted) entries.
+ * One line per directory — every ancestor, not just leaf dirs — with its direct-file
+ * count and direct-subdir count. Deterministic (no LLM): the "forest" view that lets
+ * the SessionStart hook inject just the shallow/top-level dirs for any repo size.
+ */
+function buildDirectoryMap(entries) {
+    const directFiles = new Map();   // dir -> # files directly in it
+    const childDirs = new Map();     // dir -> Set of direct child dir segments
+    const allDirs = new Set();
+
+    const ensure = (dir) => {
+        if (!directFiles.has(dir)) directFiles.set(dir, 0);
+        if (!childDirs.has(dir)) childDirs.set(dir, new Set());
+        allDirs.add(dir);
+    };
+    ensure('.');
+
+    for (const { rel } of entries) {
+        const parts = rel.split('/');
+        const dirParts = parts.slice(0, -1); // drop the filename
+        let parent = '.';
+        for (let k = 0; k < dirParts.length; k++) {
+            const dir = dirParts.slice(0, k + 1).join('/');
+            ensure(dir);
+            childDirs.get(parent).add(dirParts[k]);
+            parent = dir;
+        }
+        const immediate = dirParts.length === 0 ? '.' : dirParts.join('/');
+        directFiles.set(immediate, (directFiles.get(immediate) || 0) + 1);
+    }
+
+    const dirs = [...allDirs].sort((a, b) => a.localeCompare(b));
+    return dirs.map(d => {
+        const f = directFiles.get(d) || 0;
+        const sub = (childDirs.get(d) || new Set()).size;
+        const label = d === '.' ? '`.` (root)' : `\`${d}/\``;
+        const bits = [`${f} file${f === 1 ? '' : 's'}`];
+        if (sub > 0) bits.push(`${sub} subdir${sub === 1 ? '' : 's'}`);
+        return `- ${label} — ${bits.join(', ')}`;
+    }).join('\n');
+}
+
 // ---- error log helper (Layer D) ----
 const ERROR_LOG_DIR = join(TARGET, '.harness-anchor');
 const ERROR_LOG_PATH = join(ERROR_LOG_DIR, 'last-error.log');
@@ -157,12 +200,19 @@ try {
     const decisionsSection = readDecisionsSection(OUTPUT) ||
         '## Decisions\n\n<!-- Long-lived design decisions; one line each.\n- 2026-05-15: example decision (see docs/decisions/0001.md)\n-->\n';
 
+    const dirMap = buildDirectoryMap(entries);
+
     const header = `<!-- generated-at-commit: ${head} -->
 <!-- DO NOT EDIT BY HAND — run /index-project or scripts/index-builder.mjs -->
 
 # PROJECT TOC
 
 > One-line index of every git-tracked source file. ${entries.length} entries (${skipped} skipped).
+> Navigate the **Directory map** (forest) first, then drill into **Files** (leaves).
+
+## Directory map
+
+${dirMap}
 
 ## Files
 

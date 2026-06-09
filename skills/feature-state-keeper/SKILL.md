@@ -97,10 +97,9 @@ This is the calibrated-uncertainty pattern. Bluffing breaks user trust.
 
 At every `/session-end` (or when you reach a meaningful stopping point):
 
-1. Read current `progress.md`
-2. **Prepend** a new section (most recent first) using the template format already there
-3. Keep entries concise: 5-10 lines max per session
-4. Never delete past entries (append-only)
+1. Compose a concise new section (5-10 lines max) in the template format
+2. **Prepend** it (most recent first). Prefer the tool — `node ${CLAUDE_PLUGIN_ROOT}/scripts/progress-prepend.mjs progress.md <entry-file>` — which inserts after the header **without loading the whole file** (cheap on a long history). Fallback: Read + prepend + Write.
+3. Never delete past entries (append-only)
 
 ## Updating session-handoff.md
 
@@ -127,6 +126,13 @@ Aim for ≤ 300 words. The next session should be able to resume from this alone
 - `evidence` MUST be non-null when `status == "pass"` (Default-FAIL invariant)
 
 If the schema file is present, an external validator (e.g. `ajv-cli`) can verify. The agent need not run it — write valid JSON the first time by following the shape above.
+
+## Ordering — actionable-first (applied by /session-end)
+
+Features are kept **actionable-first** (in-progress → blocked → planned → pass) by
+`scripts/feature-list-sort.mjs`, run at `/session-end`. Don't hand-reorder the array — let the
+tool do it deterministically (it only reorders; ids, evidence, and unknown fields are preserved).
+This keeps what you most need at the top, so reading the **head** of a long `feature_list.json` suffices.
 
 ## Looking up JSON Schema constraints
 

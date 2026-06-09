@@ -6,6 +6,11 @@
 > One-line index of every git-tracked source file. Used by agents to navigate
 > without expensive Glob/find calls. Regenerate when the file tree changes.
 
+## Directory map
+
+<!-- Auto-populated by index-builder.mjs: one line per directory (direct-file + subdir
+counts). The "forest" view — navigate this first, then drill into ## Files. -->
+
 ## Files
 
 <!-- Auto-populated by index-builder.mjs. Format:

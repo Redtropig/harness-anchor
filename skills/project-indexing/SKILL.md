@@ -30,7 +30,7 @@ description: Use when locating files or understanding structure. Consults PROJEC
 
    Note: the SessionStart hook already computes `toc_stale: true/false` and injects it. If stale, prefer `/index-project` before deep navigation; for one-off questions, fall back to Glob.
 
-3. **Search the TOC, not the filesystem.** A simple grep/scan of `PROJECT-TOC.md` typically answers "which file is about X" in one shot.
+3. **Forest before trees.** Read the **`## Directory map`** first (one line per directory, with file + subdir counts) to find the right subtree, then grep/scan the **`## Files`** entries under that path. On a large repo the SessionStart hook injects only the directory map (or just its top levels), so the per-file leaves are read on demand.
 
 4. **Open the file.** Only after locating via TOC.
 
@@ -58,6 +58,11 @@ Or simply tell the user to run `/index-project`. Don't try to maintain the TOC b
 
 # PROJECT TOC
 
+## Directory map
+- `.` (root) — 2 files, 3 subdirs
+- `src/` — 1 file, 1 subdir
+- `src/util/` — 4 files
+
 ## Files
 - `src/main.cpp` — entry point, parses CLI args, initializes Engine
 - `src/util/log.h` — fmt-based logger
@@ -71,7 +76,7 @@ The `## Decisions` section is human-edited (long-lived architectural notes). The
 
 ## Token economy
 
-`PROJECT-TOC.md` typically fits within a few thousand tokens even for medium projects. The SessionStart hook injects **only the first N lines** that fit the Tier 1 budget; the rest is read on demand. Don't ask the user to load the full TOC unless the budget allows.
+`PROJECT-TOC.md` typically fits within a few thousand tokens even for medium projects. The SessionStart hook **adaptively** injects the `## Directory map` (or, for a small repo, the full `## Files`) within the Tier 1 budget — and on a very large repo, only the top-level directories; the rest is read on demand. Don't ask the user to load the full TOC unless the budget allows.
 
 ## Looking up indexing techniques
 

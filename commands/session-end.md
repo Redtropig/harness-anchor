@@ -25,7 +25,7 @@ End the current session cleanly. Implements the "clean restart path" lifecycle p
 
    Keep ≤ 300 words.
 
-4. **Append to `progress.md`**. **Prepend** a new section (most recent first) following the template structure:
+4. **Append to `progress.md`**. **Prepend** a new section (most recent first). Prefer `node ${CLAUDE_PLUGIN_ROOT}/scripts/progress-prepend.mjs progress.md <entry-file>` — it inserts after the header without loading the whole file (cheap on a long history); fall back to Read+prepend+Write if node is unavailable. Section structure:
 
    ```
    ## YYYY-MM-DD HH:MM — Session N
@@ -45,6 +45,7 @@ End the current session cleanly. Implements the "clean restart path" lifecycle p
    - If criteria all met with evidence → status='pass', evidence object populated, completedAt set
    - If blocked → status='blocked', blockedReason populated
    - Otherwise → leave status='in-progress'
+   - Then keep entries actionable-first: `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-sort.mjs feature_list.json` (best-effort, deterministic reorder only — skip silently if node is unavailable).
 
 6. **Offer TOC refresh.** If git diff suggests structural changes (new/renamed/deleted files), ask the user:
 

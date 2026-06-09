@@ -144,6 +144,84 @@ else
     PASS=$((PASS+1))
 fi
 
+# ---- Deep repo → directory-map injection + budget-at-scale (piece 4b/4c) ----
+# A real index-builder run on a deep tree produces a TOC whose ## Files and ## Directory map
+# both exceed the Tier-1 budget, forcing the adaptive degradation. The map (not the file list)
+# must be injected, and — crucially — the decoded context must stay within the 8000-char cap.
+TMPDIR4=$(mktemp -d)
+trap 'rm -rf "$TMPDIR" "$TMPDIR2" "$TMPDIR3" "$TMPDIR4"' EXIT
+cd "$TMPDIR4" || exit 1
+git init -q
+git config user.email test@example.com
+git config user.name test
+printf '{ "project": "big", "features": [] }\n' > feature_list.json
+i=0
+while [ "$i" -lt 200 ]; do
+    d=$(printf 'd%03d' "$i")
+    mkdir -p "$d"
+    printf '// %s file\n' "$d" > "$d/f.txt"
+    i=$((i+1))
+done
+git add -A >/dev/null 2>&1
+git commit -qm init >/dev/null 2>&1 || true
+node "$PLUGIN_ROOT/scripts/index-builder.mjs" --target "$TMPDIR4" >/dev/null 2>&1 || true
+
+echo ""
+echo "=== session-start (deep repo → directory-map injected, budget held) ==="
+output5=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR4" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
+ctx5=$(printf '%s' "$output5" | python3 -c "import json,sys; print(json.load(sys.stdin).get('hookSpecificOutput',{}).get('additionalContext',''))" 2>/dev/null || true)
+if [ -z "$output5" ]; then
+    echo "  FAIL no output emitted"; FAIL=$((FAIL+1))
+else
+    assert_json_valid "$output5"
+    assert_contains "(root)" "$ctx5"        # the "(root)" line is map-only — proves map injection
+    assert_contains "for the full" "$ctx5"  # a "see ... for the full ..." pointer (degraded view)
+    len5=${#ctx5}
+    if [ "$len5" -le 8000 ]; then
+        echo "  OK   budget held at scale: ${len5} <= 8000"; PASS=$((PASS+1))
+    else
+        echo "  FAIL budget blown at scale: ${len5} > 8000"; FAIL=$((FAIL+1))
+    fi
+fi
+
+# ---- Old-style TOC (no ## Directory map) → legacy files-truncation fallback (piece 4d) ----
+TMPDIR5=$(mktemp -d)
+trap 'rm -rf "$TMPDIR" "$TMPDIR2" "$TMPDIR3" "$TMPDIR4" "$TMPDIR5"' EXIT
+cd "$TMPDIR5" || exit 1
+git init -q
+git config user.email test@example.com
+git config user.name test
+printf '{ "project": "legacy", "features": [] }\n' > feature_list.json
+{
+    echo '<!-- generated-at-commit: PLACEHOLDER_COMMIT_SHA -->'
+    echo '# PROJECT TOC'
+    echo ''
+    echo '## Files'
+    echo ''
+    j=0
+    while [ "$j" -lt 400 ]; do printf -- '- `src/file%03d.cpp` — one-line summary for file %03d\n' "$j" "$j"; j=$((j+1)); done
+} > PROJECT-TOC.md
+git add -A >/dev/null 2>&1
+git commit -qm init >/dev/null 2>&1 || true
+
+echo ""
+echo "=== session-start (old TOC, no dir-map → legacy truncation, budget held) ==="
+output6=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR5" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
+ctx6=$(printf '%s' "$output6" | python3 -c "import json,sys; print(json.load(sys.stdin).get('hookSpecificOutput',{}).get('additionalContext',''))" 2>/dev/null || true)
+if [ -z "$output6" ]; then
+    echo "  FAIL no output emitted"; FAIL=$((FAIL+1))
+else
+    assert_json_valid "$output6"
+    assert_contains "file000.cpp" "$ctx6"                        # head of the list present
+    assert_contains "see PROJECT-TOC.md for full index" "$ctx6"  # legacy pointer
+    len6=${#ctx6}
+    if [ "$len6" -le 8000 ]; then
+        echo "  OK   legacy budget held: ${len6} <= 8000"; PASS=$((PASS+1))
+    else
+        echo "  FAIL legacy budget blown: ${len6} > 8000"; FAIL=$((FAIL+1))
+    fi
+fi
+
 echo ""
 echo "==================================="
 echo " Pass: $PASS    Fail: $FAIL"
