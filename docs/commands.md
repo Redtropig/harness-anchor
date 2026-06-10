@@ -76,7 +76,7 @@ substitution (project name, ISO-8601 timestamp, git SHA):
 **Arguments.** None.
 
 **Prerequisites.** Best run inside a git repo — if not, it asks whether to `git init` first
-(recommended) or continue (TOC freshness then degrades to "always stale").
+(recommended) or continue (TOC freshness then can't be verified — reports `not-git`).
 
 **Writes / side effects.** Creates the files above. Existing non-empty files trigger the
 overwrite prompt. Does **not** commit (review the diff yourself first).

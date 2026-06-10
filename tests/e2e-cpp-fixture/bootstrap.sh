@@ -4,13 +4,12 @@
 # Copies the fixture into a temp directory, git-inits, makes an initial commit,
 # regenerates PROJECT-TOC.md via index-builder.mjs, and commits it.
 #
-# Note on TOC freshness: the anchor in PROJECT-TOC.md will point to the
-# commit BEFORE the TOC was committed, so `toc-freshness.sh` will report
-# "stale (1 file changed)" — this is an inherent limitation of the
-# commit-then-anchor approach (committing the TOC advances HEAD past the
-# anchor it records). The CI structural checks verify file existence and
-# JSON validity, not TOC freshness. For a genuinely fresh TOC, the user
-# would run `/index-project` after committing, which updates the anchor.
+# Note on TOC freshness: the anchor in PROJECT-TOC.md points to the commit
+# BEFORE the TOC was committed, but `toc-freshness.sh` excludes the TOC from
+# its own staleness counts — so the regenerate→commit sequence below ends
+# "fresh". Only real drift (other files changed since the anchor) reports
+# "stale". The CI structural checks verify file existence and JSON validity,
+# not TOC freshness.
 #
 # Usage: bash tests/e2e-cpp-fixture/bootstrap.sh
 #   Prints the temp directory path to stdout.

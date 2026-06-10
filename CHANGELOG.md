@@ -2,6 +2,12 @@
 
 All notable changes to harness-anchor are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- `scripts/toc-freshness.sh`: **exclude `PROJECT-TOC.md` from its own staleness counts** (pathspec `:(exclude)` on both the committed-diff and working-tree checks). Previously the TOC counted itself — committing a regenerated TOC always advanced HEAD past its own anchor, so **"fresh" was unreachable in the canonical tracked-TOC workflow** (the very one `/index-project` recommends: `git add PROJECT-TOC.md && git commit`) and the "stale … run /index-project" nudge fired permanently, prescribing a cure that couldn't work. Now the regenerate→commit loop converges to `fresh`, and `stale` means real drift. Status words/format unchanged (consumers — SessionStart banner, `/status`, `index-curator` — unaffected). Rewrote the unit-test stale fixture that had pinned the old behavior, added a canonical-workflow regression case, and corrected three docs/comments that had rationalized the false-stale as "an inherent limitation" (`tests/e2e-cpp-fixture/bootstrap.sh`, `docs/troubleshooting.md` §3, `skills/project-indexing` algorithm note) plus the inaccurate "always stale" wording in `/anchor` docs (a no-git project actually reports `not-git`).
+
 ## [0.4.0] - 2026-06-09
 
 ### Added

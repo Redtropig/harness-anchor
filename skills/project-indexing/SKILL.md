@@ -24,9 +24,10 @@ description: Use when locating files or understanding structure. Consults PROJEC
    <!-- generated-at-commit: <SHA> -->
    ```
 
-   Stale if either:
+   Stale if either (both counts exclude `PROJECT-TOC.md` itself, so committing a
+   regenerated TOC does not re-stale it):
    - `git diff --name-only <SHA> HEAD` returns files
-   - `git status --porcelain` shows working-tree changes to tracked files
+   - `git status --porcelain` shows working-tree changes (untracked files count — the TOC doesn't cover them)
 
    Note: the SessionStart hook already computes `toc_stale: true/false` and injects it. If stale, prefer `/index-project` before deep navigation; for one-off questions, fall back to Glob.
 

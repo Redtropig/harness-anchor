@@ -46,9 +46,12 @@ if ! (cd "$PROJECT_DIR" && git cat-file -t "$anchor_commit" >/dev/null 2>&1); th
     exit 0
 fi
 
-# Count committed changes since anchor + working-tree changes.
-cc=$(cd "$PROJECT_DIR" && git diff --name-only "$anchor_commit" HEAD 2>/dev/null | wc -l | tr -d ' ') || cc=0
-wc_=$(cd "$PROJECT_DIR" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ') || wc_=0
+# Count committed changes since anchor + working-tree changes — excluding the
+# TOC itself. Committing a regenerated TOC necessarily advances HEAD past the
+# anchor it records, so counting the TOC would make "fresh" unreachable in the
+# canonical tracked-TOC workflow (permanent false-stale). Only real drift counts.
+cc=$(cd "$PROJECT_DIR" && git diff --name-only "$anchor_commit" HEAD -- . ':(exclude)PROJECT-TOC.md' 2>/dev/null | wc -l | tr -d ' ') || cc=0
+wc_=$(cd "$PROJECT_DIR" && git status --porcelain -- . ':(exclude)PROJECT-TOC.md' 2>/dev/null | wc -l | tr -d ' ') || wc_=0
 # Sanitize: ensure numeric-only (strip stray whitespace/newlines).
 cc=$(printf '%s' "$cc" | tr -cd '0-9') ; cc="${cc:-0}"
 wc_=$(printf '%s' "$wc_" | tr -cd '0-9') ; wc_="${wc_:-0}"

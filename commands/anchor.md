@@ -53,7 +53,7 @@ When writing templates:
 ## Refusal cases
 
 If the current directory is **not a git repository**, surface this and ask whether to:
-- Continue anyway (TOC freshness will degrade to "always stale")
+- Continue anyway (TOC freshness can't be verified — reports `not-git`)
 - Run `git init` first (recommended)
 
 If `feature_list.json` exists and is **already valid**: skip it by default, mention to the user.

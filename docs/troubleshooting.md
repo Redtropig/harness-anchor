@@ -42,19 +42,19 @@ Common failure modes with diagnosis and fix steps.
 
 ---
 
-## 3. PROJECT-TOC.md always reports "stale"
+## 3. PROJECT-TOC.md reports "stale"
 
-**Symptom:** Every session, TOC freshness shows "stale (N file(s) changed)" even after running `/index-project`.
+**Symptom:** TOC freshness shows "stale (N file(s) changed since anchor <sha>)".
 
-**Cause:** Running `/index-project` regenerates the TOC with the current HEAD as anchor, but committing the TOC advances HEAD by 1 — making it "stale" again immediately. This is an inherent limitation of the commit-then-anchor approach.
+**Cause:** Tracked content really changed since the TOC was generated — commits past the anchor, or working-tree changes (untracked files count too: the TOC doesn't cover them). `PROJECT-TOC.md` itself is **excluded** from the count, so committing the regenerated TOC does *not* re-stale it — the canonical `/index-project` → `git commit` loop converges to "fresh". (Older versions counted the TOC itself, producing a permanent false-stale; that was fixed.)
 
 **Diagnosis:**
 1. Run `bash scripts/toc-freshness.sh <project-dir>` — check the anchor commit vs HEAD.
-2. If the anchor is 1 commit behind and the only changed file is `PROJECT-TOC.md` itself, this is the expected behavior.
+2. `git diff --name-only <anchor> HEAD -- . ':(exclude)PROJECT-TOC.md'` lists exactly the files driving the staleness.
 
 **Fix:**
-- Run `/index-project` after committing other changes but before committing the TOC itself.
-- Or accept the stale status — it's a warning, not a blocker. The TOC content is still accurate; only the anchor lags.
+- Run `/index-project` (re-anchors at current HEAD), then commit the TOC.
+- Mid-feature with only 1–2 changed files, it's fine to ignore the warning until `/session-end` — it's a warning, not a blocker.
 
 ---
 

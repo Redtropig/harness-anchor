@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Unit test for scripts/toc-freshness.sh — every status branch, including the
-# documented bug-fix paths (anchor-commit existence guard; numeric sanitization).
+# documented bug-fix paths (anchor-commit existence guard; numeric sanitization;
+# TOC self-exclusion: the TOC never counts toward its own staleness).
 
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -43,17 +44,32 @@ mkgit "$ROOT/missingcommit"; ( cd "$ROOT/missingcommit" || exit 1; echo x>f; git
 printf '<!-- generated-at-commit: %s -->\n' "0000000000000000000000000000000000000000" > "$ROOT/missingcommit/PROJECT-TOC.md"
 expect "no-anchor(missing commit)" "no-anchor" "$(bash "$TF" "$ROOT/missingcommit")"
 
-# stale — anchor == HEAD but the (untracked) TOC dirties the working tree
+# stale — anchor == HEAD but a real (non-TOC) untracked file dirties the tree.
+# The untracked TOC alone must NOT count (self-exclusion) — see the fresh cases.
 mkgit "$ROOT/stale"; ( cd "$ROOT/stale" || exit 1; echo x>f; git add -A; git commit -qm init )
 h_stale=$(cd "$ROOT/stale" || exit 1; git rev-parse HEAD)
 printf '<!-- generated-at-commit: %s -->\n' "$h_stale" > "$ROOT/stale/PROJECT-TOC.md"
-expect "stale" "stale" "$(bash "$TF" "$ROOT/stale")"
+echo y > "$ROOT/stale/new-file"
+expect "stale(untracked non-TOC file)" "stale" "$(bash "$TF" "$ROOT/stale")"
 
 # fresh — anchor == HEAD and clean tree (gitignore the TOC so it doesn't dirty status)
 mkgit "$ROOT/fresh"; ( cd "$ROOT/fresh" || exit 1; echo x>f; printf 'PROJECT-TOC.md\n'>.gitignore; git add -A; git commit -qm init )
 h_fresh=$(cd "$ROOT/fresh" || exit 1; git rev-parse HEAD)
 printf '<!-- generated-at-commit: %s -->\n' "$h_fresh" > "$ROOT/fresh/PROJECT-TOC.md"
 expect "fresh" "fresh" "$(bash "$TF" "$ROOT/fresh")"
+
+# fresh — CANONICAL tracked-TOC workflow (regression pin for the self-exclusion
+# fix): regenerate (anchor = HEAD), commit the TOC. Without the exclusion this
+# loop could never converge to fresh — the TOC's own commit re-staled it forever.
+mkgit "$ROOT/canonical"; ( cd "$ROOT/canonical" || exit 1; echo x>f; git add -A; git commit -qm init )
+h_canon=$(cd "$ROOT/canonical" || exit 1; git rev-parse HEAD)
+printf '<!-- generated-at-commit: %s -->\n' "$h_canon" > "$ROOT/canonical/PROJECT-TOC.md"
+( cd "$ROOT/canonical" || exit 1; git add -A; git commit -qm toc )
+expect "fresh(canonical: TOC committed)" "fresh" "$(bash "$TF" "$ROOT/canonical")"
+
+# …and real drift after that canonical fresh state still reports stale.
+( cd "$ROOT/canonical" || exit 1; echo y>grown.c; git add -A; git commit -qm grow )
+expect "stale(real drift past canonical fresh)" "stale" "$(bash "$TF" "$ROOT/canonical")"
 
 echo ""
 echo " Pass: $PASS  Fail: $FAIL"
