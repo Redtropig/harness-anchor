@@ -63,13 +63,15 @@ by id, and the hooks find the active feature by it. Two features sharing an id m
 ambiguous (wrong entry, or both). The JSON Schema **cannot** catch this (draft-07 has no per-field
 uniqueness), so it is on you to keep ids unique.
 
-**Check the candidate id BEFORE you write the new entry** (this is the reliable moment — collisions
-are cheap to avoid, annoying to untangle later):
+**Mint the id with the tool BEFORE you write the new entry — don't eyeball the list** (scanning a
+long id list for a clash is unreliable and splits your attention from composing the feature):
 
-1. You just `Read` `feature_list.json` to `Edit` it, so its existing ids are already in front of
-   you — scan them. If unsure, run `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-validate.mjs --check <candidate-id> feature_list.json` (exit 0 = free; non-zero = taken, and it prints a free suggestion).
-2. **If the candidate collides, qualify the NEW entry's id** — `parser` → `parser-cli`, `parser-net`,
-   or the suggested `parser-2`. Never reuse a slug; never rename an *existing* id to dodge the clash.
+1. Run `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-validate.mjs --check <candidate-id> feature_list.json`
+   (exit 0 = free; non-zero = taken, and it prints a free suggestion). *If node is unavailable, fall
+   back to scanning the existing ids yourself.*
+2. **If the candidate collides, qualify the NEW entry's id** — take the suggestion (`parser-2`) or a
+   descriptive variant (`parser` → `parser-cli`, `parser-net`). Never reuse a slug; never rename an
+   *existing* id to dodge the clash.
 3. Then write the entry with the unique id.
 
 Backstops if one slips through: the **post-tool-use hook** warns the moment a duplicate is written,
