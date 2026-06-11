@@ -82,7 +82,7 @@ flowchart TB
     CMDS["/anchor /cpp-init /index-project<br/>/verify /sanitize /status /session-end"]:::cmd
   end
 
-  HELP["runtime scripts<br/>cpp-detect · toc-freshness · index-builder<br/>feature-list-sort · progress-prepend"]:::script
+  HELP["runtime scripts<br/>cpp-detect · toc-freshness · index-builder<br/>feature-list-sort · feature-list-validate · progress-prepend"]:::script
   TPL["templates/*.tpl"]:::tpl
   STATE[("PER-PROJECT STATE<br/>feature_list.json · progress.md · session-handoff.md<br/>PROJECT-TOC.md · AGENTS.md · init.sh · context-budget.md<br/>.clang-format/.clang-tidy · .harness-anchor/ logs")]:::state
 
@@ -169,7 +169,7 @@ flowchart LR
 | Hook | Fires on (trigger) | Reads (info) | Effect | Recommends |
 |---|---|---|---|---|
 | **session-start** | session `startup`/`clear`/`compact` | `plugin.json` (version), `feature_list.json`, `session-handoff.md`, `PROJECT-TOC.md` (via `toc-freshness.sh`), project type (via `cpp-detect.sh`), `.clang-format`/`.clang-tidy` | injects `<harness-anchor-state>` banner **+ an adaptive `<project-toc>` view** (full `## Files` on a small repo, else the `## Directory map`; shallowest dirs first when even that is large) **+ the `using-harness-anchor` meta-skill body** (`additionalContext`, budget ≤ 2000 tok) | `/anchor` (un-anchored) · `/cpp-init` (C/C++, anchored, no clang cfg — v0.3.1) · `/index-project` (TOC absent/stale) |
-| **post-tool-use** | after **Edit/Write** | `feature_list.json` (pass-feature file list), `compile_commands.json` (presence) | `additionalContext` warning: regression-warn if a *passed* feature's file changed; **clang-tidy** on the changed C/C++ file when `compile_commands.json` exists | `/sanitize` (one-line nudge on C/C++ edit) · `/verify` (before a pass claim) |
+| **post-tool-use** | after **Edit/Write** | `feature_list.json` (pass-feature file list; **duplicate `id` scan when the ledger itself is written**), `compile_commands.json` (presence) | `additionalContext` warning: regression-warn if a *passed* feature's file changed; **duplicate feature-`id` warn** (warn-only safety net behind `feature-state-keeper`'s pre-write check); **clang-tidy** on the changed C/C++ file when `compile_commands.json` exists | `/sanitize` (one-line nudge on C/C++ edit) · `/verify` (before a pass claim) |
 | **stop** | agent about to stop | `feature_list.json`, `progress.md` (mtime), `session-handoff.md` (mtime) | **`systemMessage`** wrap-up reminder *(v0.3.2 — was the invalid `hookSpecificOutput`)* | `/session-end` |
 | **user-prompt-submit** | every user prompt | `feature_list.json` (active feature) | `additionalContext` scope-check | confirm scope before pivoting (one-active-feature) |
 
@@ -242,7 +242,7 @@ flowchart TB
 | **/verify** `[--fix]` | before claiming a feature passes | **Task → `verification-runner`** (fresh context each cycle) | on PASS, updates `feature_list.json` status+evidence (via `feature-state-keeper`) | `--fix` bounded to **≤ 2** cycles; never self-grades; Default-FAIL (#8) |
 | **/sanitize** | after a C/C++ change / before merge | `cpp-detect.sh`; `templates/cpp/sanitizer-build.sh.tpl` | runs ASan+UBSan (TSan separately) → `.harness-anchor/sanitize-*.log`; report mirrors `verification-runner` | refuses on non-C/C++ (via `cpp-detect.sh`); heavy ⇒ command, never a hook (#7) |
 | **/status** | "where am I / what's the state?" | `toc-freshness.sh` | **nothing — read-only** snapshot (active feature, counts, git tree, TOC freshness, handoff head) | — |
-| **/session-end** | at a stopping point | runs `init.sh`; `progress-prepend.mjs`; `feature-list-sort.mjs` | overwrites `session-handoff.md`; prepends `progress.md` (newest-first); updates + actionable-first sorts `feature_list.json`; offers TOC refresh + commit | refuses `status=pass` without evidence (Default-FAIL); suggests `/anchor` if un-anchored |
+| **/session-end** | at a stopping point | runs `init.sh`; `progress-prepend.mjs`; `feature-list-sort.mjs`; `feature-list-validate.mjs` | overwrites `session-handoff.md`; prepends `progress.md` (newest-first); updates + actionable-first sorts `feature_list.json`; validates feature `id` uniqueness before commit; offers TOC refresh + commit | refuses `status=pass` without evidence (Default-FAIL); suggests `/anchor` if un-anchored |
 
 ---
 
@@ -359,6 +359,7 @@ flowchart TB
     tocf["toc-freshness.sh"]:::script
     ib["index-builder.mjs"]:::script
     fls["feature-list-sort.mjs"]:::script
+    flv["feature-list-validate.mjs"]:::script
     pp["progress-prepend.mjs"]:::script
   end
   H1["session-start"]:::hook --> cpd
@@ -369,6 +370,7 @@ flowchart TB
   C4["/status"]:::cmd --> tocf
   C5["/index-project"]:::cmd --> ib
   C6["/session-end"]:::cmd --> fls
+  C6 --> flv
   C6 --> pp
   A1["index-curator"]:::agent --> ib
 
@@ -396,6 +398,7 @@ flowchart TB
 | `toc-freshness.sh` | runtime | session-start hook, `/status` | compare `PROJECT-TOC.md` anchor commit vs HEAD |
 | `index-builder.mjs` | runtime | `/index-project`, `index-curator` agent | scan `git ls-files`, build `PROJECT-TOC.md` (incl. the `## Directory map`); writes `.harness-anchor/last-error.log` on failure |
 | `feature-list-sort.mjs` | runtime | `/session-end` | reorder `feature_list.json` actionable-first (in-progress→blocked→planned→pass); deterministic, idempotent, lossless |
+| `feature-list-validate.mjs` | runtime | post-tool-use hook (logic mirrored), `/session-end`, `feature-state-keeper` (`--check`) | enforce feature **`id` uniqueness** — the schema's blind spot (draft-07 has no per-field uniqueness); read-only, exit 3 on collision |
 | `progress-prepend.mjs` | runtime | `/session-end` | insert a new `progress.md` entry after the header without loading the whole file (newest-first) |
 | `validate-anchor.sh` | dev/CI | CI, manual | plugin self-consistency (skills/commands/agents/templates/hooks); calls `check-allowed-tools.sh` |
 | `validate-manifests.sh` | dev/CI | CI, manual | `plugin.json`/`marketplace.json` shape + version sync (uses `schemas/`) |

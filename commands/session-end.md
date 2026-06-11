@@ -46,6 +46,7 @@ End the current session cleanly. Implements the "clean restart path" lifecycle p
    - If blocked → status='blocked', blockedReason populated
    - Otherwise → leave status='in-progress'
    - Then keep entries actionable-first: `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-sort.mjs feature_list.json` (best-effort, deterministic reorder only — skip silently if node is unavailable).
+   - **Verify id uniqueness before committing:** `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-validate.mjs feature_list.json` (best-effort; skip silently if node is unavailable). If it exits non-zero, it prints the duplicate id(s) — resolve by **renaming the newer entry** to the suggested unique id (never rename an existing id, never commit a colliding ledger) before step 7.
 
 6. **Offer TOC refresh.** If git diff suggests structural changes (new/renamed/deleted files), ask the user:
 

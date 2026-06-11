@@ -101,6 +101,52 @@ else
     FAIL=$((FAIL+1))
 fi
 
+# Duplicate feature-id test: editing feature_list.json with a colliding id must warn.
+# Pins the post-tool-use hook (L3) to agree with feature-list-validate.mjs (L2).
+TMPDIR3=$(mktemp -d)
+trap 'rm -rf "$TMPDIR" "$TMPDIR2" "$TMPDIR3"' EXIT
+cat > "$TMPDIR3/feature_list.json" <<'EOF'
+{
+  "project": "fixture",
+  "features": [
+    { "id": "parser", "name": "P1", "description": "d", "status": "planned", "done_criteria": ["x"] },
+    { "id": "parser", "name": "P2", "description": "d", "status": "in-progress", "done_criteria": ["x"] }
+  ]
+}
+EOF
+input_json3=$(printf '{"tool_name":"Edit","tool_input":{"file_path":"%s/feature_list.json"}}' "$TMPDIR3")
+output3=$(printf '%s' "$input_json3" | bash "$PLUGIN_ROOT/hooks/post-tool-use" 2>/dev/null || true)
+
+echo ""
+echo "=== duplicate feature-id test ==="
+if [ -z "$output3" ]; then
+    echo "  FAIL no output emitted; expected duplicate-id warning"
+    FAIL=$((FAIL+1))
+else
+    assert_json_valid "$output3"
+    assert_contains "Duplicate feature id" "$output3"
+    assert_contains "parser" "$output3"
+fi
+
+# Negative: a UNIQUE-id ledger edit must stay silent (no false dup warning).
+cat > "$TMPDIR3/feature_list.json" <<'EOF'
+{
+  "project": "fixture",
+  "features": [
+    { "id": "parser", "name": "P1", "description": "d", "status": "in-progress", "done_criteria": ["x"] },
+    { "id": "engine", "name": "E", "description": "d", "status": "planned", "done_criteria": ["x"] }
+  ]
+}
+EOF
+output4=$(printf '%s' "$input_json3" | bash "$PLUGIN_ROOT/hooks/post-tool-use" 2>/dev/null || true)
+if printf '%s' "$output4" | grep -q "Duplicate feature id"; then
+    echo "  FAIL unique ledger wrongly flagged as duplicate"
+    FAIL=$((FAIL+1))
+else
+    echo "  OK   unique-id ledger edit is silent (no false dup warning)"
+    PASS=$((PASS+1))
+fi
+
 echo ""
 echo "==================================="
 echo " Pass: $PASS    Fail: $FAIL"

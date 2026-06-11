@@ -26,7 +26,8 @@
         "id": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9-]*$",
-          "description": "Stable kebab-case id; never rename"
+          "description": "Stable kebab-case id; never rename",
+          "$comment": "Must be UNIQUE across features. JSON Schema draft-07 cannot express per-field uniqueness (uniqueItems is whole-object equality), so this is enforced imperatively by scripts/feature-list-validate.mjs + the post-tool-use hook — do not try to encode it here."
         },
         "name": {
           "type": "string"

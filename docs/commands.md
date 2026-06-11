@@ -299,7 +299,9 @@ can resume from disk, not from chat memory.
 4. **Prepends** a dated entry to `progress.md` (append-only history) — via
    `progress-prepend.mjs`, which inserts after the header without loading the whole file.
 5. Updates `feature_list.json` status if warranted (`pass` only with evidence; else
-   `blocked` / stays `in-progress`), then keeps it **actionable-first** via `feature-list-sort.mjs`.
+   `blocked` / stays `in-progress`), keeps it **actionable-first** via `feature-list-sort.mjs`,
+   then **validates feature `id` uniqueness** via `feature-list-validate.mjs` (resolve any
+   duplicate before committing).
 6. Offers a `PROJECT-TOC.md` refresh if structure changed.
 7. Offers to commit **state files only** (`chore(harness): session N handoff — <feature id>`).
 

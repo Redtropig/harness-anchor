@@ -48,7 +48,7 @@ Run `/session-end` for guided handoff.
 
 ## Scope Boundaries
 
-- One active feature at a time. If you discover new work, add it to `feature_list.json` with `status: "planned"` — do NOT begin it.
+- One active feature at a time. If you discover new work, add it to `feature_list.json` with a **unique `id`** and `status: "planned"` — do NOT begin it.
 - If the user adds an unrelated request mid-feature, surface the scope-jump and ask for explicit confirmation before pivoting.
 
 ## Verification Commands

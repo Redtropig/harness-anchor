@@ -4,6 +4,15 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+### Added
+
+- **Feature `id` uniqueness enforcement** (closes a gap the JSON Schema can't: draft-07 has no per-field uniqueness, so `feature_list.schema.json` was structurally blind to `id` collisions — and `id` is the lookup key for status/evidence updates, so a duplicate silently corrupts the source of truth). Warn-only, defense-in-depth:
+  - `scripts/feature-list-validate.mjs` (NEW, node, read-only) — default mode flags duplicate ids (exit 3); `--check <id>` is a pre-write candidate test that suggests the first free `-N` suffix. Single responsibility = uniqueness (id *format* stays the schema's job).
+  - **Pre-write (primary):** `feature-state-keeper` gains a "Feature id uniqueness" section — check the candidate id against existing ones (the file was just read to edit it; or `--check`) and qualify a colliding id *before* writing.
+  - **At-write safety net:** `hooks/post-tool-use` warns (warn-only, fail-silent) the moment a `feature_list.json` write introduces a duplicate id, naming it + suggesting a free one.
+  - **Pre-commit backstop:** `/session-end` runs the validator before offering a commit.
+  - New `tests/unit/feature-list-validate.sh` + a duplicate-id hook-contract case + an e2e-fixture uniqueness assertion; schema carries an inert `$comment` documenting why uniqueness is enforced imperatively, not in the schema.
+
 ### Fixed
 
 - `scripts/toc-freshness.sh`: **exclude `PROJECT-TOC.md` from its own staleness counts** (pathspec `:(exclude)` on both the committed-diff and working-tree checks). Previously the TOC counted itself — committing a regenerated TOC always advanced HEAD past its own anchor, so **"fresh" was unreachable in the canonical tracked-TOC workflow** (the very one `/index-project` recommends: `git add PROJECT-TOC.md && git commit`) and the "stale … run /index-project" nudge fired permanently, prescribing a cure that couldn't work. Now the regenerate→commit loop converges to `fresh`, and `stale` means real drift. Status words/format unchanged (consumers — SessionStart banner, `/status`, `index-curator` — unaffected). Rewrote the unit-test stale fixture that had pinned the old behavior, added a canonical-workflow regression case, and corrected three docs/comments that had rationalized the false-stale as "an inherent limitation" (`tests/e2e-cpp-fixture/bootstrap.sh`, `docs/troubleshooting.md` §3, `skills/project-indexing` algorithm note) plus the inaccurate "always stale" wording in `/anchor` docs (a no-git project actually reports `not-git`).

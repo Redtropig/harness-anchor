@@ -56,6 +56,26 @@ If you discover work that doesn't match the active feature:
 2. Tell the user: *"This looks like new scope. I've recorded it as a planned feature. Should I finish <active feature> first, or pivot?"*
 3. Wait for confirmation before changing status.
 
+## Feature id uniqueness
+
+`id` is the **lookup/mutation key** — `/verify` flips *the* feature to `pass` and attaches evidence
+by id, and the hooks find the active feature by it. Two features sharing an id make those updates
+ambiguous (wrong entry, or both). The JSON Schema **cannot** catch this (draft-07 has no per-field
+uniqueness), so it is on you to keep ids unique.
+
+**Check the candidate id BEFORE you write the new entry** (this is the reliable moment — collisions
+are cheap to avoid, annoying to untangle later):
+
+1. You just `Read` `feature_list.json` to `Edit` it, so its existing ids are already in front of
+   you — scan them. If unsure, run `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-validate.mjs --check <candidate-id> feature_list.json` (exit 0 = free; non-zero = taken, and it prints a free suggestion).
+2. **If the candidate collides, qualify the NEW entry's id** — `parser` → `parser-cli`, `parser-net`,
+   or the suggested `parser-2`. Never reuse a slug; never rename an *existing* id to dodge the clash.
+3. Then write the entry with the unique id.
+
+Backstops if one slips through: the **post-tool-use hook** warns the moment a duplicate is written,
+and **`/session-end`** runs `feature-list-validate.mjs` before committing. Both are warn-only — they
+catch, they don't fix. Resolve a flagged duplicate by renaming the newer entry, as above.
+
 ## Default-FAIL evidence contract
 
 Before flipping `status` to `"pass"`:
@@ -121,7 +141,7 @@ Aim for ≤ 300 words. The next session should be able to resume from this alone
 
 - Required: `project`, `features` (array)
 - Per feature: `id`, `name`, `description`, `status`, `done_criteria`
-- `id` is kebab-case, never rename once set
+- `id` is kebab-case, **unique across all features**, and never renamed once set (see "Feature id uniqueness" below)
 - `status` ∈ `planned | in-progress | pass | blocked`
 - `evidence` MUST be non-null when `status == "pass"` (Default-FAIL invariant)
 

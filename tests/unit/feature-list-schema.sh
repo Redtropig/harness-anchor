@@ -83,6 +83,14 @@ if not errs:
 else:
     bad("e2e fixture violations: " + "; ".join(errs))
 
+# --- feature ids must be UNIQUE (the schema cannot express this; enforced imperatively) ---
+fixture_ids = [ft.get("id") for ft in fixture.get("features", [])]
+if len(fixture_ids) == len(set(fixture_ids)):
+    ok("e2e fixture feature ids are unique")
+else:
+    dupes = sorted({i for i in fixture_ids if fixture_ids.count(i) > 1})
+    bad("e2e fixture has duplicate feature ids: " + ", ".join(dupes))
+
 # --- negative: Default-FAIL must reject a pass-without-evidence doc ---
 bad_doc = {"project": "x", "features": [
     {"id": "f", "name": "n", "description": "d",
