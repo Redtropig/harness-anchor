@@ -15,7 +15,7 @@ harness-anchor has **three invocation modes** that all converge on **one shared 
 | Mode | Who fires it | Examples | Can it write state? |
 |---|---|---|---|
 | ① **Automatic** | Claude Code *events* → warn-only hooks | SessionStart, PostToolUse, Stop, UserPromptSubmit | **No** — hooks only *read* state + *recommend* commands |
-| ② **Model-pulled** | the agent *auto-loads* a skill by its description; a skill may dispatch a subagent via `Task` | 12 skills, 3 agents | Agents: only `index-curator` writes (`PROJECT-TOC.md`); the rest are read-only |
+| ② **Model-pulled** | the agent *auto-loads* a skill by its description; a skill may dispatch a subagent via `Task` | 13 skills, 4 agents | Agents: only `index-curator` writes (`PROJECT-TOC.md`); the rest are read-only |
 | ③ **User-invoked** | the user types a *slash command* | `/anchor` … `/session-end` | **Yes** — commands are the main writers |
 
 Hooks are deliberately "dumb": they detect a situation and *nudge* the user toward a command or
@@ -72,14 +72,14 @@ flowchart TB
 
   subgraph PULL["② MODEL-PULLED (auto-load by description)"]
     META["using-harness-anchor<br/>(meta-skill)"]:::skill
-    SKILLS["11 sibling skills<br/>(docs-lookup is the hub)"]:::skill
-    AGENTS["3 subagents via Task<br/>(single-level)"]:::agent
+    SKILLS["12 sibling skills<br/>(docs-lookup is the hub)"]:::skill
+    AGENTS["4 subagents via Task<br/>(single-level)"]:::agent
     META --- SKILLS
     SKILLS -->|"dispatch"| AGENTS
   end
 
   subgraph USER["③ USER-INVOKED (slash commands)"]
-    CMDS["/anchor /cpp-init /index-project<br/>/verify /sanitize /status /session-end"]:::cmd
+    CMDS["/anchor /cpp-init /index-project<br/>/verify /test-plan /sanitize /status /session-end"]:::cmd
   end
 
   HELP["runtime scripts<br/>cpp-detect · toc-freshness · index-builder<br/>feature-list-sort · feature-list-validate · progress-prepend"]:::script
@@ -175,7 +175,7 @@ flowchart LR
 
 ---
 
-## 3 · User-invoked layer — the 7 commands
+## 3 · User-invoked layer — the 8 commands
 
 Commands are the **writers**. They call runtime scripts, instantiate templates, dispatch the
 `verification-runner` subagent, and update the state files. (`allowed-tools` from each command's
@@ -193,6 +193,7 @@ flowchart TB
   cppinit["/cpp-init"]:::cmd
   index["/index-project"]:::cmd
   verify["/verify [--fix]"]:::cmd
+  testplan["/test-plan"]:::cmd
   sanitize["/sanitize"]:::cmd
   status["/status"]:::cmd
   sessionend["/session-end"]:::cmd
@@ -201,6 +202,7 @@ flowchart TB
   tocf["toc-freshness.sh"]:::script
   ib["index-builder.mjs"]:::script
   vr["verification-runner<br/>(fresh-context subagent)"]:::agent
+  ca["coverage-analyst<br/>(fresh-context subagent)"]:::agent
 
   TPLbase["templates/*.tpl<br/>(AGENTS, feature_list+schema, init.sh,<br/>progress, session-handoff, PROJECT-TOC, context-budget)"]:::tpl
   TPLcpp["templates/cpp/*.tpl<br/>(.clang-format, .clang-tidy,<br/>sanitizer-build, cmake/meson-init)"]:::tpl
@@ -223,6 +225,9 @@ flowchart TB
   vr -->|"evidence report"| verify
   verify -->|"on PASS update status"| state
 
+  testplan -->|"Task (fresh-context)"| ca
+  ca -->|"coverage report → .harness-anchor/coverage-*.md (read-only)"| testplan
+
   sanitize -->|"gate (refuse if not C/C++)"| cpd
   sanitize -->|"use"| TPLcpp
   sanitize -->|"ASan+UBSan / TSan; report mirrors verification-runner"| log
@@ -240,6 +245,7 @@ flowchart TB
 | **/cpp-init** | C/C++ project, **after** `/anchor`, no clang cfg | `cpp-detect.sh`; instantiates `templates/cpp/*` | drops `.clang-format`, `.clang-tidy`, `scripts/sanitizer-build.sh`; tunes `init.sh` | asks before overwriting existing clang cfg; refuses on non-C/C++ |
 | **/index-project** | `PROJECT-TOC.md` absent/stale, or before a broad search | `scripts/index-builder.mjs` (bootstraps from `PROJECT-TOC.md.tpl`) | rewrites `PROJECT-TOC.md` with a git-commit freshness anchor | errors if not a git repo |
 | **/verify** `[--fix]` | before claiming a feature passes | **Task → `verification-runner`** (fresh context each cycle) | on PASS, updates `feature_list.json` status+evidence (via `feature-state-keeper`) | `--fix` bounded to **≤ 2** cycles; never self-grades; Default-FAIL (#8) |
+| **/test-plan** | after implementing, before marking `pass` | **Task → `coverage-analyst`** (fresh context) | **nothing — read-only**; emits obligations + run-scope gaps + minimal oracle-independent-first tests → `.harness-anchor/coverage-*.md` | post-impl (TDD owns pre-impl); recommends, never writes tests |
 | **/sanitize** | after a C/C++ change / before merge | `cpp-detect.sh`; `templates/cpp/sanitizer-build.sh.tpl` | runs ASan+UBSan (TSan separately) → `.harness-anchor/sanitize-*.log`; report mirrors `verification-runner` | refuses on non-C/C++ (via `cpp-detect.sh`); heavy ⇒ command, never a hook (#7) |
 | **/status** | "where am I / what's the state?" | `toc-freshness.sh` | **nothing — read-only** snapshot (active feature, counts, git tree, TOC freshness, handoff head) | — |
 | **/session-end** | at a stopping point | runs `init.sh`; `progress-prepend.mjs`; `feature-list-sort.mjs`; `feature-list-validate.mjs` | overwrites `session-handoff.md`; prepends `progress.md` (newest-first); updates + actionable-first sorts `feature_list.json`; validates feature `id` uniqueness before commit; offers TOC refresh + commit | refuses `status=pass` without evidence (Default-FAIL); suggests `/anchor` if un-anchored |
@@ -268,6 +274,7 @@ flowchart LR
   IV["init-verification"]:::skill
   SCL["self-correction-loop"]:::skill
   AHG["anti-hallucination-gates"]:::skill
+  TCD["test-coverage-design"]:::skill
   CBD["context-budget-discipline"]:::skill
   CBS["cpp-build-systems"]:::skill
   CSA["cpp-static-analysis"]:::skill
@@ -275,11 +282,12 @@ flowchart LR
   CS["cpp-sanitizers"]:::skill
 
   VR["verification-runner<br/>(read-only)"]:::agent
+  CA["coverage-analyst<br/>(read-only)"]:::agent
   BD["cpp-build-doctor<br/>(read-only)"]:::agent
   IC["index-curator<br/>(writes PROJECT-TOC.md)"]:::agent
   IB["index-builder.mjs"]:::script
 
-  META -. "recommends all 7 commands" .-> CMDS["/anchor … /session-end"]:::cmd
+  META -. "recommends all 8 commands" .-> CMDS["/anchor … /session-end"]:::cmd
 
   PI -.-> Ci["/index-project"]:::cmd
   FSK -.-> Cse["/session-end"]:::cmd
@@ -293,12 +301,14 @@ flowchart LR
   CF -.-> Cse
   CSA -.-> Ccpp
   CS -.-> Csan["/sanitize"]:::cmd
+  TCD -.-> Ctp["/test-plan"]:::cmd
 
   AHG -->|"Task"| VR
   SCL -->|"Task (re-verify)"| VR
   CBS -->|"Task"| BD
   CBD -->|"Task"| BD
   IC -->|"runs"| IB
+  TCD -->|"Task"| CA
 
   PI -. uses .-> DL
   FSK -. uses .-> DL
@@ -310,6 +320,7 @@ flowchart LR
   CSA -. uses .-> DL
   CF -. uses .-> DL
   CS -. uses .-> DL
+  TCD -. uses .-> DL
   META -. uses .-> DL
 ```
 
@@ -317,12 +328,13 @@ flowchart LR
 
 | Skill | Auto-triggers when | Recommends | Dispatches | Touches |
 |---|---|---|---|---|
-| **using-harness-anchor** (meta) | every session (injected by SessionStart) | **all 7 commands** | — | navigation: `AGENTS.md`, `feature_list.json`, `PROJECT-TOC.md`, `session-handoff.md` |
+| **using-harness-anchor** (meta) | every session (injected by SessionStart) | **all 8 commands** | — | navigation: `AGENTS.md`, `feature_list.json`, `PROJECT-TOC.md`, `session-handoff.md` |
 | **project-indexing** | locating files / understanding structure | `/index-project` | — | reads `PROJECT-TOC.md` before Glob |
 | **feature-state-keeper** | start/advance/finish/block a feature | `/session-end`, `/status` | — | writes `feature_list.json`, `progress.md`, `session-handoff.md` |
 | **init-verification** | start of work; after env change; something breaks | `/anchor`, `/verify` | — | runs `init.sh` |
 | **self-correction-loop** | a hook/tool returns a warning, lint/type/build error, test failure | — | `verification-runner` | re-verify after fix |
-| **anti-hallucination-gates** | before claiming "done/fixed/passing" | `/verify` | `verification-runner` | Default-FAIL evidence contract |
+| **anti-hallucination-gates** | before claiming "done/fixed/passing" | `/verify`, `/test-plan` | `verification-runner` | Default-FAIL evidence contract |
+| **test-coverage-design** | deciding what to test; is a feature covered before "done" | `/test-plan` | `coverage-analyst` | post-impl coverage obligations + risk checklist (sibling `coverage-reference.md`) |
 | **context-budget-discipline** | long sessions, subagents, large fetches | `/verify`, `/session-end` | `cpp-build-doctor` | `context-budget.md` |
 | **docs-lookup** | unfamiliar tool/API/error/library | — (is itself the hub) | — | Context7 → WebSearch → calibrated-uncertainty |
 | **cpp-build-systems** | C/C++ configure/build errors, `compile_commands.json` | — | `cpp-build-doctor` | build dir, `compile_commands.json` |
@@ -335,6 +347,7 @@ flowchart LR
 | Agent | Dispatched by | Tools | Effect |
 |---|---|---|---|
 | **verification-runner** | `/verify` (and re-used by `/sanitize`'s report shape, `anti-hallucination-gates`, `self-correction-loop`) | `Read, Bash, Grep, Glob` (read-only) | fresh-context build/test/lint → `### Build / Tests / Verdict / Recommendation` evidence report |
+| **coverage-analyst** | `/test-plan`, `test-coverage-design` skill | `Read, Bash, Grep, Glob` (read-only) | fresh-context: derive test obligations from code+spec, diff vs suite + run scope, recommend oracle-independent-first tests → `.harness-anchor/coverage-*.md` |
 | **cpp-build-doctor** | `cpp-build-systems`, `context-budget-discipline` skills (when a C/C++ build fails) | `Read, Bash, Grep, Glob` (read-only) | diagnoses root cause from compiler output |
 | **index-curator** | model-pulled by description (TOC needs rebuild: refactors/renames/`toc_stale`) | `Read, Bash, Grep, Glob, Write` | runs `index-builder.mjs`; **sole agent that writes `PROJECT-TOC.md`** |
 

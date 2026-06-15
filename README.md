@@ -1,6 +1,6 @@
 # harness-anchor
 
-> **Runtime constraint layer for Claude Code agents.** Companion to [`superpowers`](https://github.com/obra/superpowers). Anchors your agent to project state, scope boundaries, evidence-based completion, C/C++ engineering best practices, and a strict docs-lookup discipline.
+> **Runtime constraint layer for Claude Code agents.** Companion to [`superpowers`](https://github.com/obra/superpowers). Anchors your agent to project state, scope boundaries, evidence-based completion, test-coverage design, C/C++ engineering best practices, and a strict docs-lookup discipline.
 
 ---
 
@@ -56,7 +56,7 @@ bash init.sh     # health-check the environment
 
 ---
 
-## Skills (12 total — auto-triggered from session context)
+## Skills (13 total — auto-triggered from session context)
 
 | Skill | When it fires |
 |---|---|
@@ -66,6 +66,7 @@ bash init.sh     # health-check the environment
 | `init-verification` | Start of work; after env change; when something stops working |
 | `self-correction-loop` | After tool/hook returns warning, lint/type/build error |
 | `anti-hallucination-gates` | Before claiming "done", "fixed", "passing" |
+| `test-coverage-design` | Deciding what to test; is a feature covered before "done" (dispatches `coverage-analyst`) |
 | `context-budget-discipline` | Long sessions; subagents; large file fetches |
 | `docs-lookup` | Looking up unfamiliar tools/APIs/errors (Context7 → WebSearch → uncertainty) |
 | `cpp-build-systems` | CMake/Meson/Make/Bazel projects |
@@ -73,11 +74,12 @@ bash init.sh     # health-check the environment
 | `cpp-formatting` | clang-format |
 | `cpp-sanitizers` | ASan / UBSan / TSan / valgrind |
 
-## Subagents (3 — invoked via `Task` tool or slash commands)
+## Subagents (4 — invoked via `Task` tool or slash commands)
 
 | Agent | Role |
 |---|---|
 | `verification-runner` | Fresh-context evaluator — runs build/tests/lint, reports evidence paths. Read-only. |
+| `coverage-analyst` | Fresh-context coverage-gap analyst — derives test obligations from code + spec, flags paths outside the run scope, recommends oracle-independent-first tests. Read-only. |
 | `cpp-build-doctor` | Diagnoses C/C++ build failures from compiler output. Read-only. |
 | `index-curator` | Sole writer of `PROJECT-TOC.md`. Used by `/index-project`. |
 
@@ -89,6 +91,7 @@ bash init.sh     # health-check the environment
 | `/cpp-init` | C/C++ project: tunes `init.sh`, drops `.clang-format` / `.clang-tidy` / `sanitizer-build.sh` |
 | `/index-project` | (Re)builds `PROJECT-TOC.md` from git-tracked sources |
 | `/verify` | Dispatches `verification-runner` for fresh-context evaluation; opt-in `--fix` runs a bounded (≤ 2-cycle) auto-fix loop |
+| `/test-plan` | Dispatches `coverage-analyst` for a post-impl coverage-gap analysis (obligations, paths outside the run scope, minimal oracle-independent-first tests); read-only |
 | `/sanitize` | C/C++ project: builds under ASan+UBSan (TSan separately), runs tests, reports findings in fixed sections with a `.harness-anchor/sanitize-*.log` evidence path |
 | `/session-end` | Writes structured handoff + appends `progress.md` + offers commit |
 | `/status` | Read-only project overview: active feature, counts, git tree, TOC freshness, handoff head |
@@ -113,6 +116,7 @@ bash init.sh     # health-check the environment
 - **Progressive Disclosure.** SessionStart injects ≤ 2000 tokens (banner + an adaptive `PROJECT-TOC` view — the directory map, or the full file list on a small repo — + meta-skill). Deeper references live in skill subfolders, loaded on demand.
 - **docs-lookup is canonical.** No inline Context7 → WebSearch waterfalls in other skills — they all reference `docs-lookup` for the procedure (including failure-mode detection and calibrated-uncertainty fallback).
 - **Fresh-context evaluator.** `/verify` dispatches `verification-runner` in a subagent with read-only tools; mitigates "self-grading" leniency per Anthropic's March 2026 three-agent architecture.
+- **Test coverage is post-implementation.** `/test-plan` + `coverage-analyst` derive what *must* be tested from code + spec and flag paths outside the runner's scope — the code-aware pass superpowers' (deliberately code-blind) TDD can't do; pre-implementation test-first stays TDD's job. Reliability against correlated LLM blind spots (code and tests both LLM-generated) leans on oracle-independent tests (metamorphic / differential / property) + a risk-construct checklist, not the model's judgement.
 - **Heavy ops are explicit commands, not auto-fired hooks.** Sanitizer builds (`/sanitize`) and the opt-in auto-fix loop (`/verify --fix`, bounded to ≤ 2 fresh-evaluated cycles) far exceed the ≤ 5s warn-only hook budget — a hook may *suggest* `/sanitize`, but never runs it inline.
 - **C/C++ first-class.** Build system auto-detect (CMake/Meson/Make/Bazel), `compile_commands.json`-aware clang-tidy, sanitizer build templates.
 

@@ -41,6 +41,7 @@ use it.
 | [`/cpp-init`](#cpp-init) | Add C/C++ config + sanitizer build | Right after `/anchor` in a C/C++ project | ✍️ creates files | C/C++ |
 | [`/index-project`](#index-project) | (Re)build `PROJECT-TOC.md` file index | TOC missing/stale, or before a broad file search | ✍️ writes TOC | any (git) |
 | [`/verify`](#verify) | Fresh-context build/test/lint evaluation | Before marking a feature `pass` / claiming "done" | 🔒 read-only (`--fix` writes) | any |
+| [`/test-plan`](#test-plan) | Fresh-context coverage-gap analysis | After implementing, before marking a feature `pass` | 🔒 read-only | any |
 | [`/sanitize`](#sanitize) | Run tests under ASan+UBSan (TSan separately) | After a C/C++ change, or before merging C/C++ | ✍️ build + log only | C/C++ |
 | [`/status`](#status) | Read-only "where am I" snapshot | Anytime you want the current state | 🔒 read-only | any |
 | [`/session-end`](#session-end) | Write handoff + progress, offer commit | At a stopping point / before ending | ✍️ writes state files | any |
@@ -52,8 +53,9 @@ use it.
 ```
 New project       /anchor ──▶ /cpp-init (C/C++ only) ──▶ /index-project ──▶ bash init.sh
                      │
-During work        edit ──▶ /verify   (before flipping a feature to "pass")
-                        └─▶ /sanitize (C/C++ runtime check: crashes / leaks / UB / races)
+During work        edit ──▶ /verify    (before flipping a feature to "pass")
+                        ├─▶ /test-plan (coverage gaps: untested paths / outside the run scope)
+                        └─▶ /sanitize  (C/C++ runtime check: crashes / leaks / UB / races)
 Check state        /status            (anytime, read-only, writes nothing)
 End of session     /session-end ──▶ offers TOC refresh + commit of state files
 ```
@@ -208,6 +210,49 @@ and hands back the path.
 
 **Related.** `verification-runner` agent · `anti-hallucination-gates` skill ·
 `feature-state-keeper` skill · `/sanitize` (runtime-instrumented deepening).
+
+---
+
+## `/test-plan`
+
+**Purpose.** Produce a **coverage plan** for the active feature in a **fresh-context** subagent:
+what *must* be tested, what the suite already covers, what's missing — including paths the test
+runner never executes — and the minimal set of tests to close the gaps. The post-implementation,
+code-aware counterpart to superpowers' (deliberately code-blind) TDD.
+
+**When to use.** After implementing a feature, before flipping it to `pass`; or whenever tests
+pass but you're unsure they exercise the real risks (numeric / large-data / no-oracle code).
+
+**What it does.** Dispatches the `coverage-analyst` subagent (read-only), which (1) scans the code
+against a risk-construct checklist, (2) derives the spec's behavioural obligations, (3) diffs both
+against the suite **and the verified run scope** — flagging the T2 pattern of a binary built but
+never registered with the test runner (so `/verify` + `/sanitize` silently skip it) — and (4)
+recommends a minimal **oracle-independent-first** test set (metamorphic / differential / property —
+correctness from a relation, not a guessed expected value). Returns a fixed report
+(`### Obligations derived` · `### Run-scope gaps` · `### Recommended tests` · `### Coverage verdict`
+· `### Uncertainties`) and persists it to `.harness-anchor/coverage-<ts>.md`.
+
+**Arguments.** *(optional)* a feature id or path; else the active feature from `feature_list.json`.
+
+**Prerequisites.** Code written for the active feature (it reads the implementation). Not callable
+from inside a subagent (single-level).
+
+**Writes / side effects.** **Read-only** — it recommends; you write the tests. The only file it
+creates is the evidence report under `.harness-anchor/` (the gitignored runtime path).
+
+**How it surfaces.** The `test-coverage-design` skill points here when deciding what to test or
+before a "done" claim; `anti-hallucination-gates`'s "Coverage obligations" criterion takes the
+`coverage-<ts>.md` report as evidence; `verification-runner` recommends it when it spots a built
+binary the runner never runs.
+
+**Reliability note.** Because code and tests are both LLM-generated, a "different agent" only
+decorrelates context bias, not shared model priors — so the analyst prefers oracle-independent
+tests and a deterministic risk checklist, and **escalates** ambiguous oracles to you rather than
+fabricating an expected value.
+
+**Related.** `coverage-analyst` agent · `test-coverage-design` skill · `anti-hallucination-gates`
+skill · `/verify` (runs the registered suite; pair them) · superpowers `test-driven-development`
+(the pre-implementation counterpart).
 
 ---
 
