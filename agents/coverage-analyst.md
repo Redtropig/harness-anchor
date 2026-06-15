@@ -97,6 +97,10 @@ met and really run.
   that re-introduces the very blind spot you exist to catch.
 - **If something is missing** (no build dir, unknown runner) report what you could and couldn't
   determine; don't guess silently.
+- **Don't guess unfamiliar runners/frameworks.** If the test runner or build system (Meson, Bazel,
+  pytest, cargo, …) or a coverage tool is one you're unsure of, look up its test-discovery rules via
+  the `docs-lookup` skill before asserting a run-scope gap (invariant #9) — a wrong assumption about
+  how tests get registered would mis-flag.
 
 ## Calibrated uncertainty
 
