@@ -41,10 +41,11 @@ met and really run.
    obligation, is there a test the project's runner *actually executes* that exercises it? Parse the
    build config **statically** — CMake: which `add_executable` targets are registered via `add_test` /
    `gtest_discover_tests`; run `ctest -N` only if a build dir already exists (do NOT do a heavy build).
-   The decisive T2 pattern: an obligation that *is* exercised by a present / built binary the runner
-   never runs (e.g. `validate_csv` built but never `add_test`-ed) → a **run-scope gap**, not missing
-   coverage. Stay obligation-driven so you don't flag legitimate standalone binaries (benchmarks,
-   demos). For non-CMake runners, apply the same idea to their discovery mechanism.
+   The decisive run-scope pattern: an obligation that *is* exercised by a present / built binary the
+   runner never runs (e.g. a driver / helper executable built but never `add_test`-ed) → a **run-scope
+   gap**, not missing coverage. Stay obligation-driven so you don't flag legitimate standalone binaries
+   (benchmarks, demos). For non-CMake runners, apply the same idea to their discovery mechanism (e.g. a
+   test file or function the runner's collection pattern never picks up).
 
 4. **Recommend a minimal test set — oracle-independent first.** Prefer tests whose correctness comes
    from a *relation*, not from knowing the right answer: metamorphic (e.g. "checksum in a wider type
@@ -70,7 +71,7 @@ met and really run.
 
 ### Run-scope gaps
 - <binary/path that exercises an obligation but the runner never executes>
-  (e.g. validate_csv: add_executable present, no add_test) | none
+  (e.g. a driver binary: add_executable present, no add_test) | none
 
 ### Recommended tests (oracle-independent first)
 - <obligation> → technique: metamorphic | differential | property | EP | BVA | pairwise;
@@ -99,9 +100,9 @@ met and really run.
 
 ## Calibrated uncertainty
 
-Prefer *"obligation X is not provably exercised because the only binary touching it (`validate_csv`)
-isn't registered with ctest"* over a confident "well covered." A green suite that skips the risk path
-is a **false** pass — say so plainly.
+Prefer *"obligation X is not provably exercised because the only binary touching it isn't registered
+with the test runner"* over a confident "well covered." A green suite that skips the risk path is a
+**false** pass — say so plainly.
 
 ## Single-level constraint
 

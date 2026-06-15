@@ -225,7 +225,7 @@ pass but you're unsure they exercise the real risks (numeric / large-data / no-o
 
 **What it does.** Dispatches the `coverage-analyst` subagent (read-only), which (1) scans the code
 against a risk-construct checklist, (2) derives the spec's behavioural obligations, (3) diffs both
-against the suite **and the verified run scope** — flagging the T2 pattern of a binary built but
+against the suite **and the verified run scope** — flagging the run-scope pattern of a binary built but
 never registered with the test runner (so `/verify` + `/sanitize` silently skip it) — and (4)
 recommends a minimal **oracle-independent-first** test set (metamorphic / differential / property —
 correctness from a relation, not a guessed expected value). Returns a fixed report

@@ -49,13 +49,13 @@ Generic — each row: the construct → the failure it hides → the test that c
 | **Empty / boundary / error paths** (0 items, max size, alloc / IO failure) | crash or wrong result on the unhappy path | explicit empty, single, max, and failure-injection cases |
 | **Floating point / narrowing casts** (`double`→`int`) | precision loss, range overflow, NaN / Inf | boundary + out-of-range inputs; relation vs. a wider type |
 
-Keep this list **living**: when a new confident-wrong class surfaces (as T2's overflow did), add a row +
-its oracle-independent test.
+Keep this list **living**: when a new confident-wrong class surfaces, add a row + its oracle-independent
+test.
 
 ## B — C/C++ only: sanitizer-class risks
 
 For C/C++, the runtime-UB arm of this checklist is `cpp-sanitizers/ub-failure-patterns.md` (signed
 overflow, misaligned access, null deref, shift / float-cast overflow, …). Treat it as the C/C++
 extension of the table above. Remember the **run-scope caveat**: a sanitizer build only catches UB on
-paths its tests actually execute — a binary built but not `add_test`-registered is silently skipped (the
-T2 trap). Cross-check with `/test-plan` before trusting an "ASan+UBSan clean."
+paths its tests actually execute — a binary built but not `add_test`-registered is silently skipped.
+Cross-check with `/test-plan` before trusting an "ASan+UBSan clean."

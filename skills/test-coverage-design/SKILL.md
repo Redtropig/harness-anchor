@@ -29,7 +29,7 @@ implementation). The design techniques in `coverage-reference.md` serve **both**
    never executes it (e.g. a binary built with `add_executable` but never `add_test`-registered, so
    `/sanitize` + `/verify` silently skip it and report "clean").
 
-Both shipped together as the eval's T2 trap. A line-coverage tool misses them: the line can run under a
+These are classic confident-wrong traps, and a line-coverage tool misses them: the line can run under a
 small input yet never at the magnitude / in the scope where the bug bites.
 
 ## Method (gray-box, post-implementation)

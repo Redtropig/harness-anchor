@@ -1,1 +1,1 @@
-I just finished the CSV loader for this library and all the unit tests are green. Before I call it done, I'm worried the tests only cover small happy-path inputs — what am I missing so that a huge input or some weird edge case can't sneak a bug past a passing suite?
+I just finished the discount-pricing module for this library and all the unit tests are green. I'm worried the tests only exercise small happy-path inputs — which test cases am I missing so that a large or unusual input can't slip a bug past a passing suite?
