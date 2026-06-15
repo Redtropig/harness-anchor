@@ -1,6 +1,6 @@
 # Command Manual — harness-anchor
 
-<!-- doc-align: b260770355e4d5ae1aa5ad91eb0bc3a25ce26147 · 2026-06-09 · harness-anchor v0.4.0 -->
+<!-- doc-align: f722717540700cc14828b9b48f3dfdd069d7ffa8 · 2026-06-15 · harness-anchor v0.5.0 -->
 > **Aligned with commit** [`b260770`](https://github.com/Redtropig/harness-anchor/commit/b260770355e4d5ae1aa5ad91eb0bc3a25ce26147) (harness-anchor v0.4.0, 2026-06-09). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
 
 Reference for every slash command shipped by harness-anchor: what it does, **when to

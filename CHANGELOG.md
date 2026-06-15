@@ -4,6 +4,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-15
+
 ### Added
 
 - **Test-coverage design capability** (targets a confident-wrong failure mode: a fixed-width-accumulator overflow that only fires on large inputs and ships because its only triggering binary is built but never `add_test`-registered, so the sanitizer never runs it and a false "clean" is claimed). Post-implementation, and complements superpowers' (deliberately code-blind) TDD — TDD owns the pre-impl, spec-driven test-first pass; this owns the code-aware post-impl pass.
@@ -160,7 +162,9 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Redtropig/harness-anchor/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/Redtropig/harness-anchor/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/Redtropig/harness-anchor/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/Redtropig/harness-anchor/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/Redtropig/harness-anchor/compare/v0.3.0...v0.3.1
