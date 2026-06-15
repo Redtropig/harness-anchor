@@ -134,7 +134,7 @@ Run: `ASAN_OPTIONS=suppressions=asan-suppressions.txt ./your_test`
 - Test passes but behavior is weird → maybe uninitialized read (MSan, or UBSan)
 - Before any release / merge to main → run full ASan+UBSan suite
 
-## See `ub-failure-patterns.md` for common UBSan signatures and their fixes.
+## See `ub-failure-patterns.md` for common UBSan signatures and their fixes — it doubles as the **C/C++ arm** of `test-coverage-design`'s risk-construct checklist.
 
 ## Looking up unfamiliar signatures
 
