@@ -28,9 +28,9 @@ met and really run.
    `${CLAUDE_PLUGIN_ROOT}/skills/test-coverage-design/coverage-reference.md` and check the changed /
    active code against every risk class in it (fixed-width accumulator→overflow, modulo/index→
    off-by-one, raw owning pointer→rule-of-five, unchecked parse→garbage accepted, shared mutable→race,
-   empty / error paths…). Each match is a **white-box / risk obligation**. *(If that path won't
-   resolve, the core classes are named there — prefer the file for the full set and the test each maps
-   to.)*
+   empty / error paths…). Each match is a **white-box / risk obligation**. *(The core classes are
+   inlined above, so you can scan even if that path won't resolve — but read the file for the full set
+   and the oracle-independent test each maps to.)*
 
 2. **Cross-check spec-derived obligations.** From `feature_list.json` (description + `done_criteria`),
    `AGENTS.md`, and `docs/superpowers/specs|plans/*` when present, list the behavioural (black-box)
@@ -53,9 +53,10 @@ met and really run.
    names the obligation it closes, the technique, the input, and the relation / oracle. Prioritise by
    risk.
 
-5. **Persist + report.** Write your report to `.harness-anchor/coverage-<timestamp>.md` via shell
-   redirection (you have Bash — this is how `verification-runner` captures evidence) so it can serve as
-   the on-disk evidence artifact, then return it.
+5. **Persist + report.** Ensure the dir exists (`mkdir -p .harness-anchor`), then write your report to
+   `.harness-anchor/coverage-<timestamp>.md` via shell redirection (you have Bash — this is how
+   `verification-runner` captures evidence) so it can serve as the on-disk evidence artifact, then
+   return it.
 
 ## Report format (fixed structure)
 
