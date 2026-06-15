@@ -28,7 +28,7 @@ Adapted from [Anthropic's Code with Claude 2026 reference impl](https://github.c
 | **Compile / build passes** | Build log path + exit code 0, or compiler stdout/stderr captured |
 | **Type-check passes** | `tsc --noEmit` (or equivalent) output |
 | **Tests pass** | Test runner output showing N passed, **0 failed**, **0 errored** |
-| **Coverage obligations** | The spec/code obligations are exercised by tests the run actually executes — a `/test-plan` report (`.harness-anchor/coverage-<ts>.md`) with no open gaps. A green suite that skips the risk path is a false pass. |
+| **Coverage obligations** *(non-trivial / risk-bearing features)* | The spec/code obligations are exercised by tests the run actually executes — for features with real logic or risk constructs, a `/test-plan` report (`.harness-anchor/coverage-<ts>.md`) with no open gaps. A green suite that skips the risk path is a false pass. |
 | **Static analysis** | Lint report file, OR explicit "no warnings" line in output |
 | **Manual smoke** | Concrete steps + observed result (only if the above can't cover) |
 

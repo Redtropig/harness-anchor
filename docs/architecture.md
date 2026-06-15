@@ -457,7 +457,7 @@ default **except `.harness-anchor/`** (runtime logs — the only gitignored path
 | `context-budget.md` | `/anchor` | `context-budget-discipline` |
 | `.clang-format` / `.clang-tidy` | `/cpp-init` | `cpp-formatting`, `cpp-static-analysis`, `post-tool-use` (clang-tidy) |
 | `compile_commands.json` | the project build (guided by `cpp-build-systems`) | `post-tool-use` (clang-tidy gate), `cpp-static-analysis` |
-| `.harness-anchor/` (logs) | `index-builder.mjs`, `/sanitize` | humans / debugging (gitignored) |
+| `.harness-anchor/` (logs) | `index-builder.mjs`, `/sanitize`, `/verify`, `/test-plan` | humans / debugging (gitignored) |
 
 ---
 
