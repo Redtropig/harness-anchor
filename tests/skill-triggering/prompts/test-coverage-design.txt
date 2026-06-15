@@ -1,0 +1,1 @@
+I just finished the CSV loader for this library and all the unit tests are green. Before I call it done, I'm worried the tests only cover small happy-path inputs — what am I missing so that a huge input or some weird edge case can't sneak a bug past a passing suite?
