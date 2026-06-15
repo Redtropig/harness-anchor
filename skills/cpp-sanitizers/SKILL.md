@@ -28,7 +28,10 @@ share a build with ASan.
 
 - Clang or recent GCC (`-fsanitize=` family supported since GCC 4.8 / Clang 3.1+)
 - A separate sanitizer build directory (don't mix configs)
-- Tests that actually exercise the suspect code paths
+- Tests that actually exercise the suspect code paths — **and that the runner actually runs**: a
+  sanitizer build only catches UB on paths its tests execute, so a binary built but never
+  `add_test`-registered is silently skipped (a false "clean"). Use `/test-plan` to find such run-scope
+  gaps before trusting a clean result.
 
 ## Standard build setup
 

@@ -84,6 +84,8 @@ If you cannot determine pass/fail with confidence, say so:
 
 > "Tests appear to pass: 47 tests ran, all reported 'ok', but the runner output also contained 'skipped: 3' entries that were not in the previous baseline. Recommend reviewing skipped tests at <path> before marking pass."
 
+If you notice built test-like binaries the runner never executes (e.g. an `add_executable` with no `add_test`), the suite can be green yet skip a real path — flag it and recommend `/test-plan` (`coverage-analyst`) for a run-scope check.
+
 Always prefer "uncertain because <specific reason>" over a confident wrong answer.
 
 ## Single-level constraint

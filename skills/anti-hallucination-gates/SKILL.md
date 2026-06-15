@@ -28,6 +28,7 @@ Adapted from [Anthropic's Code with Claude 2026 reference impl](https://github.c
 | **Compile / build passes** | Build log path + exit code 0, or compiler stdout/stderr captured |
 | **Type-check passes** | `tsc --noEmit` (or equivalent) output |
 | **Tests pass** | Test runner output showing N passed, **0 failed**, **0 errored** |
+| **Coverage obligations** | The spec/code obligations are exercised by tests the run actually executes — a `/test-plan` report (`.harness-anchor/coverage-<ts>.md`) with no open gaps. A green suite that skips the risk path is a false pass. |
 | **Static analysis** | Lint report file, OR explicit "no warnings" line in output |
 | **Manual smoke** | Concrete steps + observed result (only if the above can't cover) |
 
@@ -91,6 +92,7 @@ Before saying ANY of {"done", "fixed", "ready", "complete", "passing", "working"
 ```
 - [ ] I ran the build/compile, observed exit code 0
 - [ ] I ran the test suite, observed N passed / 0 failed
+- [ ] the passing tests exercise the spec's edge cases / risk paths — not just the happy path (run `/test-plan` if unsure)
 - [ ] I have a file path for each piece of evidence
 - [ ] feature_list.json is updated with evidence object + timestamp + commit
 ```
@@ -114,5 +116,6 @@ Bluffing the command and not actually running it is the anti-pattern this skill 
 
 - `verification-before-completion` (superpowers) — the same Iron Law (no completion claim without fresh evidence). This skill is its harness-anchor counterpart and **superset**: it adds the on-disk evidence record (`feature_list.json`) and the `/verify` subagent. One verification run satisfies both gates — capture the evidence once, don't re-verify.
 - `feature-state-keeper` — actual writes to feature_list.json
+- `test-coverage-design` / `/test-plan` — derive the coverage obligations this gate checks (are the right things tested, and actually run?)
 - `self-correction-loop` — what to do when evidence shows failure
 - `/verify` command — full automated verification pass via `verification-runner` subagent

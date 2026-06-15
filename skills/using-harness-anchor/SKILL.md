@@ -34,6 +34,7 @@ If none exist, the project is **un-anchored**. Suggest the user run `/anchor` to
 - `init-verification` — at start of work; run `init.sh` health check
 - `self-correction-loop` — after edits that fail lint/build; iterate with evidence
 - `anti-hallucination-gates` — before claiming "done"; Default-FAIL evidence contract
+- `test-coverage-design` — what to test / is a feature really covered before "done"; dispatches `coverage-analyst`
 - `context-budget-discipline` — when context fills up; SELECT/WRITE/COMPRESS/ISOLATE
 - `docs-lookup` — when looking up unfamiliar tools/APIs/errors; Context7 → WebSearch → calibrated uncertainty fallback chain
 - `cpp-build-systems` — CMake/Meson/Make/Bazel project
@@ -62,6 +63,7 @@ say why in one line, and let the user run it.
 - `/cpp-init` — a C/C++ project has no `.clang-format`/`.clang-tidy` (run right after `/anchor`): drops C/C++ config + sanitizer build, tunes `init.sh`.
 - `/index-project` — `PROJECT-TOC.md` is absent or stale, or before a broad file search: (re)builds the one-line-per-file index.
 - `/verify` — before you claim a feature passes or flip its status to `pass`: build + lint + tests in a fresh-context subagent. `--fix` runs a bounded (≤ 2-cycle) auto-fix loop.
+- `/test-plan` — after implementing, before marking `pass`: fresh-context coverage-gap analysis (obligations, paths outside the run scope, minimal tests). Complements `/verify`.
 - `/sanitize` — after a C/C++ source change, or before merging C/C++: ASan+UBSan run (TSan separately), findings in fixed sections with an evidence log.
 - `/status` — whenever the user asks "where am I / what's the state": read-only snapshot, writes nothing.
 - `/session-end` — at a stopping point or before ending: writes handoff, appends `progress.md`, offers a commit.
