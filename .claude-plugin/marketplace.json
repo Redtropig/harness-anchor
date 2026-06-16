@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "harness-anchor",
-      "description": "Runtime harness layer for Claude Code (companion to superpowers): state, scope, verification gates, C/C++ engineering",
+      "description": "Warn-only, zero-dependency runtime harness layer for Claude Code (companion to superpowers): persistent state, scope control (prompt + action side), Default-FAIL verification & coverage gates, entropy governance (golden-rules + drift detection), and first-class C/C++ engineering (CMake/Meson/Make/Bazel + clang-tidy + sanitizers).",
       "version": "0.7.0",
       "source": "./",
       "author": {

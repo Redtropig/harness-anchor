@@ -4,6 +4,10 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+### Changed
+
+- Synced `plugin.json` / `marketplace.json` descriptions with the GitHub repo About — they now reflect coverage gates (v0.5.0), entropy governance (v0.6.0), and the warn-only / zero-dependency identity, not just the pre-v0.5.0 blurb. Metadata only; no version bump.
+
 ## [0.7.0] - 2026-06-16
 
 ### Added
