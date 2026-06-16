@@ -1,7 +1,7 @@
 # Command Manual — harness-anchor
 
-<!-- doc-align: PENDING_RELEASE_SHA · 2026-06-16 · harness-anchor v0.6.0 -->
-> **Aligned with commit** [`PENDING_RELEASE_SHA`](https://github.com/Redtropig/harness-anchor/commit/PENDING_RELEASE_SHA) (harness-anchor v0.6.0, 2026-06-16). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
+<!-- doc-align: 4962c652b9475da630f6db5967b9fa593625f08c · 2026-06-16 · harness-anchor v0.6.0 -->
+> **Aligned with commit** [`4962c652b9475da630f6db5967b9fa593625f08c`](https://github.com/Redtropig/harness-anchor/commit/4962c652b9475da630f6db5967b9fa593625f08c) (harness-anchor v0.6.0, 2026-06-16). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
 
 Reference for every slash command shipped by harness-anchor: what it does, **when to
 reach for it**, its arguments, prerequisites, outputs, and how the harness reminds you to
