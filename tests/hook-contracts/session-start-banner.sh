@@ -222,6 +222,57 @@ else
     fi
 fi
 
+# ---- Golden-rules count (v0.6.0 banner field): real rules counted, commented example NOT ----
+# Guards the count pattern ^### GR-[0-9]: a freshly-scaffolded golden-rules.md (only the
+# commented ### GR-N example) must read 0, not 1; absence → no banner line.
+TMPDIR6=$(mktemp -d)
+trap 'rm -rf "$TMPDIR" "$TMPDIR2" "$TMPDIR3" "$TMPDIR4" "$TMPDIR5" "$TMPDIR6"' EXIT
+cd "$TMPDIR6" || exit 1
+printf '{ "project": "gr", "features": [] }\n' > feature_list.json
+cat > golden-rules.md <<'EOF'
+# Golden Rules
+
+<!-- Example shape (delete and replace):
+### GR-N — placeholder example that must NOT be counted
+-->
+
+## Rules
+
+### GR-1 — real rule one
+- **Check:** manual review
+
+### GR-2 — real rule two
+- **Check:** manual review
+EOF
+
+echo ""
+echo "=== session-start (2 real rules + commented example → expect 2) ==="
+output7=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR6" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
+if [ -z "$output7" ]; then
+    echo "  FAIL no output emitted"; FAIL=$((FAIL+1))
+else
+    assert_json_valid "$output7"
+    assert_contains "Golden rules: *2 rule" "$output7"
+fi
+
+# as-shipped empty template → must read 0, not the commented example (the bug guard)
+cp "$PLUGIN_ROOT/templates/golden-rules.md.tpl" "$TMPDIR6/golden-rules.md"
+echo ""
+echo "=== session-start (as-shipped empty template → expect 0 rules) ==="
+output8=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR6" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
+assert_contains "Golden rules: *0 rule" "$output8"
+
+# absence → no "Golden rules:" banner line
+rm -f "$TMPDIR6/golden-rules.md"
+echo ""
+echo "=== session-start (no golden-rules.md → expect NO 'Golden rules:' line) ==="
+output9=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR6" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
+if printf '%s' "$output9" | grep -q "Golden rules:"; then
+    echo "  FAIL 'Golden rules:' line present when golden-rules.md absent"; FAIL=$((FAIL+1))
+else
+    echo "  OK   'Golden rules:' line correctly absent"; PASS=$((PASS+1))
+fi
+
 echo ""
 echo "==================================="
 echo " Pass: $PASS    Fail: $FAIL"

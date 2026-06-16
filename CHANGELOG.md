@@ -4,6 +4,16 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-16
+
+### Fixed
+
+- **golden-rules count off-by-one** in the SessionStart banner (`Golden rules: N`) and `/status` harness-health. The count pattern `^### GR-` also matched the commented-out `### GR-1` *example* inside the freshly-scaffolded `golden-rules.md`, so a project with **zero** real rules reported `1`. Fixed by counting only numbered real rules (`^### GR-[0-9]`) and changing the template's example heading to the non-counted placeholder `### GR-N`. New `tests/hook-contracts/session-start-banner.sh` assertions guard it: real rules counted, commented example excluded, the as-shipped empty template → `0`, absent file → no banner line (the missing contract assertion that let this ship — mirrors the v0.3.1 cpp-init-hint pattern).
+
+### Changed
+
+- `scripts/validate-anchor.sh` [5/9] now also asserts every `agents/*.md` ends with the single-level constraint line ("Do not invoke other subagents from this one.") — mechanizing invariant #3, which was previously maintained by hand.
+
 ## [0.6.0] - 2026-06-16
 
 ### Added
@@ -179,7 +189,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/Redtropig/harness-anchor/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Redtropig/harness-anchor/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Redtropig/harness-anchor/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Redtropig/harness-anchor/compare/v0.3.3...v0.4.0

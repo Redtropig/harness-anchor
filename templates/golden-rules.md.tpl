@@ -24,7 +24,7 @@ apply: entropy applies to this file too.
 
 <!-- Example shape (delete and replace with real rules):
 
-### GR-1 — Use the shared logger; never bare stdout/print in library code
+### GR-N — Use the shared logger; never bare stdout/print in library code
 - **Why / origin:** a change shipped stray debug prints that leaked into program output.
 - **Check:** `grep -rn "console.log\|printf(\|println!" src/` returns nothing unexpected.
 

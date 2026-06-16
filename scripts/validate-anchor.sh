@@ -7,7 +7,7 @@
 #   [1/9]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
 #   [2/9]   JSON files parse
 #   [3-4/9] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
-#   [5/9]   Every agent has name + description frontmatter (description ≤500 chars)
+#   [5/9]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3)
 #   [6/9]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
 #   [7/9]   SessionStart hook is executable and produces valid JSON when run
 #   [8/9]   Commands directory consistency (each commands/*.md is a usable /command)
@@ -84,7 +84,7 @@ done < <(find skills -name SKILL.md 2>/dev/null)
 echo ""
 
 # ---- 5. Agent frontmatter (name + description) ----
-echo "[5/9] Agent frontmatter (name + description, ≤500 chars desc)..."
+echo "[5/9] Agent frontmatter (name + description) + single-level constraint (invariant #3)..."
 if [ -d agents ]; then
     while IFS= read -r agent; do
         [ -e "$agent" ] || continue
@@ -105,6 +105,12 @@ if [ -d agents ]; then
             fail "$agent: description ${#desc} chars > 500"
         else
             ok "$agent description ${#desc} chars"
+        fi
+        # Invariant #3: every subagent prompt must end with the single-level constraint.
+        if grep -q 'Do not invoke other subagents from this one' "$agent"; then
+            ok "$agent single-level constraint"
+        else
+            fail "$agent: missing single-level constraint line (invariant #3)"
         fi
     done < <(find agents -name '*.md' 2>/dev/null)
 else

@@ -110,8 +110,9 @@ except Exception:
     golden_rules_line=""
     gr_file="$PROJECT_DIR/golden-rules.md"
     if [ -f "$gr_file" ]; then
-        gr_count=$(grep -c '^### GR-' "$gr_file" 2>/dev/null || printf '0')
-        gr_count=$(printf '%s' "$gr_count" | tr -cd '0-9')
+        # grep -c already prints "0" on no match (and exits 1); do NOT add `|| printf 0`
+        # — that would append a second "0", yielding "00". tr strips the trailing newline.
+        gr_count=$(grep -c '^### GR-[0-9]' "$gr_file" 2>/dev/null | tr -cd '0-9')
         [ -z "$gr_count" ] && gr_count=0
         golden_rules_line="${gr_count} rule(s) — /gc scans changed code against them"
     fi

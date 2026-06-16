@@ -61,7 +61,7 @@ Read-only project status overview. Shows everything at a glance without modifyin
 
    ```
    ### Harness health
-   - golden rules: N        (grep -c '^### GR-' golden-rules.md; else "(none — seed via capturing-golden-rules)")
+   - golden rules: N        (grep -c '^### GR-[0-9]' golden-rules.md; else "(none — seed via capturing-golden-rules)")
    - last /gc scan: <age of newest .harness-anchor/drift-*.md> — <verdict if parseable>   (else "never — run /gc")
    - active feature age: <now − createdAt of the in-progress feature>   (else "(no active feature)")
    - handoff age: <now − mtime of session-handoff.md>   (else "(no handoff)")
