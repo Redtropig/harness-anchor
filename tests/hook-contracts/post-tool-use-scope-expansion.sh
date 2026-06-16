@@ -3,7 +3,7 @@
 #
 # Happy path: Write of a NEW untracked code module while a feature is in-progress -> warn.
 # Negatives (precision): tracked-file overwrite, Edit event, new test-dir file, new non-code
-#   file, and "no in-progress feature" all stay silent.
+#   file, git-ignored file, and "no in-progress feature" all stay silent.
 #
 # Requires git (the "new = untracked" signal is git-derived); the temp projects are real repos.
 
@@ -60,6 +60,9 @@ mkdir -p src tests
 echo "x = 1" > src/existing.py
 git add feature_list.json src/existing.py
 git commit -qm "init"
+printf 'generated/\n' > .gitignore
+git add .gitignore
+git commit -qm "gitignore"
 
 echo "=== (a) new untracked code module + in-progress feature -> WARN ==="
 echo "def widget(): pass" > src/widget.py     # left untracked
@@ -96,6 +99,13 @@ echo ""
 echo "=== (f) Edit event on a tracked file -> quiet (Write-gate) ==="
 out_f=$(run_hook "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$TMPA/src/existing.py\"}}")
 if [ -z "$out_f" ]; then ok "(f) silent for Edit event"; else fail "(f) expected silence, got: $(printf '%s' "$out_f" | head -c 120)"; fi
+
+echo ""
+echo "=== (g) new untracked but GIT-IGNORED code module -> quiet ==="
+mkdir -p generated
+echo "def gen(): pass" > generated/thing.py
+out_g=$(run_hook "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$TMPA/generated/thing.py\"}}")
+if [ -z "$out_g" ]; then ok "(g) silent for git-ignored new module"; else fail "(g) expected silence, got: $(printf '%s' "$out_g" | head -c 120)"; fi
 
 # ---- Project B: anchored, NO in-progress feature (only planned) ----
 TMPB=$(mktemp -d)
