@@ -59,6 +59,15 @@ Looping > 5 times is almost always a sign of:
 - Missing tool/dependency → install it before continuing
 - Genuinely ambiguous case → consult the user
 
+### Two budgets: re-run vs. edit
+
+The budget above is the **re-run budget** — re-running the *same failing command*. There's a second, sneakier loop: the **edit budget**.
+
+- **Edit budget (doom-loop):** if you've made ~3–5 edits to the **same file** chasing the **same goal** without the signal clearing, you're micro-adjusting one approach. STOP. **Re-read the original spec / `done_criteria` — not your own diff** (the classic failure is re-reading your own code, deciding it "looks ok", and continuing). Then either switch to a structurally different approach or escalate to the user.
+- Don't "fix" a failing test by **rewriting the test** to match your code — that silences the signal. Treat tests as a reserved space: change the implementation, or question the requirement, not the test.
+
+This mirrors LoopDetection middleware ("reconsider the approach after N edits on one file") — break out *before* the 10th micro-adjustment, not after.
+
 ## What "fixed" looks like
 
 - The original failing command now succeeds (exit 0 + expected output)

@@ -46,13 +46,17 @@ End the current session cleanly. Implements the "clean restart path" lifecycle p
    - If blocked → status='blocked', blockedReason populated
    - Otherwise → leave status='in-progress'
    - Then keep entries actionable-first: `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-sort.mjs feature_list.json` (best-effort, deterministic reorder only — skip silently if node is unavailable).
-   - **Verify id uniqueness before committing:** `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-validate.mjs feature_list.json` (best-effort; skip silently if node is unavailable). If it exits non-zero, it prints the duplicate id(s) — resolve by **renaming the newer entry** to the suggested unique id (never rename an existing id, never commit a colliding ledger) before step 7.
+   - **Verify id uniqueness before committing:** `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-validate.mjs feature_list.json` (best-effort; skip silently if node is unavailable). If it exits non-zero, it prints the duplicate id(s) — resolve by **renaming the newer entry** to the suggested unique id (never rename an existing id, never commit a colliding ledger) before step 8.
 
-6. **Offer TOC refresh.** If git diff suggests structural changes (new/renamed/deleted files), ask the user:
+6. **Flywheel reflection (capture the session's lessons).** Ask one quick question — *"Did anything recur this session that should change a shared artifact (a golden rule, a convention, or a skill)?"*
+   - If yes and it's a **failure / anti-pattern** → capture it as a `GR-<n>` in `golden-rules.md` via the `capturing-golden-rules` skill. Route other signals to their home (a missing fact → AGENTS.md; a reliable prompt / workflow → a skill or AGENTS.md).
+   - Usually the answer is no — say so and move on. This is a few-seconds reflex anchored to session-end (the feedback flywheel), **not** a ceremony.
+
+7. **Offer TOC refresh.** If git diff suggests structural changes (new/renamed/deleted files), ask the user:
 
    *"Project structure changed. Refresh PROJECT-TOC.md now?"* (Yes / Skip)
 
-7. **Offer commit.** Show `git status` of the state files (handoff/progress/feature_list/TOC). Ask:
+8. **Offer commit.** Show `git status` of the state files (handoff/progress/feature_list/TOC). Ask:
 
    *"Commit these state changes?"* (Yes / I'll commit later / Show diff)
 

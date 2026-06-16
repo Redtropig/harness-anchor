@@ -23,7 +23,8 @@ If they exist in the project root, read in this order:
 1. `AGENTS.md` or `CLAUDE.md` — operating manual
 2. `feature_list.json` — active feature + scope + done criteria
 3. `PROJECT-TOC.md` — file-level index, one line per file
-4. `session-handoff.md` — what previous session left
+4. `golden-rules.md` — project-specific taste / anti-pattern rules to honor
+5. `session-handoff.md` — what previous session left
 
 If none exist, the project is **un-anchored**. Suggest the user run `/anchor` to scaffold.
 
@@ -35,6 +36,7 @@ If none exist, the project is **un-anchored**. Suggest the user run `/anchor` to
 - `self-correction-loop` — after edits that fail lint/build; iterate with evidence
 - `anti-hallucination-gates` — before claiming "done"; Default-FAIL evidence contract
 - `test-coverage-design` — what to test / is a feature really covered before "done"; dispatches `coverage-analyst`
+- `capturing-golden-rules` — same mistake recurs / a review comment is really a convention; encode it as a durable rule in golden-rules.md (the feedback flywheel)
 - `context-budget-discipline` — when context fills up; SELECT/WRITE/COMPRESS/ISOLATE
 - `docs-lookup` — when looking up unfamiliar tools/APIs/errors; Context7 → WebSearch → calibrated uncertainty fallback chain
 - `cpp-build-systems` — CMake/Meson/Make/Bazel project
@@ -64,6 +66,7 @@ say why in one line, and let the user run it.
 - `/index-project` — `PROJECT-TOC.md` is absent or stale, or before a broad file search: (re)builds the one-line-per-file index.
 - `/verify` — before you claim a feature passes or flip its status to `pass`: build + lint + tests in a fresh-context subagent. `--fix` runs a bounded (≤ 2-cycle) auto-fix loop.
 - `/test-plan` — after implementing, before marking `pass`: fresh-context coverage-gap analysis (obligations, paths outside the run scope, minimal tests). Complements `/verify`.
+- `/gc` — after a batch of generated code, before `/session-end`: fresh-context drift/entropy scan against `golden-rules.md` + slop heuristics (dead code, duplication, doc-drift). Read-only, report-only (not `git gc`).
 - `/sanitize` — after a C/C++ source change, or before merging C/C++: ASan+UBSan run (TSan separately), findings in fixed sections with an evidence log.
 - `/status` — whenever the user asks "where am I / what's the state": read-only snapshot, writes nothing.
 - `/session-end` — at a stopping point or before ending: writes handoff, appends `progress.md`, offers a commit.

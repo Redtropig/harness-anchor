@@ -1,7 +1,7 @@
 # Command Manual — harness-anchor
 
-<!-- doc-align: f722717540700cc14828b9b48f3dfdd069d7ffa8 · 2026-06-15 · harness-anchor v0.5.0 -->
-> **Aligned with commit** [`b260770`](https://github.com/Redtropig/harness-anchor/commit/b260770355e4d5ae1aa5ad91eb0bc3a25ce26147) (harness-anchor v0.4.0, 2026-06-09). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
+<!-- doc-align: PENDING_RELEASE_SHA · 2026-06-16 · harness-anchor v0.6.0 -->
+> **Aligned with commit** [`PENDING_RELEASE_SHA`](https://github.com/Redtropig/harness-anchor/commit/PENDING_RELEASE_SHA) (harness-anchor v0.6.0, 2026-06-16). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
 
 Reference for every slash command shipped by harness-anchor: what it does, **when to
 reach for it**, its arguments, prerequisites, outputs, and how the harness reminds you to
@@ -42,6 +42,7 @@ use it.
 | [`/index-project`](#index-project) | (Re)build `PROJECT-TOC.md` file index | TOC missing/stale, or before a broad file search | ✍️ writes TOC | any (git) |
 | [`/verify`](#verify) | Fresh-context build/test/lint evaluation | Before marking a feature `pass` / claiming "done" | 🔒 read-only (`--fix` writes) | any |
 | [`/test-plan`](#test-plan) | Fresh-context coverage-gap analysis | After implementing, before marking a feature `pass` | 🔒 read-only | any |
+| [`/gc`](#gc) | Fresh-context code-drift / entropy scan | After a batch of generated code, before `/session-end` | 🔒 read-only | any |
 | [`/sanitize`](#sanitize) | Run tests under ASan+UBSan (TSan separately) | After a C/C++ change, or before merging C/C++ | ✍️ build + log only | C/C++ |
 | [`/status`](#status) | Read-only "where am I" snapshot | Anytime you want the current state | 🔒 read-only | any |
 | [`/session-end`](#session-end) | Write handoff + progress, offer commit | At a stopping point / before ending | ✍️ writes state files | any |
@@ -55,6 +56,7 @@ New project       /anchor ──▶ /cpp-init (C/C++ only) ──▶ /index-proj
                      │
 During work        edit ──▶ /verify    (before flipping a feature to "pass")
                         ├─▶ /test-plan (coverage gaps: untested paths / outside the run scope)
+                        ├─▶ /gc        (drift / entropy: dead code, duplication, doc-drift, golden-rule violations)
                         └─▶ /sanitize  (C/C++ runtime check: crashes / leaks / UB / races)
 Check state        /status            (anytime, read-only, writes nothing)
 End of session     /session-end ──▶ offers TOC refresh + commit of state files
@@ -256,6 +258,47 @@ skill · `/verify` (runs the registered suite; pair them) · superpowers `test-d
 
 ---
 
+## `/gc`
+
+**Purpose.** Scan recent work for **drift / entropy / AI slop** — code that compiles and passes
+tests but has rotted from the project's conventions (duplicated helpers, dead code, inconsistent
+error handling, stale docs, golden-rule violations). The garbage-collection sensor of
+harness-engineering's Concept ⑥ — **not** `git gc`.
+
+**When to use.** After a batch of generated code, before `/session-end`; before merging; or when
+`golden-rules.md` has grown and you want recent changes checked against it.
+
+**What it does.** Dispatches the `drift-analyst` subagent (read-only, fresh-context), which loads
+`golden-rules.md`, bounds the scope to **changed files** (`git diff` vs `HEAD`) or the active
+feature, runs each rule's Check, applies generic drift heuristics (duplication, dead code, oversized
+files, TODO pileup, **doc-drift**), grades findings **must / should / nice**, and persists
+`.harness-anchor/drift-<ts>.md`. Returns a fixed report (`### Golden-rule violations` ·
+`### Generic drift findings` · `### Recommended actions` · `### Verdict` CLEAN / DRIFT FOUND ·
+`### Uncertainties`), surfaced **verbatim**.
+
+**Arguments.** *(optional)* a path or feature id; else changed files / the active feature.
+
+**Prerequisites.** Code written or changed to scan. Not callable from inside a subagent
+(single-level).
+
+**Writes / side effects.** **Read-only** — it recommends; you decide. The only file it creates is
+the evidence report under `.harness-anchor/` (the gitignored runtime path). On DRIFT FOUND it
+*offers* (never auto-applies) scoped fixes, a golden-rule capture, or a handoff note — it never
+bulk-refactors.
+
+**How it surfaces.** No hook nudge by design (like `/status`) — the `capturing-golden-rules` skill
+and the `using-harness-anchor` meta-skill recommend it (after a batch of generated code, before
+wrapping up). One of three read-only sensors: `/verify` (build/test/lint pass), `/test-plan`
+(coverage / run-scope), `/gc` (drift / maintainability).
+
+**Distinct from.** `/verify` and `/test-plan` answer "does it pass?" and "is it tested?"; `/gc`
+answers "has it drifted?" — different sensors, pair them.
+
+**Related.** `drift-analyst` agent · `capturing-golden-rules` skill (turn a finding into a rule) ·
+`/verify` · `/test-plan` · `golden-rules.md` state file.
+
+---
+
 ## `/sanitize`
 
 **Purpose.** Build a C/C++ project under runtime sanitizers and run its tests, reporting in
@@ -308,8 +351,10 @@ SessionStart banner.
 
 **What it does.** Prints, in fixed order: `## Status — <project>`, `### Active feature`,
 `### Feature counts` (planned / in-progress / pass / blocked), `### Git working tree`
-(`git status --porcelain`), `### TOC freshness` (`toc-freshness.sh`), and
-`### Session handoff (head)` (first 15 lines of `session-handoff.md`).
+(`git status --porcelain`), `### TOC freshness` (`toc-freshness.sh`),
+`### Session handoff (head)` (first 15 lines of `session-handoff.md`), and `### Harness health`
+(golden-rules count, last `/gc` scan + verdict, active-feature + handoff staleness — a few signals,
+not a dashboard).
 
 **Arguments.** None.
 
@@ -347,8 +392,10 @@ can resume from disk, not from chat memory.
    `blocked` / stays `in-progress`), keeps it **actionable-first** via `feature-list-sort.mjs`,
    then **validates feature `id` uniqueness** via `feature-list-validate.mjs` (resolve any
    duplicate before committing).
-6. Offers a `PROJECT-TOC.md` refresh if structure changed.
-7. Offers to commit **state files only** (`chore(harness): session N handoff — <feature id>`).
+6. **Flywheel reflection** — asks whether anything recurred this session worth capturing as a
+   golden rule / convention (the `capturing-golden-rules` skill); usually nothing, a few-seconds reflex.
+7. Offers a `PROJECT-TOC.md` refresh if structure changed.
+8. Offers to commit **state files only** (`chore(harness): session N handoff — <feature id>`).
 
 **Arguments.** None.
 
@@ -379,7 +426,7 @@ through two channels:
 | **SessionStart** banner | Session start, on missing artifacts | `/anchor` (no state), `/cpp-init` (C/C++, no clang config), `/index-project` (TOC absent/stale) |
 | **PostToolUse** hook | After an `Edit`/`Write` | `/verify` (edited a passed feature's files), `/sanitize` (C/C++ source change) |
 | **Stop** hook | When the agent wraps up | `/session-end` (stale progress / handoff) |
-| **`using-harness-anchor`** meta-skill | Injected every session (model-facing) | All commands, each with a *when-to-recommend* trigger — including `/status`, which has no hook nudge by design |
+| **`using-harness-anchor`** meta-skill | Injected every session (model-facing) | All commands, each with a *when-to-recommend* trigger — including `/status` and `/gc`, which have no hook nudge by design |
 
 Hooks are **warn-only**: they inject a suggestion, never block and never run the command for
 you.

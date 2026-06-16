@@ -16,6 +16,7 @@ Initialize harness-anchor state files in the current project. Implements the **I
    | Template | Target in user project |
    |---|---|
    | `templates/AGENTS.md.tpl` | `AGENTS.md` |
+   | `templates/golden-rules.md.tpl` | `golden-rules.md` |
    | `templates/feature_list.json.tpl` | `feature_list.json` |
    | `templates/feature_list.schema.json` | `feature_list.schema.json` (copied as-is) |
    | `templates/init.sh.tpl` | `init.sh` (chmod +x) |
@@ -39,6 +40,7 @@ Initialize harness-anchor state files in the current project. Implements the **I
    3. Run `bash init.sh` to verify it executes.
    4. (Optional) Run /index-project to generate PROJECT-TOC.md from your sources.
    5. (Optional, C/C++ only) Run /cpp-init to add clang-format/.clang-tidy.
+   6. Leave golden-rules.md empty for now — add your first rule when a pattern recurs (see the capturing-golden-rules skill).
    ```
 
 5. **Do NOT auto-commit.** Let the user review the diff first.
@@ -57,6 +59,8 @@ If the current directory is **not a git repository**, surface this and ask wheth
 - Run `git init` first (recommended)
 
 If `feature_list.json` exists and is **already valid**: skip it by default, mention to the user.
+
+If `golden-rules.md` exists and is **non-empty**: **skip by default** (like `feature_list.json`) — it accumulates the project's hard-won rules, so overwriting it with the empty template would wipe the feedback flywheel's value.
 
 ## Verification
 

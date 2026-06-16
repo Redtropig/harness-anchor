@@ -15,6 +15,7 @@ Read-only project status overview. Shows everything at a glance without modifyin
 4. **`### Git working tree`** — output of `git status --porcelain` (or "not a git repo")
 5. **`### TOC freshness`** — output of `scripts/toc-freshness.sh` (fresh / stale / absent / no-anchor / not-git)
 6. **`### Session handoff (head)`** — first 15 lines of `session-handoff.md`, or "(no handoff file)"
+7. **`### Harness health`** — golden-rules count, last `/gc` drift-scan age + verdict, active-feature staleness, handoff age
 
 ## Steps
 
@@ -55,6 +56,16 @@ Read-only project status overview. Shows everything at a glance without modifyin
 5. **Print TOC freshness.** Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/toc-freshness.sh <project-dir>` and print the output directly.
 
 6. **Print session handoff head.** Read first 15 lines of `session-handoff.md`. If missing, say "(no session-handoff.md — run `/session-end` after work)".
+
+7. **Print harness health.** A few counts/ages — **not** a metrics dashboard. Read the *last persisted* drift report; never run a scan (that is `/gc`'s job).
+
+   ```
+   ### Harness health
+   - golden rules: N        (grep -c '^### GR-' golden-rules.md; else "(none — seed via capturing-golden-rules)")
+   - last /gc scan: <age of newest .harness-anchor/drift-*.md> — <verdict if parseable>   (else "never — run /gc")
+   - active feature age: <now − createdAt of the in-progress feature>   (else "(no active feature)")
+   - handoff age: <now − mtime of session-handoff.md>   (else "(no handoff)")
+   ```
 
 ## Boundary with /session-end
 

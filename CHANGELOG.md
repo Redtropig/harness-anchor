@@ -4,6 +4,23 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-16
+
+### Added
+
+- **Entropy governance / feedback flywheel** (Concept ⑥ — the one canonical harness-engineering concept harness-anchor had no mechanism for, built in the *lightweight, report-only* form a solo / small-team harness needs: "grow from failure, 3 rules not 30", and Böckeler's "continuous drift sensors"). Warn-only, zero-dependency, never auto-refactors:
+  - `templates/golden-rules.md.tpl` (NEW) — a project state file for accumulated taste / anti-pattern rules, each `GR-<n>` tied to a concrete past failure with a Check that escalates manual → grep → lint by frequency × impact. Ships **empty** (seed on real recurrence); scaffolded by `/anchor` and **Skip-by-default** on re-anchor so accumulated rules are never wiped. Kept separate from AGENTS.md so the map stays a map.
+  - `skills/capturing-golden-rules/` (NEW, generic) — the ratchet: turn a recurring failure into a durable rule ("blame the process, not the agent"). Routes the four Feedback-Flywheel signal types to their homes (failure → golden-rules; context → AGENTS.md; instruction / workflow → skill / AGENTS.md) so the file doesn't become a dump.
+  - `agents/drift-analyst.md` (NEW, read-only, fresh-context) — scans **changed** code against `golden-rules.md` + generic drift heuristics (duplicated helpers, inconsistent error handling, copy-paste, oversized files, TODO pileup, **doc-drift**), grades findings must / should / nice, persists `.harness-anchor/drift-<ts>.md`. Explicitly non-overlapping with `verification-runner` (build/test/lint) and `coverage-analyst` (coverage / run-scope).
+  - `commands/gc.md` (NEW) — dispatches `drift-analyst`; mirrors `/verify` & `/test-plan`'s fresh-context, read-only shape; report-only (offers scoped fixes / rule capture, never bulk-refactors). Not `git gc`.
+  - **Flywheel wiring:** `/session-end` gains a one-question reflection ("did anything recur worth capturing?") — anchored to the existing checkpoint, not a new ceremony (Garg's Feedback Flywheel). `/status` gains a lightweight `### Harness health` section (rule count, last drift scan, staleness) — a few signals, deliberately not a dashboard. The SessionStart banner surfaces the golden-rules count.
+
+- **AGENTS.md template upgraded to the validated content formula** (`templates/AGENTS.md.tpl`): commands-first (they were an empty block at the bottom), a `## Git workflow` section (the missing sixth domain, kept **value-neutral** — no hardcoded GitFlow / commit convention), a code-example stub in Conventions (examples > prose), and a pointer to `golden-rules.md`. Still a map (≤ ~80 lines). Existing projects adopt it by re-running `/anchor` (Overwrite/Skip/Diff prompt).
+
+### Changed
+
+- `skills/self-correction-loop`: added the **edit budget** (doom-loop) alongside the existing re-run budget — ~3–5 edits to one file chasing the same goal without the signal clearing means STOP, re-read the spec (not your own diff), switch approach or escalate; and don't "fix" a failing test by rewriting it to match the code (LoopDetection-middleware discipline).
+
 ## [0.5.0] - 2026-06-15
 
 ### Added
@@ -162,7 +179,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Redtropig/harness-anchor/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Redtropig/harness-anchor/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Redtropig/harness-anchor/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/Redtropig/harness-anchor/compare/v0.3.2...v0.3.3

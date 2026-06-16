@@ -106,6 +106,16 @@ except Exception:
             ;;
     esac
 
+    # ---- 2c. Golden-rules count (reinforces the feedback flywheel) ----
+    golden_rules_line=""
+    gr_file="$PROJECT_DIR/golden-rules.md"
+    if [ -f "$gr_file" ]; then
+        gr_count=$(grep -c '^### GR-' "$gr_file" 2>/dev/null || printf '0')
+        gr_count=$(printf '%s' "$gr_count" | tr -cd '0-9')
+        [ -z "$gr_count" ] && gr_count=0
+        golden_rules_line="${gr_count} rule(s) — /gc scans changed code against them"
+    fi
+
     # ---- 3. TOC freshness (delegated to scripts/toc-freshness.sh, DD5) ----
     toc_file="$PROJECT_DIR/PROJECT-TOC.md"
     freshness_script="${PLUGIN_ROOT}/scripts/toc-freshness.sh"
@@ -154,6 +164,11 @@ Project root:     ${PROJECT_DIR}
 Active feature:   ${active_feature}
 Project type:     ${project_type}
 TOC freshness:    ${toc_status}"
+
+    if [ -n "$golden_rules_line" ]; then
+        banner="${banner}
+Golden rules:     ${golden_rules_line}"
+    fi
 
     if [ -n "$cpp_init_hint" ]; then
         banner="${banner}

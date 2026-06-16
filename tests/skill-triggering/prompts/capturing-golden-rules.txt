@@ -1,0 +1,1 @@
+The AI keeps writing its own little date-formatting helpers in three different files instead of reusing the one we already have — this is the second time I've had to clean this up. How do I stop it from happening again?

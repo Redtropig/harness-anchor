@@ -1,6 +1,6 @@
 # harness-anchor
 
-> **Runtime constraint layer for Claude Code agents.** Companion to [`superpowers`](https://github.com/obra/superpowers). Anchors your agent to project state, scope boundaries, evidence-based completion, test-coverage design, C/C++ engineering best practices, and a strict docs-lookup discipline.
+> **Runtime constraint layer for Claude Code agents.** Companion to [`superpowers`](https://github.com/obra/superpowers). Anchors your agent to project state, scope boundaries, evidence-based completion, test-coverage design, entropy governance (golden rules + drift scan), C/C++ engineering best practices, and a strict docs-lookup discipline.
 
 ---
 
@@ -15,7 +15,7 @@ Together they form a complete harness based on Anthropic's [Effective Harnesses 
 | Subsystem | Provided by |
 |---|---|
 | Instructions | superpowers + harness-anchor (`using-harness-anchor`) |
-| State | **harness-anchor** (`feature_list.json`, `progress.md`, `session-handoff.md`) |
+| State | **harness-anchor** (`feature_list.json`, `progress.md`, `session-handoff.md`, `golden-rules.md`) |
 | Verification | **harness-anchor** (`anti-hallucination-gates`, `/verify`) + superpowers (TDD) |
 | Scope | **harness-anchor** (active-feature lock, scope-jump detection) |
 | Lifecycle | **harness-anchor** (`init.sh`, `/session-end`) |
@@ -44,7 +44,7 @@ You should see a `<harness-anchor-state>...</harness-anchor-state>` block in the
 ```bash
 # In your project root:
 /anchor          # scaffolds AGENTS.md, feature_list.json, init.sh, progress.md,
-                 # session-handoff.md, PROJECT-TOC.md, context-budget.md
+                 # session-handoff.md, PROJECT-TOC.md, context-budget.md, golden-rules.md
 /cpp-init        # (C/C++ projects only) tunes init.sh, drops .clang-format,
                  # .clang-tidy, scripts/sanitizer-build.sh
 /index-project   # builds PROJECT-TOC.md from your git-tracked files
@@ -56,7 +56,7 @@ bash init.sh     # health-check the environment
 
 ---
 
-## Skills (13 total — auto-triggered from session context)
+## Skills (14 total — auto-triggered from session context)
 
 | Skill | When it fires |
 |---|---|
@@ -67,6 +67,7 @@ bash init.sh     # health-check the environment
 | `self-correction-loop` | After tool/hook returns warning, lint/type/build error |
 | `anti-hallucination-gates` | Before claiming "done", "fixed", "passing" |
 | `test-coverage-design` | Deciding what to test; is a feature covered before "done" (dispatches `coverage-analyst`) |
+| `capturing-golden-rules` | The same mistake recurs / a review comment is really a convention — encode it as a durable rule (the feedback flywheel) |
 | `context-budget-discipline` | Long sessions; subagents; large file fetches |
 | `docs-lookup` | Looking up unfamiliar tools/APIs/errors (Context7 → WebSearch → uncertainty) |
 | `cpp-build-systems` | CMake/Meson/Make/Bazel projects |
@@ -74,12 +75,13 @@ bash init.sh     # health-check the environment
 | `cpp-formatting` | clang-format |
 | `cpp-sanitizers` | ASan / UBSan / TSan / valgrind |
 
-## Subagents (4 — invoked via `Task` tool or slash commands)
+## Subagents (5 — invoked via `Task` tool or slash commands)
 
 | Agent | Role |
 |---|---|
 | `verification-runner` | Fresh-context evaluator — runs build/tests/lint, reports evidence paths. Read-only. |
 | `coverage-analyst` | Fresh-context coverage-gap analyst — derives test obligations from code + spec, flags paths outside the run scope, recommends oracle-independent-first tests. Read-only. |
+| `drift-analyst` | Fresh-context drift / entropy scanner — checks changed code against `golden-rules.md` + slop heuristics (dead code, duplication, doc-drift), reports findings with an evidence path. Read-only. |
 | `cpp-build-doctor` | Diagnoses C/C++ build failures from compiler output. Read-only. |
 | `index-curator` | Sole writer of `PROJECT-TOC.md`. Used by `/index-project`. |
 
@@ -92,6 +94,7 @@ bash init.sh     # health-check the environment
 | `/index-project` | (Re)builds `PROJECT-TOC.md` from git-tracked sources |
 | `/verify` | Dispatches `verification-runner` for fresh-context evaluation; opt-in `--fix` runs a bounded (≤ 2-cycle) auto-fix loop |
 | `/test-plan` | Dispatches `coverage-analyst` for a post-impl coverage-gap analysis (obligations, paths outside the run scope, minimal oracle-independent-first tests); read-only |
+| `/gc` | Dispatches `drift-analyst` for an on-demand code-drift / entropy scan against `golden-rules.md` + slop heuristics (dead code, duplication, doc-drift); read-only, report-only (not `git gc`) |
 | `/sanitize` | C/C++ project: builds under ASan+UBSan (TSan separately), runs tests, reports findings in fixed sections with a `.harness-anchor/sanitize-*.log` evidence path |
 | `/session-end` | Writes structured handoff + appends `progress.md` + offers commit |
 | `/status` | Read-only project overview: active feature, counts, git tree, TOC freshness, handoff head |
@@ -102,7 +105,7 @@ bash init.sh     # health-check the environment
 
 | Hook | Purpose |
 |---|---|
-| SessionStart | Injects state banner: active feature, project type, TOC freshness, handoff head, meta-skill body (≤ 2000 token budget) |
+| SessionStart | Injects state banner: active feature, project type, TOC freshness, golden-rules count, handoff head, meta-skill body (≤ 2000 token budget) |
 | PostToolUse | After Edit/Write: regression-warn on pass-feature files; duplicate feature-`id` warn when `feature_list.json` is written; clang-tidy on C/C++ files when `compile_commands.json` present; one-line `/sanitize` nudge on C/C++ edits (never runs sanitizers inline) |
 | Stop | Nudges progress.md update, session-handoff refresh; never blocks |
 | UserPromptSubmit | Detects scope-jump phrases ("顺便", "also", "by the way"); surfaces active feature for confirmation |
@@ -117,6 +120,7 @@ bash init.sh     # health-check the environment
 - **docs-lookup is canonical.** No inline Context7 → WebSearch waterfalls in other skills — they all reference `docs-lookup` for the procedure (including failure-mode detection and calibrated-uncertainty fallback).
 - **Fresh-context evaluator.** `/verify` dispatches `verification-runner` in a subagent with read-only tools; mitigates "self-grading" leniency per Anthropic's March 2026 three-agent architecture.
 - **Test coverage is post-implementation.** `/test-plan` + `coverage-analyst` derive what *must* be tested from code + spec and flag paths outside the runner's scope — the code-aware pass superpowers' (deliberately code-blind) TDD can't do; pre-implementation test-first stays TDD's job. Reliability against correlated LLM blind spots (code and tests both LLM-generated) leans on oracle-independent tests (metamorphic / differential / property) + a risk-construct checklist, not the model's judgement.
+- **Entropy governance is a feedback flywheel — report-only.** Recurring mistakes become checkable rules in `golden-rules.md` (the `capturing-golden-rules` skill); `/gc` dispatches a fresh-context `drift-analyst` that scans *changed* code against those rules + generic slop heuristics (dead code, duplication, doc-drift) and **recommends** — it never auto-refactors. The capture habit is anchored to the existing `/session-end` checkpoint, not a new ceremony (Garg's Feedback Flywheel; the solo-appropriate, lightweight form per the harness-engineering practical guide).
 - **Heavy ops are explicit commands, not auto-fired hooks.** Sanitizer builds (`/sanitize`) and the opt-in auto-fix loop (`/verify --fix`, bounded to ≤ 2 fresh-evaluated cycles) far exceed the ≤ 5s warn-only hook budget — a hook may *suggest* `/sanitize`, but never runs it inline.
 - **C/C++ first-class.** Build system auto-detect (CMake/Meson/Make/Bazel), `compile_commands.json`-aware clang-tidy, sanitizer build templates.
 
