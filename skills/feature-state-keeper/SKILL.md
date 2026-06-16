@@ -56,6 +56,11 @@ If you discover work that doesn't match the active feature:
 2. Tell the user: *"This looks like new scope. I've recorded it as a planned feature. Should I finish <active feature> first, or pivot?"*
 3. Wait for confirmation before changing status.
 
+**Action-layer backstop:** the post-tool-use hook warns the moment a *new code module* is created
+while a feature is in-progress — so "record new scope as `planned` first" is enforced at write-time,
+not only when the new work happens to be phrased in a prompt. Warn-only: it surfaces the new module
+for you to either confirm in-scope or record as planned; it never blocks.
+
 ## Feature id uniqueness
 
 `id` is the **lookup/mutation key** — `/verify` flips *the* feature to `pass` and attaches evidence

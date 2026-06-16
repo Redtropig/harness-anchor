@@ -106,7 +106,7 @@ bash init.sh     # health-check the environment
 | Hook | Purpose |
 |---|---|
 | SessionStart | Injects state banner: active feature, project type, TOC freshness, golden-rules count, handoff head, meta-skill body (≤ 2000 token budget) |
-| PostToolUse | After Edit/Write: regression-warn on pass-feature files; duplicate feature-`id` warn when `feature_list.json` is written; clang-tidy on C/C++ files when `compile_commands.json` present; one-line `/sanitize` nudge on C/C++ edits (never runs sanitizers inline) |
+| PostToolUse | After Edit/Write: regression-warn on pass-feature files; duplicate feature-`id` warn when `feature_list.json` is written; **new-code-module scope-creep warn** when a new module is written while a feature is in-progress (action-side companion to the prompt-side scope-jump check); clang-tidy on C/C++ files when `compile_commands.json` present; one-line `/sanitize` nudge on C/C++ edits (never runs sanitizers inline) |
 | Stop | Nudges progress.md update, session-handoff refresh; never blocks |
 | UserPromptSubmit | Detects scope-jump phrases ("顺便", "also", "by the way"); surfaces active feature for confirmation |
 

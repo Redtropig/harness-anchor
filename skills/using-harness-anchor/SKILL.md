@@ -49,7 +49,7 @@ If none exist, the project is **un-anchored**. Suggest the user run `/anchor` to
 These are non-negotiable invariants:
 
 1. **No "done" without evidence.** A feature is "pass" only when compile + tests + lint produce concrete output paths. Lacking evidence → status stays `in-progress`. Express uncertainty: *"I am uncertain whether X passes because <reason>."*
-2. **One active feature at a time** unless explicit multi-feature plan. If the user adds an unrelated request mid-feature, surface the scope-jump and confirm before pivoting.
+2. **One active feature at a time** unless explicit multi-feature plan. If the user adds an unrelated request mid-feature, surface the scope-jump and confirm before pivoting. Scope is guarded on **two sides**: a prompt-side hook (scope-jump phrasing) and an action-side hook (a new code module created mid-feature) — both warn-only.
 3. **State lives on disk, not in chat.** Update `feature_list.json` / `progress.md` / `session-handoff.md` rather than relying on conversation memory.
 4. **PROJECT-TOC.md before Glob.** It is cheaper for both you and the user.
 5. **Subagents are single-level.** Never invoke a subagent from within a subagent.

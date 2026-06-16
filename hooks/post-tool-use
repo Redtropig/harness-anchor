@@ -42,6 +42,19 @@ except Exception:
         return 0
     fi
 
+    # Extract tool_name (needed by the scope-expansion check, Check 1c below).
+    tool_name=""
+    if [ -n "$input" ]; then
+        tool_name=$(printf '%s' "$input" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get('tool_name', ''))
+except Exception:
+    pass
+" 2>/dev/null || echo "")
+    fi
+
     # Find project root (where feature_list.json lives) — walk up from file_path.
     project_root=""
     search_dir="$(dirname "$file_path")"
@@ -129,6 +142,57 @@ PY
         if [ -n "$dup_warn" ]; then
             warnings+=("$dup_warn")
         fi
+    fi
+
+    # ---- Check 1c: agent-initiated scope expansion (new code module mid-feature) ----
+    # The UserPromptSubmit guardrail observes only the *prompt*; it is blind to scope the agent
+    # grows on its own (a new module, a rewrite) with no trigger phrase. This is the action-side
+    # observation point (issue #6 -- "observation-point mismatch"). Warn-only nudge, fires standalone.
+    #
+    # Coverage (signal observed): a brand-new code module created via Write while a feature is
+    #   in-progress. Precision: edits/overwrites/test+doc files/git-ignored files never trigger,
+    #   so legitimate in-feature edits stay silent by construction.
+    # Residual blind spots (do NOT read silence as proof of in-scope):
+    #   - scope spread across edits to existing files (churn);
+    #   - in-file structural growth (a class gaining template params / new public types);
+    #   - new scope introduced only in test/doc files;
+    #   - creation via a tool other than Write (PostToolUse fires only on Edit|Write — a file
+    #     produced by a Bash command never reaches this check);
+    #   - non-git projects (the "new = untracked" signal needs git).
+    if [ "$tool_name" = "Write" ] && command -v git >/dev/null 2>&1; then
+        case "$file_path" in
+            *.c|*.cc|*.cpp|*.cxx|*.h|*.hh|*.hpp|*.hxx|*.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.py|*.rs|*.go|*.java|*.kt|*.rb|*.swift|*.scala|*.cs|*.php)
+                # Deny-list: a new test/doc/build file is good behavior, not creep. Slash-bounded
+                # so "mytests/" or "docs_helper.py" are NOT mistaken for "tests/" or "docs/".
+                case "/$rel_path/" in
+                    */tests/*|*/test/*|*/spec/*|*/specs/*|*/__tests__/*|*/__mocks__/*|*/docs/*|*/doc/*|*/examples/*|*/example/*|*/samples/*|*/build/*|*/builddir/*|*/dist/*|*/out/*|*/target/*|*/vendor/*|*/third_party/*|*/node_modules/*|*/.git/*|*/.build/*|*/venv/*|*/.venv/*)
+                        : ;;  # in a deny-listed dir -> skip
+                    *)
+                        if git -C "$project_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+                           && ! git -C "$project_root" ls-files --error-unmatch -- "$rel_path" >/dev/null 2>&1 \
+                           && ! git -C "$project_root" check-ignore -q -- "$rel_path" 2>/dev/null; then
+                            # New, untracked, non-ignored code module. Warn only if a feature is in-progress.
+                            active_feat=$(python3 - "$project_root/feature_list.json" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    for feat in data.get('features', []):
+        if feat.get('status') == 'in-progress':
+            print(f"{feat['id']}: {feat.get('name','')}")
+            break
+except Exception:
+    pass
+PY
+)
+                            if [ -n "$active_feat" ]; then
+                                warnings+=("New module '$rel_path' was created while feature '$active_feat' is in-progress. If it belongs to that feature, ignore this. If it's new scope, record it as a 'planned' feature first (feature-state-keeper) and confirm direction with the user before continuing.")
+                            fi
+                        fi
+                        ;;
+                esac
+                ;;
+        esac
     fi
 
     # ---- Check 2: C/C++ static analysis (clang-tidy on changed files) ----

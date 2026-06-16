@@ -4,6 +4,17 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-16
+
+### Added
+
+- **Action-side scope-creep detector** (`hooks/post-tool-use`): a warn-only check that fires when a new code module is created via `Write` while a feature is `in-progress`, surfacing agent-initiated scope expansion the prompt-side `UserPromptSubmit` guardrail cannot observe (the "observation-point mismatch" of #6). Edits, overwrites, test/doc files, git-ignored files, and non-git projects stay silent by construction. Resolves #6.
+- **Guardrail authoring rule** (`CLAUDE.md`): new hooks must state the failure's manifestation surface (Y) and the observed signal (X), assert X ⊇ Y, or document the residual blind spot in the hook header.
+
+### Changed
+
+- `feature-state-keeper` / `using-harness-anchor`: scope discipline is now enforced on both the prompt side and the action side (the new post-tool-use check gives "record new scope as `planned` first" action-layer teeth).
+
 ## [0.6.1] - 2026-06-16
 
 ### Fixed
@@ -189,7 +200,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Redtropig/harness-anchor/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/Redtropig/harness-anchor/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Redtropig/harness-anchor/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Redtropig/harness-anchor/compare/v0.4.0...v0.5.0

@@ -42,6 +42,7 @@ Hooks are the **most dangerous** component because they fire automatically. Befo
 2. Provide a concrete failure mode being prevented.
 3. Implement timeout, silent fail, and bounded output.
 4. Add a contract test under `tests/hook-contracts/`.
+5. **State the observation-point.** Name the failure's *manifestation surface* (Y — where the bad outcome actually appears) and the *signal the hook observes* (X). Assert **X ⊇ Y**; where it can't, **document the residual blind spot** in the hook header so a silent warn-only pass is not mistaken for coverage. A guardrail keyed on a proxy narrower than its target failure is silently blind — e.g. a scope check reading only the prompt misses agent-initiated scope creep (issue #6).
 
 ## Authoring a Subagent
 

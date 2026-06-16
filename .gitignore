@@ -19,3 +19,6 @@ node_modules/
 tests/**/.build/
 tests/**/build/
 tests/**/compile_commands.json
+
+# superpowers working artifacts (brainstorming specs + implementation plans) — local only
+docs/superpowers/

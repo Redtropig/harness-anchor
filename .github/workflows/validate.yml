@@ -51,6 +51,7 @@ jobs:
       - name: Hook contracts
         run: |
           bash tests/hook-contracts/post-tool-use-warn.sh
+          bash tests/hook-contracts/post-tool-use-scope-expansion.sh
           bash tests/hook-contracts/session-start-banner.sh
           bash tests/hook-contracts/session-start-timeout.sh
           bash tests/hook-contracts/stop-wrap-up.sh
