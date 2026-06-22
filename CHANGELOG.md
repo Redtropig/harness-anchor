@@ -4,9 +4,15 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-06-22
+
 ### Changed
 
-- Synced `plugin.json` / `marketplace.json` descriptions with the GitHub repo About — they now reflect coverage gates (v0.5.0), entropy governance (v0.6.0), and the warn-only / zero-dependency identity, not just the pre-v0.5.0 blurb. Metadata only; no version bump.
+- **Evidence contract now covers deliverable state, not just the working tree.** `anti-hallucination-gates` gains a "Deliverable committed & reproducible" criterion (review the full `git status`, confirm the committed `HEAD` builds — not only the dirty working tree) plus an anti-pattern against dismissing uncommitted changes as "old / unrelated" without a `git diff`; `verification-runner` now reports working-tree clean/dirty and flags that green local evidence does not prove a buildable `HEAD`; `/session-end` surfaces uncommitted **source** (the whole tree, not just state files) with a HEAD-buildability caveat before offering its state-file commit (it still never auto-commits source). Closes the failure where a feature marked `pass` could leave its own source uncommitted and the committed HEAD unbuildable.
+- **Coverage obligations extended to behavioural-contract regressions and liveness.** `test-coverage-design`'s risk checklist + `coverage-analyst` now derive two classes the sensors previously missed: (1) *behavioural-contract substitution* — swapping a container / algorithm / impl behind a stable API can silently regress a guaranteed observable property (ordering / stability / idempotency / documented no-op) or a public signature, caught by a characterization / metamorphic test; (2) *liveness / termination under adversarial structure* — cycles, self-edges, or already-satisfied preconditions in graphs / dependencies must terminate or diagnose, not hang. The shared-mutable row also now names check-then-act (TOCTOU) on a composite predicate.
+- **Drift detection now flags dead stores.** `drift-analyst` gains a computed-but-never-used heuristic (a buffer / accumulator / timestamp built then never read) — wasted work that looks like real logic and previously slipped the scan.
+- Synced `plugin.json` / `marketplace.json` descriptions with the GitHub repo About — they now reflect coverage gates (v0.5.0), entropy governance (v0.6.0), and the warn-only / zero-dependency identity, not just the pre-v0.5.0 blurb (metadata-only change carried over from the prior unreleased state).
+- Bumped `plugin.json` / `marketplace.json` to 0.7.1 (synced); refreshed `docs/commands.md` (`/session-end`, `/verify`) and its doc-align marker.
 
 ## [0.7.0] - 2026-06-16
 
@@ -204,7 +210,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/Redtropig/harness-anchor/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Redtropig/harness-anchor/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/Redtropig/harness-anchor/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Redtropig/harness-anchor/compare/v0.5.0...v0.6.0

@@ -1,7 +1,7 @@
 # Command Manual — harness-anchor
 
-<!-- doc-align: 4962c652b9475da630f6db5967b9fa593625f08c · 2026-06-16 · harness-anchor v0.6.0 -->
-> **Aligned with commit** [`4962c652b9475da630f6db5967b9fa593625f08c`](https://github.com/Redtropig/harness-anchor/commit/4962c652b9475da630f6db5967b9fa593625f08c) (harness-anchor v0.6.0, 2026-06-16). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
+<!-- doc-align: fef07c5faa84db54a934c907a1117717d3b540f0 · 2026-06-22 · harness-anchor v0.7.1 -->
+> **Aligned with commit** [`fef07c5faa84db54a934c907a1117717d3b540f0`](https://github.com/Redtropig/harness-anchor/commit/fef07c5faa84db54a934c907a1117717d3b540f0) (harness-anchor v0.7.1, 2026-06-22). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
 
 Reference for every slash command shipped by harness-anchor: what it does, **when to
 reach for it**, its arguments, prerequisites, outputs, and how the harness reminds you to
@@ -181,7 +181,7 @@ anything is "done / fixed / passing".
 
 **What it does.** Dispatches the `verification-runner` subagent (read-only), which runs the
 documented verification commands (from `AGENTS.md`, else inferred from project type) and
-returns a fixed report: `### Build`, `### Tests`, `### Verdict`, `### Recommendation`. The
+returns a fixed report: `### Build`, `### Tests`, `### Deliverable state` (working tree clean/dirty — green local evidence is not proof of a buildable `HEAD`), `### Verdict`, `### Recommendation`. The
 command surfaces that report **verbatim**. On a `READY` verdict it offers to update
 `feature_list.json` with the evidence; on `NOT READY` it surfaces the failing criteria.
 
@@ -395,7 +395,7 @@ can resume from disk, not from chat memory.
 6. **Flywheel reflection** — asks whether anything recurred this session worth capturing as a
    golden rule / convention (the `capturing-golden-rules` skill); usually nothing, a few-seconds reflex.
 7. Offers a `PROJECT-TOC.md` refresh if structure changed.
-8. Offers to commit **state files only** (`chore(harness): session N handoff — <feature id>`).
+8. **Surfaces any uncommitted source** (full `git status`, not just state files) with a HEAD-buildability caveat — a `pass` whose source isn't committed leaves the committed HEAD unbuildable — then offers to commit **state files only** (`chore(harness): session N handoff — <feature id>`); it still never auto-commits your source.
 
 **Arguments.** None.
 
