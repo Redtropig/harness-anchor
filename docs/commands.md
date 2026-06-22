@@ -181,7 +181,7 @@ anything is "done / fixed / passing".
 
 **What it does.** Dispatches the `verification-runner` subagent (read-only), which runs the
 documented verification commands (from `AGENTS.md`, else inferred from project type) and
-returns a fixed report: `### Build`, `### Tests`, `### Deliverable state` (working tree clean/dirty — green local evidence is not proof of a buildable `HEAD`), `### Verdict`, `### Recommendation`. The
+returns a fixed report: `### Build`, `### Tests`, `### Deliverable state` (clean tree → evidence reflects the committed `HEAD`; dirty tree → evidence reflects only the working tree, so `HEAD` isn't proven buildable), `### Verdict`, `### Recommendation`. The
 command surfaces that report **verbatim**. On a `READY` verdict it offers to update
 `feature_list.json` with the evidence; on `NOT READY` it surfaces the failing criteria.
 
