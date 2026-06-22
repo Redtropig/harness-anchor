@@ -60,6 +60,9 @@ Your response MUST follow this shape exactly so the calling agent can parse reli
 - Result: N warnings, M errors
 - Evidence: .harness-anchor/verify-lint-<ts>.log
 
+### Deliverable state
+- Working tree: CLEAN | DIRTY (N uncommitted files) — the build/test evidence above reflects the **working tree**; the committed `HEAD` is therefore not proven buildable. Recommend committing the source then re-verifying, or a worktree HEAD check.
+
 ### Verdict
 - done_criteria from feature_list.json:
   - [✓ | ✗] Criterion 1 (evidence: <path> or "not covered: <reason>")
@@ -75,6 +78,7 @@ Your response MUST follow this shape exactly so the calling agent can parse reli
 - **NEVER modify code.** Your tools are `Read, Bash, Grep, Glob` only — no Write/Edit. If a fix is obvious, RECOMMEND it in the report; do not apply it.
 - **NEVER mark feature_list.json status as "pass".** That's the calling agent's job after reading your report.
 - **Capture every command output to a file.** No verbal claims without an evidence path.
+- **Report deliverable state.** Run `git status --short`; if the tree is dirty, state in `### Deliverable state` that the evidence reflects the working tree and the committed `HEAD` is not proven buildable. Never commit or stage (read-only).
 - **If a command times out (>60s)** report TIMEOUT with whatever partial output was captured.
 - **If a tool is missing** (e.g., `clang-tidy not found`) report MISSING TOOLCHAIN, suggest install command, do NOT skip silently.
 

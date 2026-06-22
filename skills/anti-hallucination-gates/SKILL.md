@@ -30,6 +30,7 @@ Adapted from [Anthropic's Code with Claude 2026 reference impl](https://github.c
 | **Tests pass** | Test runner output showing N passed, **0 failed**, **0 errored** |
 | **Coverage obligations** *(non-trivial / risk-bearing features)* | The spec/code obligations are exercised by tests the run actually executes — for features with real logic or risk constructs, a `/test-plan` report (`.harness-anchor/coverage-<ts>.md`) with no open gaps. A green suite that skips the risk path is a false pass. |
 | **Static analysis** | Lint report file, OR explicit "no warnings" line in output |
+| **Deliverable committed & reproducible** *(when claiming "done / shipped / committed")* | Full `git status` reviewed (the whole tree, not just state files) **and** the committed `HEAD` builds — not only the dirty working tree. A feature marked `pass` whose source isn't committed is not delivered: HEAD won't reproduce the evidence. |
 | **Manual smoke** | Concrete steps + observed result (only if the above can't cover) |
 
 ### Filling out evidence in `feature_list.json`
@@ -74,6 +75,7 @@ Do NOT say:
 - "The build should pass."
 - "Tests should be green."
 - "This looks correct."
+- "These are old / unrelated changes." (said about uncommitted files **without** running `git diff` to confirm — verify before you dismiss; this is how a `pass`'s own source gets left behind)
 
 Say instead:
 - "Build passes (evidence: <path>) / Build pending verification (recommend: <command>)"
@@ -95,6 +97,7 @@ Before saying ANY of {"done", "fixed", "ready", "complete", "passing", "working"
 - [ ] the passing tests exercise the spec's edge cases / risk paths — not just the happy path (run `/test-plan` if unsure)
 - [ ] I have a file path for each piece of evidence
 - [ ] feature_list.json is updated with evidence object + timestamp + commit
+- [ ] if I claimed "committed / shipped / delivered": I reviewed the **full** `git status` and confirmed the committed HEAD builds (not just the working tree)
 ```
 
 If any box is unchecked: state uncertainty explicitly, do NOT flip status to `pass`.
