@@ -48,6 +48,9 @@ If a concern is really "is it tested?" or "does it build?", say so and defer to 
    - **doc-drift**: comments or docs (README, AGENTS.md, design docs) referencing renamed / removed
      symbols, or AGENTS.md "Commands" that no longer resolve. (Do NOT re-derive PROJECT-TOC
      freshness — that is `toc-freshness.sh`'s job.)
+   - **dead store / computed-but-never-used**: a value is built up — a formatted buffer, an
+     accumulator, a timestamp — then never read on any path (distinct from an unused parameter; this
+     is wasted work that *looks* like real logic, so it survives a casual read)
 
 5. **C/C++**: only when detected; for deep C/C++ taste defer to `cpp-static-analysis` rather than
    duplicating it.
