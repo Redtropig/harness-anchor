@@ -37,6 +37,15 @@ met and really run.
    obligations the feature must satisfy — including the malformed / empty / boundary cases the spec
    implies.
 
+   **Two obligations are easy to miss because the spec rarely spells them out — derive them yourself:**
+   (a) when the change keeps an API / signature but swaps the implementation (a container, an
+   algorithm), the *prior observable contract* — ordering / stability / idempotency / a documented
+   no-op / the old call signature — is itself an obligation, met by a characterization or metamorphic
+   test (see the "Behavioural-contract substitution" row in `coverage-reference.md`). (b) any wait,
+   dependency graph, or traversal carries a *termination* obligation: an adversarial cycle / self-edge /
+   already-satisfied precondition must terminate or diagnose, not hang (the "Liveness / termination"
+   row).
+
 3. **Diff obligations vs. the test set AND the verified run scope (static-first).** For each
    obligation, is there a test the project's runner *actually executes* that exercises it? Parse the
    build config **statically** — CMake: which `add_executable` targets are registered via `add_test` /
