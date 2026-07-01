@@ -15,7 +15,7 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 - **Extended `superpowers` complementarity — closed 3 more seams the post-v0.3.3 surface opened.** Additive only — no skill `description` changed, so triggering is unaffected (mirrors the v0.3.3 audit).
   - `skills/feature-state-keeper`: the Altitude sync-contract now names **parallel / subagent dispatch** (`superpowers:dispatching-parallel-agents` / `subagent-driven-development`) as a second shared-state writer — dispatched workers don't each write the state trio or run the subagent-backed gates (single-level); the coordinating parent reconciles `feature_list.json` once after integration.
   - `skills/init-verification`: `init.sh` is documented as the **`superpowers:using-git-worktrees` baseline** (Step 2 Project Setup / Step 3 Verify Baseline), and a fresh worktree's absent, gitignored `.harness-anchor/` is expected (recreated on demand), not un-anchored.
-  - `skills/self-correction-loop`: a fresh-context sensor's findings (`/verify` · `/test-plan` · `/gc` · `/sanitize`) are triaged with **`superpowers:receiving-code-review`** rigor — verify each, push back with reasoning, don't blind-apply — most importantly inside `/verify --fix`.
+  - `skills/self-correction-loop`: a fresh-context sensor's findings (`/verify` · `/test-plan` · `/gc`) are triaged with **`superpowers:receiving-code-review`** rigor — verify each, push back with reasoning, don't blind-apply — most importantly inside `/verify --fix`.
   - `skills/using-harness-anchor`: Hard Rule #5 now spells out that dispatched workers must not run the subagent-backed gates (the parent does), plus a one-line interop pointer to the three skills above.
 
 ## [0.7.1] - 2026-06-22

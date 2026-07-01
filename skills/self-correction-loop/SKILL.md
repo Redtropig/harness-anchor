@@ -96,7 +96,7 @@ If you can't articulate WHY, your fix is suspicious — even if green. State thi
 
 ## Triaging fresh-context sensor findings
 
-A fresh-context sensor's report — `/verify` (`verification-runner`), `/test-plan` (`coverage-analyst`), `/gc` (`drift-analyst`), `/sanitize` — is **reviewer feedback from a deliberately context-blind evaluator**: it cannot see your intent (that independence is the design). Triage it with `superpowers:receiving-code-review` rigor — verify each finding against the code, push back on false positives **with technical reasoning**, act one-at-a-time — rather than blind-applying. This matters most inside **`/verify --fix`**: the bounded loop should apply *verified* findings, not churn on every recommendation. This is not a licence to dismiss the sensor — `receiving-code-review` is rigorous; you verify, then act.
+A fresh-context sensor's report — `/verify` (`verification-runner`), `/test-plan` (`coverage-analyst`), `/gc` (`drift-analyst`) — is **reviewer feedback from a deliberately context-blind evaluator**: it cannot see your intent (that independence is the design). Triage it with `superpowers:receiving-code-review` rigor — verify each finding against the code, push back on false positives **with technical reasoning**, act one-at-a-time — rather than blind-applying. This matters most inside **`/verify --fix`**: the bounded loop should apply *verified* findings, not churn on every recommendation. This is not a licence to dismiss the sensor — `receiving-code-review` is rigorous; you verify, then act.
 
 ## Related
 
