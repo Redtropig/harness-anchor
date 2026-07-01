@@ -195,7 +195,9 @@ command surfaces that report **verbatim**. On a `READY` verdict it offers to upd
 `### Recommendation`-scoped fixes (every change shown), then **re-verifies with a fresh
 `verification-runner`** — repeating at most **2 cycles**, stopping on pass or budget
 exhaustion. It never self-grades, never widens scope without asking, and never claims pass
-without a fresh PASS (invariant #8).
+without a fresh PASS (invariant #8). Triage each finding with `superpowers:receiving-code-review`
+rigor — verify it against the code before applying, never blind-application (see
+`self-correction-loop`).
 
 **Prerequisites.** Some code written for the active feature. Not callable from inside a
 subagent (subagents are single-level).

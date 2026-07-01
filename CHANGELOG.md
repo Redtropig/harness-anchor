@@ -4,6 +4,20 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-07-01
+
+### Fixed
+
+- **`verification-runner` wrote evidence logs without creating `.harness-anchor/` first.** It captured build/test/lint output to `.harness-anchor/verify-<step>-<ts>.log` without ensuring the dir exists; `.harness-anchor/` is gitignored and no hook creates it, so when `/verify` was the first gate run in a fresh clone or worktree the shell redirect failed with "No such file or directory" and evidence capture silently broke. Added the `mkdir -p .harness-anchor` guard its sibling evidence-writers (`coverage-analyst`, `drift-analyst`) already use, and enforced it: `validate-anchor.sh` [5/9] now asserts a **fresh-dir contract** — any agent that writes to `.harness-anchor/` must `mkdir -p` it first (read-only agents stay exempt).
+
+### Changed
+
+- **Extended `superpowers` complementarity — closed 3 more seams the post-v0.3.3 surface opened.** Additive only — no skill `description` changed, so triggering is unaffected (mirrors the v0.3.3 audit).
+  - `skills/feature-state-keeper`: the Altitude sync-contract now names **parallel / subagent dispatch** (`superpowers:dispatching-parallel-agents` / `subagent-driven-development`) as a second shared-state writer — dispatched workers don't each write the state trio or run the subagent-backed gates (single-level); the coordinating parent reconciles `feature_list.json` once after integration.
+  - `skills/init-verification`: `init.sh` is documented as the **`superpowers:using-git-worktrees` baseline** (Step 2 Project Setup / Step 3 Verify Baseline), and a fresh worktree's absent, gitignored `.harness-anchor/` is expected (recreated on demand), not un-anchored.
+  - `skills/self-correction-loop`: a fresh-context sensor's findings (`/verify` · `/test-plan` · `/gc` · `/sanitize`) are triaged with **`superpowers:receiving-code-review`** rigor — verify each, push back with reasoning, don't blind-apply — most importantly inside `/verify --fix`.
+  - `skills/using-harness-anchor`: Hard Rule #5 now spells out that dispatched workers must not run the subagent-backed gates (the parent does), plus a one-line interop pointer to the three skills above.
+
 ## [0.7.1] - 2026-06-22
 
 ### Changed
@@ -210,7 +224,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/Redtropig/harness-anchor/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/Redtropig/harness-anchor/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Redtropig/harness-anchor/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/Redtropig/harness-anchor/compare/v0.6.0...v0.6.1
