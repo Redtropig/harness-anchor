@@ -28,6 +28,7 @@ When `superpowers` is also active, **two record systems coexist by altitude — 
 1. Superpowers' plan-doc checkboxes and TodoWrite drive **step-level** execution. Do **not** mirror individual steps into `feature_list.json` or `progress.md`.
 2. When a superpowers plan/feature finishes (final review passes), **reflect it back once**: flip that feature's `status` in `feature_list.json` with the evidence object. That single write is the durable record it's done.
 3. `feature_list.json` answers "what features exist / which is active / is it done"; the plan-doc + TodoWrite answer "what are the steps to build the active one." If they disagree, **`feature_list.json` (with evidence) wins.**
+4. **Parallel / subagent dispatch is a shared-state writer too.** When work is fanned out with `superpowers:dispatching-parallel-agents` or `subagent-driven-development`, the dispatched workers treat this trio — above all `feature_list.json` — as **shared state** (the dispatching skill's own rule: don't fan out over shared resources). Workers must **not each write** the trio; the coordinating **parent reconciles once** after they return — the same reflect-back-once write as item 2. Because workers are single-level, they also don't run the subagent-backed gates (`/verify` · `/test-plan` · `/gc`) — the **parent** runs those after the workers integrate, then flips the one ledger entry. Parallel work is normally *within one feature* (independent sub-tasks), so it is exactly the plan/Todo case above.
 
 ## When to use
 

@@ -94,8 +94,13 @@ If you can't articulate WHY, your fix is suspicious — even if green. State thi
 - The signal is about a different feature than the one you're working on. Note it as `planned` in `feature_list.json` and continue current scope.
 - The error is in third-party code you don't own. Document it; route to the right project.
 
+## Triaging fresh-context sensor findings
+
+A fresh-context sensor's report — `/verify` (`verification-runner`), `/test-plan` (`coverage-analyst`), `/gc` (`drift-analyst`) — is **reviewer feedback from a deliberately context-blind evaluator**: it cannot see your intent (that independence is the design). Triage it with `superpowers:receiving-code-review` rigor — verify each finding against the code, push back on false positives **with technical reasoning**, act one-at-a-time — rather than blind-applying. This matters most inside **`/verify --fix`**: the bounded loop should apply *verified* findings, not churn on every recommendation. This is not a licence to dismiss the sensor — `receiving-code-review` is rigorous; you verify, then act.
+
 ## Related
 
 - `anti-hallucination-gates` — keep claims honest while looping
+- `receiving-code-review` (superpowers) — the discipline for triaging a fresh-context sensor's findings (verify each, push back with reasoning, don't blind-apply)
 - `systematic-debugging` (superpowers) — for deep debugging beyond surface signals
 - `verification-runner` (agent) — for fresh-eyes evaluation of "is this really fixed?"
