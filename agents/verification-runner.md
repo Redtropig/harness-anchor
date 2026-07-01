@@ -24,7 +24,7 @@ In an auto-fix loop (`/verify --fix`), you are re-dispatched **fresh each cycle*
    4. **Tests** — `npm test`, `pytest`, `cargo test`, `ctest`, etc.
    5. **Lint / static analysis** — `npm run lint`, `clang-tidy` (if compile_commands.json present), `cargo clippy`, etc.
 
-3. **Capture each output** to `.harness-anchor/verify-<step>-<timestamp>.log` so the calling agent has evidence paths.
+3. **Capture each output.** Ensure the dir exists (`mkdir -p .harness-anchor`), then write each command's output to `.harness-anchor/verify-<step>-<timestamp>.log` so the calling agent has evidence paths.
 
 4. **Compare against done_criteria** for the active feature in `feature_list.json`. For each criterion, decide: covered by evidence / not covered.
 

@@ -7,7 +7,7 @@
 #   [1/9]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
 #   [2/9]   JSON files parse
 #   [3-4/9] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
-#   [5/9]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3)
+#   [5/9]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
 #   [6/9]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
 #   [7/9]   SessionStart hook is executable and produces valid JSON when run
 #   [8/9]   Commands directory consistency (each commands/*.md is a usable /command)
@@ -84,7 +84,7 @@ done < <(find skills -name SKILL.md 2>/dev/null)
 echo ""
 
 # ---- 5. Agent frontmatter (name + description) ----
-echo "[5/9] Agent frontmatter (name + description) + single-level constraint (invariant #3)..."
+echo "[5/9] Agent frontmatter + single-level constraint (invariant #3) + fresh-dir evidence contract (invariant #4)..."
 if [ -d agents ]; then
     while IFS= read -r agent; do
         [ -e "$agent" ] || continue
@@ -111,6 +111,16 @@ if [ -d agents ]; then
             ok "$agent single-level constraint"
         else
             fail "$agent: missing single-level constraint line (invariant #3)"
+        fi
+        # Fresh-dir contract: .harness-anchor/ is gitignored (invariant #4) and no hook
+        # creates it, so any agent that writes evidence there must `mkdir -p` it first —
+        # otherwise the redirect breaks when that agent runs first in a fresh clone/worktree.
+        if grep -q '\.harness-anchor/' "$agent"; then
+            if grep -q 'mkdir -p \.harness-anchor' "$agent"; then
+                ok "$agent creates .harness-anchor before writing evidence"
+            else
+                fail "$agent: writes .harness-anchor/ but no 'mkdir -p .harness-anchor' guard (fresh-dir contract)"
+            fi
         fi
     done < <(find agents -name '*.md' 2>/dev/null)
 else
