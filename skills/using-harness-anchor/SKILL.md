@@ -52,8 +52,10 @@ These are non-negotiable invariants:
 2. **One active feature at a time** unless explicit multi-feature plan. If the user adds an unrelated request mid-feature, surface the scope-jump and confirm before pivoting. Scope is guarded on **two sides**: a prompt-side hook (scope-jump phrasing) and an action-side hook (a new code module created mid-feature) — both warn-only.
 3. **State lives on disk, not in chat.** Update `feature_list.json` / `progress.md` / `session-handoff.md` rather than relying on conversation memory.
 4. **PROJECT-TOC.md before Glob.** It is cheaper for both you and the user.
-5. **Subagents are single-level.** Never invoke a subagent from within a subagent.
+5. **Subagents are single-level.** Never invoke a subagent from within a subagent — so a dispatched worker (`superpowers:dispatching-parallel-agents` / `subagent-driven-development`) must not run the subagent-backed gates `/verify` · `/test-plan` · `/gc`; the parent runs them after the workers integrate.
 6. **When stuck, follow `docs-lookup`.** Never guess at unfamiliar tools/APIs/errors. The Context7 → WebSearch → calibrated-uncertainty fallback chain is canonical there.
+
+**Interop seams with superpowers** (contract in the named skill): parallel/subagent dispatch → `feature-state-keeper`; worktree setup → `init-verification`; sensor-finding triage → `self-correction-loop` (+ `receiving-code-review`).
 
 ## Commands — recommend them at the right moment
 
