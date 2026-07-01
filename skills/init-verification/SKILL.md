@@ -77,6 +77,10 @@ When it fails, list the specific failed step, not "init failed" alone.
 - Inside a subagent that was already given verified-healthy context
 - For trivial single-file edits where build/test aren't needed (rare; usually init still cheap enough to run)
 
+## Worktree setup (superpowers:using-git-worktrees)
+
+When `superpowers:using-git-worktrees` sets up an isolated workspace, its Step 2 (Project Setup) **is `init.sh`** — run it as the baseline instead of re-deriving ad-hoc `npm install` / `cargo build`; its Step 3 (Verify Clean Baseline) is the project's test command / `/verify` (the heavier pass `init.sh` deliberately defers). The git-tracked state trio travels with the branch checkout, so a worktree is **already anchored** — don't re-run `/anchor`. But `.harness-anchor/` is gitignored, so a fresh worktree starts with **no** prior verify/coverage/drift evidence: that is expected, **not** un-anchored — it is recreated on demand when a sensor first writes to it.
+
 ## Looking up toolchain errors
 
 When `init.sh` fails with a cryptic toolchain message (e.g., CMake "could not find compiler", npm `ENOENT`, cargo "linker not found") — invoke the `docs-lookup` skill. Context7 is best for stable tool behavior; WebSearch surfaces recent platform-specific changes; calibrated uncertainty when neither helps.
