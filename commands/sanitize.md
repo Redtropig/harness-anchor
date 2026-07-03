@@ -44,6 +44,11 @@ the ≤5s warn-only hook budget (CLAUDE.md invariants #4 and #7). PostToolUse ma
    - The evidence path is mandatory: no verbal "it passed" without a log (invariant #8,
      default-FAIL). If a tool is missing (no clang/cmake), report MISSING TOOLCHAIN with the
      install hint — do not silently skip.
+   - **Infra failure ≠ finding.** If the sanitizer run aborts before (or apart from)
+     exercising the tests — e.g. an `ASAN_OPTIONS` flag unsupported on this OS, a missing
+     sanitizer runtime — that proves nothing about the code. Report Verdict **INFRA-FAIL**
+     and consult the `cpp-sanitizers` skill (platform notes) or `docs-lookup` with the
+     exact abort string, instead of debugging blind or counting it as a code finding.
 
 5. **Report — fixed structure** (mirrors `agents/verification-runner.md` so callers can parse):
 
@@ -68,11 +73,15 @@ the ≤5s warn-only hook budget (CLAUDE.md invariants #4 and #7). PostToolUse ma
    ### Verdict
    - CLEAN — build + tests pass, zero sanitizer reports.
    - DIRTY — <specific sanitizer error(s)>, evidenced above.
+   - INFRA-FAIL — sanitizer tooling failed before exercising the tests; nothing proven
+     about the code (neither CLEAN nor DIRTY).
 
    ### Recommendation
    - CLEAN → safe to proceed; name the config that was NOT run (e.g. "TSan not run").
    - DIRTY → fix the root cause. Do NOT add a global suppression to silence a real bug.
      For an unfamiliar error class, consult `ub-failure-patterns.md` or invoke `docs-lookup`.
+   - INFRA-FAIL → fix the sanitizer setup first (`cpp-sanitizers` platform notes;
+     `docs-lookup` with the exact abort string). Never report an infra failure as CLEAN.
    ```
 
 6. **Never auto-suppress.** If a finding is in third-party code, surface a suppression
