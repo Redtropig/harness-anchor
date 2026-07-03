@@ -11,9 +11,19 @@
 #   - Must complete in <5 seconds (total watchdog, R1)
 #   - Silent on missing tools (warn-only philosophy, never pollute context with infra errors)
 #   - Never emits permissionDecision/stopReason/block
-#   - Check 2 fidelity: on clang-tidy parse failure (any [clang-diagnostic-error]) only a
-#     one-line notice is emitted — hook quietness is NOT lint-clean; authoritative lint
-#     verdicts come from the project lint script (e.g. scripts/lint.sh) or /verify.
+#
+# Observation point — Check 2, clang-tidy (modified in v0.8.0; CLAUDE.md hook rule 5):
+#   Y (failure surface): lint-detectable defects / style violations in the just-edited
+#     C/C++ file — plus the fidelity failure this revision targets: the agent ACTING on
+#     diagnostics that are false because the TU never parsed.
+#   X (observed signal): clang-tidy warning/error lines for that one file, resolved via
+#     compile_commands.json (+ SDK sysroot via xcrun on Darwin).
+#   Coverage: X ⊇ Y does NOT hold universally — X is trustworthy only when the TU parses.
+#   Residual blind spots (a quiet hook is NOT proof of lint-clean):
+#     - parse failure (any clang-diagnostic-error): diagnostics withheld, ONE notice line only;
+#     - >20 findings truncated; 5s watchdog kill or missing clang-tidy/compile_commands → silent skip;
+#     - authoritative lint verdicts come from the project lint script (scripts/lint.sh) or /verify.
+#   (Check 1c's observation point is documented at the check itself, lines ~160 below.)
 
 set -uo pipefail   # no -e: a single check failure should not abort other checks
 
