@@ -209,7 +209,7 @@ for src in commands/anchor.md commands/cpp-init.md; do
     done < <(grep -oE 'templates/[A-Za-z0-9._/-]+' "$src" | sort -u)
 done
 if [ "$found_any_cmd" -eq 0 ]; then
-    warn "commands/anchor.md not present yet — skipping template cross-check"
+    warn "commands/anchor.md and commands/cpp-init.md not present yet — skipping template cross-check"
 fi
 echo ""
 
