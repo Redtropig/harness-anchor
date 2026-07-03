@@ -38,6 +38,8 @@ clang-tidy -p .build --quiet path/to/changed_file.cpp
 - `-p .build` points at compile_commands.json's directory
 - `--quiet` suppresses progress noise
 - Returns 0 if clean, non-zero if warnings
+- **macOS + Homebrew clang-tidy: add the SDK sysroot** or the run fails to parse — see
+  "macOS failure mode" below (or just use `scripts/lint.sh`)
 
 For changed lines only (large existing codebases), use [`clang-tidy-diff.py`](https://github.com/llvm/llvm-project/blob/main/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py):
 
@@ -52,6 +54,26 @@ run-clang-tidy -p .build -quiet -j$(nproc) > clang-tidy-report.txt 2>&1
 ```
 
 Use sparingly — slow on large codebases.
+
+### macOS failure mode: `'<header>' file not found` (Homebrew clang-tidy)
+
+`compile_commands.json` produced with Apple clang (`/usr/bin/c++`) implies the macOS SDK;
+Homebrew clang-tidy does **not** know it. Without a sysroot it fails to parse the TU
+(`error: 'atomic' file not found` or similar) — and **diagnostics from a failed parse are
+garbage**: the half-parsed TU yields false positives (bogus const/naming/static
+suggestions). Do not act on them; capture the real signal first (`self-correction-loop`).
+
+Fix — point clang-tidy at the active SDK:
+
+```bash
+clang-tidy -p .build \
+  --extra-arg=-isysroot --extra-arg="$(xcrun --show-sdk-path)" \
+  path/to/changed_file.cpp
+```
+
+Or use the project wrapper `scripts/lint.sh` (dropped by `/cpp-init`), which injects the
+sysroot automatically when `xcrun` exists. The PostToolUse hook applies the same fix and
+suppresses its diagnostics entirely when the TU still fails to parse.
 
 ### Common check categories
 
@@ -138,4 +160,5 @@ Typical entry query: `clang-tidy <check-name>` or `cppcheck <id>`.
 ## Templates
 
 - `.clang-tidy` baseline config: `templates/cpp/.clang-tidy.tpl` (copied by `/cpp-init`)
+- `scripts/lint.sh` sysroot-aware clang-tidy wrapper: `templates/cpp/lint.sh.tpl` (copied by `/cpp-init`)
 - See `tool-comparison.md` for clang-tidy vs cppcheck vs IWYU side-by-side decisions.
