@@ -27,6 +27,9 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 - **`templates/cpp/lint.sh.tpl`** — sysroot-correct clang-tidy wrapper dropped by
   `/cpp-init` as `scripts/lint.sh`: the stable lint entry point for agents, docs, and
   `done_criteria` (field use kept having to reinvent exactly this script on macOS).
+  Locates `compile_commands.json` across root / `.build/` / `build/` / `builddir/`
+  (the PostToolUse hook's search order) with a clear generate-hint when absent, and
+  soft-falls-back to no sysroot args when `xcrun` cannot report an SDK path.
 - **`/sanitize` INFRA-FAIL verdict** — a sanitizer-infrastructure abort (e.g. an
   unsupported `ASAN_OPTIONS` flag) is now reported as INFRA-FAIL: not a code finding, and
   never CLEAN. Previously the report shape had no honest slot for "the tooling itself

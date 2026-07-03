@@ -71,9 +71,10 @@ clang-tidy -p .build \
   path/to/changed_file.cpp
 ```
 
-Or use the project wrapper `scripts/lint.sh` (dropped by `/cpp-init`), which injects the
-sysroot automatically when `xcrun` exists. The PostToolUse hook applies the same fix and
-suppresses its diagnostics entirely when the TU still fails to parse.
+Or use the project wrapper `scripts/lint.sh` (dropped by `/cpp-init`), which locates the
+compilation database (root / `.build/` / `build/` / `builddir/`, same search order as the
+PostToolUse hook) and injects the sysroot automatically on macOS. The hook applies the
+same fix and suppresses its diagnostics entirely when the TU still fails to parse.
 
 ### Common check categories
 
