@@ -33,22 +33,29 @@ Add C/C++-specific config files to a project already anchored via `/anchor`. Tun
 
 5. **Drop `scripts/sanitizer-build.sh`** from `templates/cpp/sanitizer-build.sh.tpl` if the project is CMake (other build systems: ask user, sanitizer setup is build-system-specific).
 
-6. **chmod +x** the shell scripts written.
+6. **Drop `scripts/lint.sh`** from `templates/cpp/lint.sh.tpl` (any C/C++ project —
+   clang-tidy is build-system-agnostic given `compile_commands.json`). Same skip-if-present
+   ask policy. This is the sysroot-correct lint entry point (macOS Homebrew clang-tidy
+   fails without it — see `cpp-static-analysis`).
 
-7. **Print next-steps**:
+7. **chmod +x** the shell scripts written.
+
+8. **Print next-steps**:
 
    ```
    ✓ /cpp-init complete:
      - init.sh tuned for <build system>
      - .clang-format applied (LLVM base + 4-space indent + 100 col)
      - .clang-tidy applied (bugprone/cert/clang-analyzer/cppcoreguidelines baseline)
+     - scripts/lint.sh applied (sysroot-correct clang-tidy entry point)
      - scripts/sanitizer-build.sh available for ASan+UBSan runs
 
    Next:
      1. Run `bash init.sh` — should succeed if your project is well-configured
      2. Review .clang-tidy and disable any checks too noisy for this codebase
-     3. Run `clang-format --dry-run -Werror $(git ls-files '*.cpp' '*.h')` to see what would change
-     4. Optionally run scripts/sanitizer-build.sh to do a full ASan+UBSan pass
+     3. Run `bash scripts/lint.sh` for a clang-tidy pass (sysroot handled)
+     4. Run `clang-format --dry-run -Werror $(git ls-files '*.cpp' '*.h')` to see what would change
+     5. Optionally run scripts/sanitizer-build.sh to do a full ASan+UBSan pass
    ```
 
 ## Overwrite policy (hard rule)
