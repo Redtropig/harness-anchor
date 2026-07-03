@@ -4,6 +4,46 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-07-03
+
+### Fixed
+
+- **`templates/cpp/sanitizer-build.sh.tpl`: per-OS `detect_leaks`.** LeakSanitizer is
+  unavailable on macOS/Apple toolchains; the previous unconditional `detect_leaks=1` made
+  every ASan run abort at startup there ("detect_leaks is not supported on this platform")
+  — the old comment even called it a no-op. Now Darwin → 0, else → 1.
+- **`cpp-sanitizers` skill: corrected the LSan platform claim.** macOS is not "supported
+  but off by default" — forcing it aborts ASan; standalone `-fsanitize=leak` is likewise
+  Apple-unavailable. Use `leaks`(1)/Instruments on macOS, or run LSan on Linux CI.
+- **PostToolUse clang-tidy signal fidelity.** On macOS the hook now injects the SDK sysroot
+  via `xcrun`; when a TU still fails to parse (any `clang-diagnostic-error`) it suppresses
+  the unreliable diagnostics and emits one honest notice instead of garbage warnings
+  (previously the false positives from the half-parsed TU were injected as if real —
+  field use had to adopt a "don't trust the hook" project rule, the opposite of a
+  guardrail). New contract test pins both behaviours. Warn-only contract unchanged.
+
+### Added
+
+- **`templates/cpp/lint.sh.tpl`** — sysroot-correct clang-tidy wrapper dropped by
+  `/cpp-init` as `scripts/lint.sh`: the stable lint entry point for agents, docs, and
+  `done_criteria` (field use kept having to reinvent exactly this script on macOS).
+- **`/sanitize` INFRA-FAIL verdict** — a sanitizer-infrastructure abort (e.g. an
+  unsupported `ASAN_OPTIONS` flag) is now reported as INFRA-FAIL: not a code finding, and
+  never CLEAN. Previously the report shape had no honest slot for "the tooling itself
+  failed before exercising anything".
+
+### Changed
+
+- **`cpp-static-analysis` skill** documents the macOS `'<header>' file not found` failure
+  mode (Homebrew clang-tidy without the SDK sysroot) and the rule that **diagnostics from
+  a failed parse are garbage** — do not act on them.
+- **Friction-point skill wiring:** hook clang-tidy warnings now carry a
+  `self-correction-loop` / `cpp-static-analysis` pointer tail; `/sanitize` and the cpp
+  template scripts point at `cpp-sanitizers` / `docs-lookup` on infra failures — the
+  knowledge existed in the skills but nothing delivered it at the moment of friction.
+- `scripts/validate-anchor.sh` [9/9] now also cross-checks templates referenced from
+  `commands/cpp-init.md` (previously only `/anchor`'s references were guarded).
+
 ## [0.7.2] - 2026-07-01
 
 ### Fixed
@@ -224,7 +264,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/Redtropig/harness-anchor/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/Redtropig/harness-anchor/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/Redtropig/harness-anchor/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Redtropig/harness-anchor/compare/v0.6.1...v0.7.0

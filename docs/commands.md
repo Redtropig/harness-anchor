@@ -1,7 +1,7 @@
 # Command Manual — harness-anchor
 
-<!-- doc-align: fef07c5faa84db54a934c907a1117717d3b540f0 · 2026-06-22 · harness-anchor v0.7.1 -->
-> **Aligned with commit** [`fef07c5faa84db54a934c907a1117717d3b540f0`](https://github.com/Redtropig/harness-anchor/commit/fef07c5faa84db54a934c907a1117717d3b540f0) (harness-anchor v0.7.1, 2026-06-22). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
+<!-- doc-align: 8cb5fc01e9623a0b3a477918df89711caf402905 · 2026-07-03 · harness-anchor v0.7.3 -->
+> **Aligned with commit** [`8cb5fc01e9623a0b3a477918df89711caf402905`](https://github.com/Redtropig/harness-anchor/commit/8cb5fc01e9623a0b3a477918df89711caf402905) (harness-anchor v0.7.3, 2026-07-03). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
 
 Reference for every slash command shipped by harness-anchor: what it does, **when to
 reach for it**, its arguments, prerequisites, outputs, and how the harness reminds you to
@@ -111,6 +111,8 @@ has no `.clang-format` / `.clang-tidy` yet.
   the generic one with a warning).
 - Drops `.clang-format` (LLVM base, 4-space indent, 100-col) and `.clang-tidy`
   (bugprone / cert / clang-analyzer / cppcoreguidelines baseline).
+- Drops `scripts/lint.sh` — the sysroot-correct clang-tidy entry point (macOS Homebrew
+  clang-tidy fails to parse without the SDK sysroot; see `cpp-static-analysis`).
 - Drops `scripts/sanitizer-build.sh` (CMake projects; other build systems: asks).
 
 **Arguments.** None.
@@ -313,8 +315,10 @@ crash / leak / hang / intermittent failure.
 **What it does.** Confirms C/C++ (`cpp-detect.sh`), locates or materializes
 `scripts/sanitizer-build.sh`, then builds + tests under the chosen config and tees output to
 `.harness-anchor/sanitize-<config>-<ts>.log`. Reports:
-`### Build` · `### Tests` · `### Sanitizer findings` · `### Verdict` (CLEAN / DIRTY) ·
-`### Recommendation`.
+`### Build` · `### Tests` · `### Sanitizer findings` · `### Verdict` (CLEAN / DIRTY /
+INFRA-FAIL) · `### Recommendation`. An abort of the sanitizer tooling *itself* (e.g. an
+`ASAN_OPTIONS` flag unsupported on this OS) is reported as **INFRA-FAIL** — not a code
+finding, and never CLEAN; the fix path is `cpp-sanitizers` platform notes / `docs-lookup`.
 
 **Arguments.** None (it asks which config when the symptom is ambiguous).
 

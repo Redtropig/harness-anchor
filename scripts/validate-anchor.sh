@@ -187,9 +187,12 @@ else
 fi
 echo ""
 
-# ---- 9. Templates referenced in /anchor exist ----
-echo "[9/9] Templates referenced by /anchor..."
-if [ -f commands/anchor.md ]; then
+# ---- 9. Templates referenced in /anchor + /cpp-init exist ----
+echo "[9/9] Templates referenced by /anchor + /cpp-init..."
+found_any_cmd=0
+for src in commands/anchor.md commands/cpp-init.md; do
+    [ -f "$src" ] || continue
+    found_any_cmd=1
     while IFS= read -r tpl; do
         # Skip directory references (trailing slash) and empty matches
         case "$tpl" in
@@ -197,14 +200,15 @@ if [ -f commands/anchor.md ]; then
             "") continue ;;
         esac
         if [ -f "$tpl" ]; then
-            ok "$tpl"
+            ok "$tpl ($src)"
         elif [ -d "$tpl" ]; then
-            ok "$tpl (dir)"
+            ok "$tpl (dir, $src)"
         else
-            fail "missing template: $tpl"
+            fail "missing template: $tpl (referenced by $src)"
         fi
-    done < <(grep -oE 'templates/[A-Za-z0-9._/-]+' commands/anchor.md | sort -u)
-else
+    done < <(grep -oE 'templates/[A-Za-z0-9._/-]+' "$src" | sort -u)
+done
+if [ "$found_any_cmd" -eq 0 ]; then
     warn "commands/anchor.md not present yet — skipping template cross-check"
 fi
 echo ""

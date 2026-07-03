@@ -46,6 +46,10 @@ The log must show: **N passed, 0 failed, 0 errored**. If skipped > 0, note it â€
 | ruff | `ruff check . --output-format json > .harness-anchor/ruff-<ts>.json` | ruff json |
 | clippy | `cargo clippy -- -D warnings 2>&1 \| tee .harness-anchor/clippy-<ts>.log` | clippy log |
 
+> macOS + Homebrew clang-tidy: run via the project's `scripts/lint.sh` (or add the SDK
+> sysroot) â€” a bare run fails to parse the TU, and output from a failed parse is **not
+> valid evidence** (see `cpp-static-analysis`, "macOS failure mode").
+
 Evidence requires either:
 - "0 warnings" / "no issues found" line, OR
 - A non-empty report file that the user/reviewer has accepted (with explicit notes)
