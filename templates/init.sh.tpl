@@ -30,6 +30,7 @@ check_file PROJECT-TOC.md
 echo ""
 
 echo "[2/3] Verifying tools..."
+# shellcheck disable=SC2043  # seeded with git only by design — append your project's tools here
 for tool in git; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "  MISSING tool: $tool"

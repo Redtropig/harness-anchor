@@ -52,7 +52,7 @@ Hooks are the **most dangerous** component because they fire automatically. Befo
 
 ## Versioning
 
-Bump `version` in `.claude-plugin/plugin.json` AND `.claude-plugin/marketplace.json` together. Semver: PATCH for skill content tweaks, MINOR for new skill/agent/command, MAJOR for breaking hook contract.
+Bump `version` in `.claude-plugin/plugin.json` AND `.claude-plugin/marketplace.json` together. Semver: PATCH for fixes / content tweaks to existing components; MINOR for **any new backward-compatible capability** — new skill/agent/command/template/hook check, anything that belongs in a CHANGELOG `### Added` section; MAJOR for breaking hook contract. (The old "new skill/agent/command" wording was an incomplete enumeration and once caused an Added-bearing release to be mislabeled PATCH.)
 
 ## Tests
 

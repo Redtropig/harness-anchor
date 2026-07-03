@@ -9,7 +9,7 @@ Sanitizers are compiler-instrumented runtime checks. They catch what static anal
 
 | Sanitizer | What it catches | Slowdown |
 |---|---|---|
-| **ASan** (Address) | Use-after-free, heap/stack overflow, leaks | 2-3x |
+| **ASan** (Address) | Use-after-free, heap/stack overflow, leaks (leaks: Linux) | 2-3x |
 | **UBSan** (UB) | Signed overflow, null deref, misaligned, OOB shift, ... | ~1.1x |
 | **TSan** (Thread) | Data races, deadlocks | 5-10x |
 | **MSan** (Memory) | Use of uninitialized memory | 3x (Linux only, Clang only) |
@@ -55,14 +55,19 @@ meson test -C builddir-asan
 
 ### LeakSanitizer (LSan) — the leak half of ASan
 
-ASan's "leaks" row above **is** LeakSanitizer — you're already running it. Leak detection is
-**on by default on Linux**; on **macOS** it's supported but **off by default**, enabled with
-`ASAN_OPTIONS=detect_leaks=1` (the generated `scripts/sanitizer-build.sh` already sets it).
+ASan's "leaks" row above **is** LeakSanitizer. Platform truth:
 
-When you want leaks *without* ASan's memory-error overhead, link the **standalone** detector:
+- **Linux**: leak detection is **on by default** with ASan.
+- **macOS / Apple toolchains**: LeakSanitizer is **not supported** — setting
+  `ASAN_OPTIONS=detect_leaks=1` makes every ASan binary **abort at startup** with
+  `detect_leaks is not supported on this platform` (it is NOT a silent no-op). The
+  generated `scripts/sanitizer-build.sh` selects per-OS (Darwin → 0, else → 1). For leak
+  hunting on macOS use `leaks`(1) / Instruments, or run the ASan+LSan suite on Linux CI.
+
+On Linux, when you want leaks *without* ASan's memory-error overhead, link the **standalone** detector:
 
 ```bash
-clang -fsanitize=leak -g -O1 your_prog.c -o your_prog   # lighter than full ASan
+clang -fsanitize=leak -g -O1 your_prog.c -o your_prog   # Linux; not available on Apple toolchains
 ```
 
 Suppress known third-party leaks with the same `leak:` syntax as ASan, via LSan's own var:

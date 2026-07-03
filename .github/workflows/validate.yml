@@ -48,14 +48,17 @@ jobs:
       - name: Command frontmatter negative fixtures
         run: bash scripts/check-allowed-tools.sh --fixtures tests/command-fixtures
 
-      - name: Hook contracts
+      # Glob, not an enumerated list: a hardcoded list silently omits newly added
+      # tests (it had already omitted post-tool-use-tidy-fidelity.sh once).
+      # </dev/null: a hook that reads stdin must not inherit the runner's.
+      - name: Hook contracts (every tests/hook-contracts/*.sh)
+        shell: bash
         run: |
-          bash tests/hook-contracts/post-tool-use-warn.sh
-          bash tests/hook-contracts/post-tool-use-scope-expansion.sh
-          bash tests/hook-contracts/session-start-banner.sh
-          bash tests/hook-contracts/session-start-timeout.sh
-          bash tests/hook-contracts/stop-wrap-up.sh
-          bash tests/hook-contracts/user-prompt-submit-scope-jump.sh
+          set -euo pipefail
+          for t in tests/hook-contracts/*.sh; do
+            echo "=== $t"
+            bash "$t" </dev/null
+          done
 
       - name: POSIX compatibility
         run: bash tests/posix-compat.sh
@@ -67,7 +70,7 @@ jobs:
           FIXTURE_DIR=$(bash tests/e2e-cpp-fixture/bootstrap.sh)
           echo "Fixture: $FIXTURE_DIR"
           # Verify key files exist
-          for f in feature_list.json AGENTS.md init.sh PROJECT-TOC.md session-handoff.md progress.md .clang-format .clang-tidy CMakeLists.txt; do
+          for f in feature_list.json AGENTS.md init.sh PROJECT-TOC.md session-handoff.md progress.md .clang-format .clang-tidy CMakeLists.txt scripts/lint.sh scripts/sanitizer-build.sh; do
             test -f "$FIXTURE_DIR/$f"
             echo "OK $f present"
           done
@@ -130,15 +133,15 @@ jobs:
           grep -q 'generated-at-commit' PROJECT-TOC.md
           echo "OK index-builder smoke pass"
 
-      - name: Script unit tests (index-builder summary+dirmap, toc-freshness, schema, feature-list-sort/validate, progress-prepend)
+      # Glob for the same reason as the hook-contracts step: enumeration rots.
+      - name: Script unit tests (every tests/unit/*.sh)
+        shell: bash
         run: |
-          bash tests/unit/index-builder-summary.sh
-          bash tests/unit/index-builder-dirmap.sh
-          bash tests/unit/toc-freshness.sh
-          bash tests/unit/feature-list-schema.sh
-          bash tests/unit/feature-list-sort.sh
-          bash tests/unit/feature-list-validate.sh
-          bash tests/unit/progress-prepend.sh
+          set -euo pipefail
+          for t in tests/unit/*.sh; do
+            echo "=== $t"
+            bash "$t" </dev/null
+          done
 
       - name: cpp-detect — negative fixture (non-C/C++ stays dormant)
         shell: bash
@@ -167,7 +170,7 @@ jobs:
         run: |
           set -uo pipefail
           files=()
-          while IFS= read -r f; do files+=("$f"); done < <(find hooks -type f ! -name '*.json' ! -name '*.cmd'; find scripts tests -type f -name '*.sh')
+          while IFS= read -r f; do files+=("$f"); done < <(find hooks -type f ! -name '*.json' ! -name '*.cmd'; find scripts tests -type f -name '*.sh'; find templates -type f -name '*.sh.tpl')
           printf 'Linting %d files:\n' "${#files[@]}"; printf '  %s\n' "${files[@]}"
           echo "== full findings, all levels (informational) =="
           shellcheck --severity=style --exclude=SC1091 "${files[@]}" || true
