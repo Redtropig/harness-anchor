@@ -5,6 +5,7 @@
 #   - Active feature (from feature_list.json, "in-progress" entry)
 #   - TOC freshness (git-commit anchor algorithm)
 #   - Project type (cpp|generic, via scripts/cpp-detect.sh)
+#   - State-file budget sentinel (only when a budgeted file exceeds its cap; see step 2d)
 #   - Session handoff head (first 10 lines of session-handoff.md)
 #   - using-harness-anchor SKILL.md body (the meta-skill)
 #
@@ -117,6 +118,38 @@ except Exception:
         golden_rules_line="${gr_count} rule(s) — /gc scans changed code against them"
     fi
 
+    # ---- 2d. State-file budget sentinel (v0.9.0) — warn-only, never writes ----
+    # Observation point (CLAUDE.md hook rule 5):
+    #   Y (failure surface): context blowout / attention dilution when oversized state
+    #     files get read into a session (the startup ritual reads feature_list.json and
+    #     friends every session; opt-in history reads pull progress.md).
+    #   X (observed signal): on-disk byte size of the five budgeted state files at
+    #     SessionStart, vs fixed caps (progress 64KB · feature_list 32KB ·
+    #     golden-rules 8KB · AGENTS 8KB · handoff 4KB).
+    #   Coverage: X is a byte-size PROXY — X ⊇ Y does NOT hold. Residual blind spots:
+    #     - bytes ≠ actual read cost (the agent may read none, or all, of a large file);
+    #     - archive files and PROJECT-TOC.md are unbudgeted here (TOC injection is
+    #       adaptively capped in step 8; archives are grep-only by contract);
+    #     - mid-session growth is invisible (checked once, at start).
+    #   A missing sentinel line is NOT proof of context health.
+    state_budget_line=""
+    sb_over=""
+    for spec in "progress.md:65536" "feature_list.json:32768" "golden-rules.md:8192" "AGENTS.md:8192" "session-handoff.md:4096"; do
+        sb_file="${spec%%:*}"
+        sb_cap="${spec##*:}"
+        sb_path="$PROJECT_DIR/$sb_file"
+        [ -f "$sb_path" ] || continue
+        sb_size=$(wc -c < "$sb_path" 2>/dev/null | tr -cd '0-9')
+        [ -n "$sb_size" ] || continue
+        if [ "$sb_size" -gt "$sb_cap" ]; then
+            sb_entry="${sb_file} $((sb_size / 1024))KB>$((sb_cap / 1024))KB"
+            if [ -z "$sb_over" ]; then sb_over="$sb_entry"; else sb_over="${sb_over}, ${sb_entry}"; fi
+        fi
+    done
+    if [ -n "$sb_over" ]; then
+        state_budget_line="over budget: ${sb_over} — /session-end offers archival/trim"
+    fi
+
     # ---- 3. TOC freshness (delegated to scripts/toc-freshness.sh, DD5) ----
     toc_file="$PROJECT_DIR/PROJECT-TOC.md"
     freshness_script="${PLUGIN_ROOT}/scripts/toc-freshness.sh"
@@ -169,6 +202,11 @@ TOC freshness:    ${toc_status}"
     if [ -n "$golden_rules_line" ]; then
         banner="${banner}
 Golden rules:     ${golden_rules_line}"
+    fi
+
+    if [ -n "$state_budget_line" ]; then
+        banner="${banner}
+State budget:     ${state_budget_line}"
     fi
 
     if [ -n "$cpp_init_hint" ]; then
