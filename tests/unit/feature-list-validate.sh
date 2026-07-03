@@ -88,6 +88,44 @@ node "$VALIDATE" "$DUP" >/dev/null 2>&1 || true
 after=$(shasum "$DUP" | awk '{print $1}')
 if [ "$before" = "$after" ]; then ok "read-only (file byte-identical after run)"; else bad "validator mutated the file"; fi
 
+# ---- archive-aware (v0.9.0): feature_archive.json shares the id namespace ----
+ARCHD="$TMP/archd"; mkdir -p "$ARCHD"
+cat > "$ARCHD/feature_list.json" <<'JSON'
+{ "project": "p", "features": [
+  { "id": "parser", "name": "A", "description": "d", "status": "in-progress", "done_criteria": ["x"] },
+  { "id": "auth", "name": "B", "description": "d", "status": "planned", "done_criteria": ["x"] }
+] }
+JSON
+cat > "$ARCHD/feature_archive.json" <<'JSON'
+{ "project": "p", "features": [
+  { "id": "auth", "name": "OLD", "description": "d", "status": "pass", "done_criteria": ["x"],
+    "evidence": { "timestamp": "2026-01-01T00:00:00Z", "commit": "aaa", "artifacts": ["a.log"] },
+    "createdAt": "2026-01-01T00:00:00Z", "completedAt": "2026-01-02T00:00:00Z" },
+  { "id": "old-thing", "name": "O", "description": "d", "status": "pass", "done_criteria": ["x"],
+    "evidence": { "timestamp": "2026-01-01T00:00:00Z", "commit": "bbb", "artifacts": ["b.log"] },
+    "createdAt": "2026-01-01T00:00:00Z", "completedAt": "2026-01-03T00:00:00Z" }
+] }
+JSON
+
+out=$(node "$VALIDATE" "$ARCHD/feature_list.json" 2>&1); rc=$?
+expect_exit "hot∩archive collision rejected" 3 "$rc"
+printf '%s' "$out" | grep -q "auth" && ok "collision names 'auth'" || bad "did not name 'auth' (got: $out)"
+printf '%s' "$out" | grep -q "feature_archive.json" && ok "collision names the archive" || bad "archive not named"
+
+out=$(node "$VALIDATE" --check old-thing "$ARCHD/feature_list.json" 2>&1); rc=$?
+expect_exit "--check archived id is taken" 3 "$rc"
+printf '%s' "$out" | grep -q "old-thing-2" && ok "--check suggestion clears both files" || bad "no suggestion (got: $out)"
+printf '%s' "$out" | grep -q "feature_archive.json" && ok "--check says where it lives" || bad "archive not named in --check"
+
+node "$VALIDATE" --check brand-new "$ARCHD/feature_list.json" >/dev/null 2>&1
+expect_exit "--check id free of both files passes" 0 "$?"
+
+printf '{ nope' > "$ARCHD/feature_archive.json"
+node "$VALIDATE" "$ARCHD/feature_list.json" >/dev/null 2>&1
+expect_exit "corrupt archive is a hard error (not silently ignored)" 1 "$?"
+node "$VALIDATE" --check anything "$ARCHD/feature_list.json" >/dev/null 2>&1
+expect_exit "corrupt archive hard-errors --check too" 1 "$?"
+
 echo ""
 echo " Pass: $PASS  Fail: $FAIL"
 if [ "$FAIL" -eq 0 ]; then echo " STATUS: PASSED"; exit 0; else echo " STATUS: FAILED"; exit 1; fi
