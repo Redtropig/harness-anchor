@@ -46,6 +46,13 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
   knowledge existed in the skills but nothing delivered it at the moment of friction.
 - `scripts/validate-anchor.sh` [9/9] now also cross-checks templates referenced from
   `commands/cpp-init.md` (previously only `/anchor`'s references were guarded).
+- **CI hardening:** the hook-contract and script-unit steps now glob their test
+  directories instead of enumerating files (the hardcoded list had already silently
+  omitted this release's new fidelity test); ShellCheck now also lints the shipped
+  shell templates (`templates/**/*.sh.tpl`); new `tests/unit/lint-template.sh` pins
+  the lint wrapper's DB-search / explicit-args / no-DB / sysroot behaviours; the e2e
+  cpp fixture now models `/cpp-init`'s `scripts/lint.sh` + `scripts/sanitizer-build.sh`
+  outputs and CI asserts them.
 
 ## [0.7.2] - 2026-07-01
 
