@@ -11,6 +11,9 @@
 #   - Must complete in <5 seconds (total watchdog, R1)
 #   - Silent on missing tools (warn-only philosophy, never pollute context with infra errors)
 #   - Never emits permissionDecision/stopReason/block
+#   - Check 2 fidelity: on clang-tidy parse failure (any [clang-diagnostic-error]) only a
+#     one-line notice is emitted — hook quietness is NOT lint-clean; authoritative lint
+#     verdicts come from the project lint script (e.g. scripts/lint.sh) or /verify.
 
 set -uo pipefail   # no -e: a single check failure should not abort other checks
 
@@ -198,6 +201,14 @@ PY
     # ---- Check 2: C/C++ static analysis (clang-tidy on changed files) ----
     # Phase 4: invoke clang-tidy if file is C/C++ and prerequisites are in place.
     # Silent skip on anything missing — never pollute agent context with infra errors.
+    #
+    # Signal fidelity (field-proven failure mode): Homebrew clang-tidy on macOS lacks the
+    # SDK sysroot Apple clang implies, so a bare run fails to parse ("'atomic' file not
+    # found") and the surviving diagnostics are garbage. We (a) inject the sysroot via
+    # xcrun when available, and (b) if the TU still fails to parse (any
+    # clang-diagnostic-error), suppress the diagnostics and emit ONE honest line.
+    # Residual blind spot: on parse failure only that one line is emitted — quietness is
+    # NOT lint-clean (see header note).
     case "$file_path" in
         *.c|*.cc|*.cpp|*.cxx|*.h|*.hpp|*.hh)
             # Need clang-tidy on PATH
@@ -211,6 +222,14 @@ PY
                     fi
                 done
                 if [ -n "$cc_dir" ]; then
+                    # macOS: give Homebrew clang-tidy the SDK sysroot Apple clang implies.
+                    sysroot_args=()
+                    if [ "$(uname -s)" = "Darwin" ] && command -v xcrun >/dev/null 2>&1; then
+                        sdk_path=$(xcrun --show-sdk-path 2>/dev/null || true)
+                        if [ -n "$sdk_path" ]; then
+                            sysroot_args=(--extra-arg=-isysroot "--extra-arg=$sdk_path")
+                        fi
+                    fi
                     # 5-second timeout cap (BSD/macOS `timeout` may be `gtimeout`; try both)
                     tidy_cmd="clang-tidy"
                     if command -v timeout >/dev/null 2>&1; then
@@ -219,15 +238,19 @@ PY
                         tidy_cmd="gtimeout 5 clang-tidy"
                     fi
                     # --quiet suppresses progress; capture warnings only
-                    tidy_out=$($tidy_cmd -p "$cc_dir" --quiet "$file_path" 2>/dev/null | grep -E '(warning|error):' | head -20 || true)
-                    if [ -n "$tidy_out" ]; then
+                    tidy_out=$($tidy_cmd -p "$cc_dir" --quiet ${sysroot_args[@]+"${sysroot_args[@]}"} "$file_path" 2>/dev/null | grep -E '(warning|error):' | head -20 || true)
+                    if printf '%s' "$tidy_out" | grep -q 'clang-diagnostic-error'; then
+                        # TU failed to parse — its diagnostics are unreliable. One honest line.
+                        warnings+=("clang-tidy could not fully parse $(basename "$file_path") (clang-diagnostic-error, e.g. missing SDK/include paths); diagnostics suppressed as unreliable. Verify via the build or the project lint script (see cpp-static-analysis).")
+                    elif [ -n "$tidy_out" ]; then
                         # Truncate to ~1500 chars to stay under hook budget
                         if [ "${#tidy_out}" -gt 1500 ]; then
                             tidy_out="${tidy_out:0:1500}
 ... (truncated; run clang-tidy directly for full output)"
                         fi
                         warnings+=("clang-tidy on $(basename "$file_path"):
-$tidy_out")
+$tidy_out
+(triage: self-correction-loop · interpretation: cpp-static-analysis)")
                     fi
                 fi
             fi
