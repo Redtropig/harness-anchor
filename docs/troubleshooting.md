@@ -31,6 +31,14 @@ Common failure modes with diagnosis and fix steps.
 
 **Cause:** Missing `compile_commands.json`. The hook skips silently when the compilation database isn't found (warn-only design).
 
+**Related symptom:** instead of warnings you get a single *"clang-tidy could not fully parse
+`<file>` … diagnostics suppressed"* notice. That is the hook's signal-fidelity guard: the TU
+failed to parse (typically a missing SDK sysroot — macOS + Homebrew clang-tidy), so its
+diagnostics would be garbage and are withheld. Fix the toolchain, not the code: run
+`bash scripts/lint.sh` (sysroot-aware, dropped by `/cpp-init`), or add
+`--extra-arg=-isysroot --extra-arg="$(xcrun --show-sdk-path)"` — see `cpp-static-analysis`
+("macOS failure mode").
+
 **Diagnosis:**
 1. Check for `compile_commands.json` in project root, `.build/`, `build/`, or `builddir/`.
 2. Check CMake was configured with `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`.

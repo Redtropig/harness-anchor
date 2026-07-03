@@ -46,7 +46,7 @@ You should see a `<harness-anchor-state>...</harness-anchor-state>` block in the
 /anchor          # scaffolds AGENTS.md, feature_list.json, init.sh, progress.md,
                  # session-handoff.md, PROJECT-TOC.md, context-budget.md, golden-rules.md
 /cpp-init        # (C/C++ projects only) tunes init.sh, drops .clang-format,
-                 # .clang-tidy, scripts/sanitizer-build.sh
+                 # .clang-tidy, scripts/lint.sh, scripts/sanitizer-build.sh
 /index-project   # builds PROJECT-TOC.md from your git-tracked files
 bash init.sh     # health-check the environment
 
@@ -90,7 +90,7 @@ bash init.sh     # health-check the environment
 | Command | What it does |
 |---|---|
 | `/anchor` | Scaffolds harness state files into the current project (overwrites only with explicit approval) |
-| `/cpp-init` | C/C++ project: tunes `init.sh`, drops `.clang-format` / `.clang-tidy` / `sanitizer-build.sh` |
+| `/cpp-init` | C/C++ project: tunes `init.sh`, drops `.clang-format` / `.clang-tidy` / `lint.sh` / `sanitizer-build.sh` |
 | `/index-project` | (Re)builds `PROJECT-TOC.md` from git-tracked sources |
 | `/verify` | Dispatches `verification-runner` for fresh-context evaluation; opt-in `--fix` runs a bounded (≤ 2-cycle) auto-fix loop |
 | `/test-plan` | Dispatches `coverage-analyst` for a post-impl coverage-gap analysis (obligations, paths outside the run scope, minimal oracle-independent-first tests); read-only |
@@ -106,7 +106,7 @@ bash init.sh     # health-check the environment
 | Hook | Purpose |
 |---|---|
 | SessionStart | Injects state banner: active feature, project type, TOC freshness, golden-rules count, handoff head, meta-skill body (≤ 2000 token budget) |
-| PostToolUse | After Edit/Write: regression-warn on pass-feature files; duplicate feature-`id` warn when `feature_list.json` is written; **new-code-module scope-creep warn** when a new module is written while a feature is in-progress (action-side companion to the prompt-side scope-jump check); clang-tidy on C/C++ files when `compile_commands.json` present; one-line `/sanitize` nudge on C/C++ edits (never runs sanitizers inline) |
+| PostToolUse | After Edit/Write: regression-warn on pass-feature files; duplicate feature-`id` warn when `feature_list.json` is written; **new-code-module scope-creep warn** when a new module is written while a feature is in-progress (action-side companion to the prompt-side scope-jump check); clang-tidy on C/C++ files when `compile_commands.json` present (sysroot-aware on macOS; failed-parse diagnostics suppressed with one honest notice); one-line `/sanitize` nudge on C/C++ edits (never runs sanitizers inline) |
 | Stop | Nudges progress.md update, session-handoff refresh; never blocks |
 | UserPromptSubmit | Detects scope-jump phrases ("顺便", "also", "by the way"); surfaces active feature for confirmation |
 
