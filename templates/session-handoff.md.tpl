@@ -1,7 +1,7 @@
 # Session Handoff
 
 > Single-page "what's the state of work right now" for the next agent.
-> Overwritten at every `/session-end`. For history, see `progress.md`.
+> Overwritten at every `/session-end` (budget: ≤ 300 words / ~4KB — this file never grows). For history, see `progress.md`.
 
 **Last updated**: YYYY-MM-DD HH:MM
 **Last session**: N (see progress.md entry N)

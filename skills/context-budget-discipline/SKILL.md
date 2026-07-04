@@ -60,6 +60,21 @@ If you delegate a noisy task, ask for a SUMMARY back, not a transcript.
 | System prompt + tools | Model-defined | Outside your control |
 | Working context | Most of remaining window | Your edits + reads accumulate here |
 
+## State-file budgets
+
+Hot state files carry fixed budgets. The SessionStart banner warns (warn-only) when one is
+exceeded; `/session-end` offers deterministic archival via `state-archive.mjs`.
+
+| File | Hot window | Sentinel |
+|---|---|---|
+| `progress.md` | newest 20 sections | 64KB |
+| `feature_list.json` | live features + 10 newest `pass` | 32KB |
+| `golden-rules.md` | prune — never archived | 8KB |
+| `AGENTS.md` | keep it a map (~80 lines) | 8KB |
+| `session-handoff.md` | overwritten each session | 4KB |
+
+Archives (`progress-archive.md`, `feature_archive.json`) are grep-only — never load whole.
+
 ## When to invoke this skill
 
 - A session has been going for >2 hours
