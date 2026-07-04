@@ -1,7 +1,7 @@
 # Command Manual — harness-anchor
 
-<!-- doc-align: 8cb5fc01e9623a0b3a477918df89711caf402905 · 2026-07-03 · harness-anchor v0.8.0 -->
-> **Aligned with commit** [`8cb5fc01e9623a0b3a477918df89711caf402905`](https://github.com/Redtropig/harness-anchor/commit/8cb5fc01e9623a0b3a477918df89711caf402905) (harness-anchor v0.8.0, 2026-07-03). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
+<!-- doc-align: 5e0faded83f563bbc7489c15de58892d704077f4 · 2026-07-04 · harness-anchor v0.9.0 -->
+> **Aligned with commit** [`5e0faded83f563bbc7489c15de58892d704077f4`](https://github.com/Redtropig/harness-anchor/commit/5e0faded83f563bbc7489c15de58892d704077f4) (harness-anchor v0.9.0, 2026-07-04). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
 
 Reference for every slash command shipped by harness-anchor: what it does, **when to
 reach for it**, its arguments, prerequisites, outputs, and how the harness reminds you to
@@ -25,6 +25,9 @@ use it.
 - **Never auto-commit.** Commands stage or *suggest* a commit but leave the decision to you;
   source-code changes are always your call. `/session-end` and `/index-project` offer a
   commit of *state files only*, never your source.
+- **Never silent-archive.** `/session-end`'s budget step moves cold history (old `progress.md`
+  sections; long-completed `pass` features) to git-tracked archive files only after you
+  confirm, via the deterministic `state-archive.mjs` (idempotent; refuses malformed JSON).
 - **Default-FAIL evidence.** Nothing is reported "passing" without a concrete artifact
   (a build/test log, a `.harness-anchor/*.log` path). Missing evidence ⇒ the status stays
   `in-progress` and the command says so.
@@ -45,7 +48,7 @@ use it.
 | [`/gc`](#gc) | Fresh-context code-drift / entropy scan | After a batch of generated code, before `/session-end` | 🔒 read-only | any |
 | [`/sanitize`](#sanitize) | Run tests under ASan+UBSan (TSan separately) | After a C/C++ change, or before merging C/C++ | ✍️ build + log only | C/C++ |
 | [`/status`](#status) | Read-only "where am I" snapshot | Anytime you want the current state | 🔒 read-only | any |
-| [`/session-end`](#session-end) | Write handoff + progress, offer commit | At a stopping point / before ending | ✍️ writes state files | any |
+| [`/session-end`](#session-end) | Write handoff + progress, offer archival + commit | At a stopping point / before ending | ✍️ writes state files | any |
 
 ---
 
@@ -90,7 +93,8 @@ scaffold)` and `Last session handoff: (no session-handoff.md — run /anchor …
 project isn't anchored.
 
 **Refuses / asks when.** Not a git repo (asks); `feature_list.json` already valid (skips it,
-tells you).
+tells you); state files over their hot-window budgets (points at `/session-end`'s archival
+step instead of archiving during scaffolding).
 
 **Related.** `/cpp-init` (C/C++ layer on top) · `/index-project` (fills the TOC) ·
 `using-harness-anchor` skill.
@@ -359,8 +363,10 @@ SessionStart banner.
 `### Feature counts` (planned / in-progress / pass / blocked), `### Git working tree`
 (`git status --porcelain`), `### TOC freshness` (`toc-freshness.sh`),
 `### Session handoff (head)` (first 15 lines of `session-handoff.md`), and `### Harness health`
-(golden-rules count, last `/gc` scan + verdict, active-feature + handoff staleness — a few signals,
-not a dashboard).
+(golden-rules count, last `/gc` scan + verdict, active-feature + handoff staleness, and a
+state-budget line using the SessionStart sentinel's thresholds — a few signals, not a
+dashboard). Feature counts show archived `pass` entries as `pass: N (+M archived)` when
+`feature_archive.json` exists.
 
 **Arguments.** None.
 
@@ -398,18 +404,23 @@ can resume from disk, not from chat memory.
    `blocked` / stays `in-progress`), keeps it **actionable-first** via `feature-list-sort.mjs`,
    then **validates feature `id` uniqueness** via `feature-list-validate.mjs` (resolve any
    duplicate before committing).
-6. **Flywheel reflection** — asks whether anything recurred this session worth capturing as a
+6. **Budget check** — `state-archive.mjs --dry-run`; on a backlog (progress.md beyond its
+   newest 20 sections / `pass` features beyond the 10 most recent) it **offers** archival to
+   `progress-archive.md` / `feature_archive.json` (verbatim move, evidence intact, explicit
+   confirmation; archives join the state-file commit). Also flags `.harness-anchor/` > ~5MB
+   (informational).
+7. **Flywheel reflection** — asks whether anything recurred this session worth capturing as a
    golden rule / convention (the `capturing-golden-rules` skill); usually nothing, a few-seconds reflex.
-7. Offers a `PROJECT-TOC.md` refresh if structure changed.
-8. **Surfaces any uncommitted source** (full `git status`, not just state files) with a HEAD-buildability caveat — a `pass` whose source isn't committed leaves the committed HEAD unbuildable — then offers to commit **state files only** (`chore(harness): session N handoff — <feature id>`); it still never auto-commits your source.
+8. Offers a `PROJECT-TOC.md` refresh if structure changed.
+9. **Surfaces any uncommitted source** (full `git status`, not just state files) with a HEAD-buildability caveat — a `pass` whose source isn't committed leaves the committed HEAD unbuildable — then offers to commit **state files only** (`chore(harness): session N handoff — <feature id>`); it still never auto-commits your source.
 
 **Arguments.** None.
 
 **Prerequisites.** An anchored project (suggests `/anchor` if `feature_list.json` is missing).
 
-**Writes / side effects.** Writes the state files above. The verification-before-handoff order
-means the handoff reflects reality, not optimism. Commits **only** state files, only if you
-say yes — never your source changes.
+**Writes / side effects.** Writes the state files above; archival (opt-in) writes the two
+archive files. The verification-before-handoff order means the handoff reflects reality, not
+optimism. Commits **only** state files, only if you say yes — never your source changes.
 
 **How it surfaces.** The Stop hook nudges it when `progress.md` looks un-updated this session
 or `session-handoff.md` is > 24 h old.

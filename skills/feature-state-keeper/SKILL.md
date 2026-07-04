@@ -47,6 +47,15 @@ progress.md          →  recent history (only if needed for deep context)
 
 Most sessions only need handoff + feature_list. Skip progress.md unless you genuinely need the longer view.
 
+**Cold history (archives).** Once `/session-end`'s budget step has archived, older content
+lives in `progress-archive.md` and `feature_archive.json` (moved verbatim by
+`state-archive.mjs`; hot windows: newest 20 progress sections; live features + the 10 most
+recently completed `pass` entries). History questions → **grep the archives**; never load
+them whole. They are read-only history: never hand-edit them, never reuse an archived id.
+One retired signal to know about: the PostToolUse regression-warn matches evidence artifacts
+against the **hot** ledger only, so an archived feature's file-specific warning retires with
+it — the generic "source changed after pass" nudge continues via the retained pass entries.
+
 ## Active-feature rule
 
 **Exactly one feature has `status: "in-progress"` at a time** unless the project has an explicit multi-track plan documented in AGENTS.md.
@@ -73,8 +82,10 @@ uniqueness), so it is on you to keep ids unique.
 long id list for a clash is unreliable and splits your attention from composing the feature):
 
 1. Run `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-validate.mjs --check <candidate-id> feature_list.json`
-   (exit 0 = free; non-zero = taken, and it prints a free suggestion). *If node is unavailable, fall
-   back to scanning the existing ids yourself.*
+   (exit 0 = free; non-zero = taken, and it prints a free suggestion). The tool treats ids in
+   `feature_archive.json` as taken too — archived ids stay reserved because history (progress
+   entries, evidence, commits) references them. *If node is unavailable, fall back to scanning
+   the existing ids yourself (both files).*
 2. **If the candidate collides, qualify the NEW entry's id** — take the suggestion (`parser-2`) or a
    descriptive variant (`parser` → `parser-cli`, `parser-net`). Never reuse a slug; never rename an
    *existing* id to dodge the clash.
@@ -127,7 +138,9 @@ At every `/session-end` (or when you reach a meaningful stopping point):
 
 1. Compose a concise new section (5-10 lines max) in the template format
 2. **Prepend** it (most recent first). Prefer the tool — `node ${CLAUDE_PLUGIN_ROOT}/scripts/progress-prepend.mjs progress.md <entry-file>` — which inserts after the header **without loading the whole file** (cheap on a long history). Fallback: Read + prepend + Write.
-3. Never delete past entries (append-only)
+3. Never delete past entries (append-only). The `/session-end` budget step may *move* the
+   oldest sections to `progress-archive.md` — verbatim relocation by `state-archive.mjs`,
+   never deletion.
 
 ## Updating session-handoff.md
 

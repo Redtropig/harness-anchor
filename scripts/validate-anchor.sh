@@ -5,7 +5,7 @@
 #
 # Checks (labelled [1/9]..[9/9] in the output):
 #   [1/9]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
-#   [2/9]   JSON files parse
+#   [2/9]   JSON files parse; scripts/*.mjs pass node --check
 #   [3-4/9] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
 #   [5/9]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
 #   [6/9]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
@@ -49,7 +49,7 @@ done
 echo ""
 
 # ---- 2. JSON validity ----
-echo "[2/9] JSON parse..."
+echo "[2/9] JSON parse + scripts/*.mjs syntax..."
 while IFS= read -r f; do
     if python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
         ok "parse $f"
@@ -57,6 +57,18 @@ while IFS= read -r f; do
         fail "invalid JSON: $f"
     fi
 done < <(find . -name '*.json' -not -path './node_modules/*' -not -path './.harness-anchor/*' -not -path './tests/manifest-fixtures/*' 2>/dev/null)
+# 2b: Node tools must at least parse (glob, not an enumerated list — enumeration rots).
+if command -v node >/dev/null 2>&1; then
+    while IFS= read -r mjs; do
+        if node --check "$mjs" >/dev/null 2>&1; then
+            ok "node --check $mjs"
+        else
+            fail "syntax error: $mjs (node --check)"
+        fi
+    done < <(find scripts -name '*.mjs' 2>/dev/null | sort)
+else
+    warn "node not found — skipping scripts/*.mjs syntax checks"
+fi
 echo ""
 
 # ---- 3 & 4. SKILL.md frontmatter ----

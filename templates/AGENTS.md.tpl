@@ -21,8 +21,8 @@
 Before writing or modifying any code, complete these in order:
 
 1. **Read this file completely.**
-2. **Read `feature_list.json`** — identify the single active feature (`status: "in-progress"`). Work only on that.
-3. **Read `PROJECT-TOC.md`** — navigate by index, not by `Glob`. Start with its **`## Directory map`**, then drill into the **`## Files`** entries beneath it.
+2. **Read the head of `feature_list.json`** — actionable-first ordering keeps the single active feature (`status: "in-progress"`) and other live entries on top; don't page through the pass history (older `pass` entries may live in `feature_archive.json`). Work only on the active feature.
+3. **Read `PROJECT-TOC.md`** — navigate by index, not by `Glob`. Start with its **`## Directory map`**; on a large repo **Grep** the **`## Files`** section for the subtree you need instead of reading the whole file.
 4. **Read `golden-rules.md`** — the project's accumulated taste / anti-pattern rules. Honor them.
 5. **Read `session-handoff.md`** — pick up from where the previous session left off.
 6. **Run `bash init.sh`** — verify the environment is healthy before doing anything else. Fix any reported issues first.

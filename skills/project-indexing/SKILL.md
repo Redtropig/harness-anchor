@@ -79,6 +79,10 @@ The `## Decisions` section is human-edited (long-lived architectural notes). The
 
 `PROJECT-TOC.md` typically fits within a few thousand tokens even for medium projects. The SessionStart hook **adaptively** injects the `## Directory map` (or, for a small repo, the full `## Files`) within the Tier 1 budget — and on a very large repo, only the top-level directories; the rest is read on demand. Don't ask the user to load the full TOC unless the budget allows.
 
+**Hard read rule:** if `PROJECT-TOC.md` exceeds ~400 lines, do not read it whole — read the
+`## Directory map`, then **Grep** the `## Files` section for the subtree you need. A
+full-file Read of a large TOC can spend tens of thousands of tokens on one lookup.
+
 ## Looking up indexing techniques
 
 For deeper context-engineering / progressive-disclosure indexing approaches not covered here — invoke the `docs-lookup` skill. The current TOC algorithm is intentionally minimal; refinements (semantic chunks, embeddings) belong in a separate skill.

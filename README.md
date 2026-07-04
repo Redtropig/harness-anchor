@@ -15,7 +15,7 @@ Together they form a complete harness based on Anthropic's [Effective Harnesses 
 | Subsystem | Provided by |
 |---|---|
 | Instructions | superpowers + harness-anchor (`using-harness-anchor`) |
-| State | **harness-anchor** (`feature_list.json`, `progress.md`, `session-handoff.md`, `golden-rules.md`) |
+| State | **harness-anchor** (`feature_list.json`, `progress.md`, `session-handoff.md`, `golden-rules.md`; cold history: `progress-archive.md` / `feature_archive.json`) |
 | Verification | **harness-anchor** (`anti-hallucination-gates`, `/verify`) + superpowers (TDD) |
 | Scope | **harness-anchor** (active-feature lock, scope-jump detection) |
 | Lifecycle | **harness-anchor** (`init.sh`, `/session-end`) |
@@ -51,7 +51,7 @@ You should see a `<harness-anchor-state>...</harness-anchor-state>` block in the
 bash init.sh     # health-check the environment
 
 # Then work normally; on session end:
-/session-end     # writes structured handoff, appends progress.md, suggests commit
+/session-end     # writes structured handoff, appends progress.md, offers archival + commit
 ```
 
 ---
@@ -96,7 +96,7 @@ bash init.sh     # health-check the environment
 | `/test-plan` | Dispatches `coverage-analyst` for a post-impl coverage-gap analysis (obligations, paths outside the run scope, minimal oracle-independent-first tests); read-only |
 | `/gc` | Dispatches `drift-analyst` for an on-demand code-drift / entropy scan against `golden-rules.md` + slop heuristics (dead code, duplication, doc-drift); read-only, report-only (not `git gc`) |
 | `/sanitize` | C/C++ project: builds under ASan+UBSan (TSan separately), runs tests, reports findings in fixed sections with a `.harness-anchor/sanitize-*.log` evidence path |
-| `/session-end` | Writes structured handoff + appends `progress.md` + offers commit |
+| `/session-end` | Writes structured handoff + appends `progress.md` + offers over-budget archival (state-archive.mjs) + commit |
 | `/status` | Read-only project overview: active feature, counts, git tree, TOC freshness, handoff head |
 
 📖 **Full command reference:** [docs/commands.md](docs/commands.md) — when to reach for each command, its arguments, prerequisites, outputs, and how the harness recommends it.
@@ -105,7 +105,7 @@ bash init.sh     # health-check the environment
 
 | Hook | Purpose |
 |---|---|
-| SessionStart | Injects state banner: active feature, project type, TOC freshness, golden-rules count, handoff head, meta-skill body (≤ 2000 token budget) |
+| SessionStart | Injects state banner: active feature, project type, TOC freshness, golden-rules count, state-file budget sentinel, handoff head, meta-skill body (≤ 2000 token budget) |
 | PostToolUse | After Edit/Write: regression-warn on pass-feature files; duplicate feature-`id` warn when `feature_list.json` is written; **new-code-module scope-creep warn** when a new module is written while a feature is in-progress (action-side companion to the prompt-side scope-jump check); clang-tidy on C/C++ files when `compile_commands.json` present (sysroot-aware on macOS; failed-parse diagnostics suppressed with one honest notice); one-line `/sanitize` nudge on C/C++ edits (never runs sanitizers inline) |
 | Stop | Nudges progress.md update, session-handoff refresh; never blocks |
 | UserPromptSubmit | Detects scope-jump phrases ("顺便", "also", "by the way"); surfaces active feature for confirmation |
@@ -121,6 +121,13 @@ bash init.sh     # health-check the environment
 - **Fresh-context evaluator.** `/verify` dispatches `verification-runner` in a subagent with read-only tools; mitigates "self-grading" leniency per Anthropic's March 2026 three-agent architecture.
 - **Test coverage is post-implementation.** `/test-plan` + `coverage-analyst` derive what *must* be tested from code + spec and flag paths outside the runner's scope — the code-aware pass superpowers' (deliberately code-blind) TDD can't do; pre-implementation test-first stays TDD's job. Reliability against correlated LLM blind spots (code and tests both LLM-generated) leans on oracle-independent tests (metamorphic / differential / property) + a risk-construct checklist, not the model's judgement.
 - **Entropy governance is a feedback flywheel — report-only.** Recurring mistakes become checkable rules in `golden-rules.md` (the `capturing-golden-rules` skill); `/gc` dispatches a fresh-context `drift-analyst` that scans *changed* code against those rules + generic slop heuristics (dead code, duplication, doc-drift) and **recommends** — it never auto-refactors. The capture habit is anchored to the existing `/session-end` checkpoint, not a new ceremony (Garg's Feedback Flywheel; the solo-appropriate, lightweight form per the harness-engineering practical guide).
+- **State files carry budgets and a checkpoint archival ritual.** Hot files stay bounded on
+  long-lived projects (`progress.md` keeps the newest ~20 sessions; `feature_list.json` keeps
+  live features + the 10 most recent `pass` entries); `/session-end` offers moving the excess
+  verbatim — evidence intact — to git-tracked archives via `scripts/state-archive.mjs`
+  (deterministic, idempotent, crash-convergent, aborts on malformed JSON rather than
+  "repairing" the ledger). The SessionStart banner warns (warn-only) when a budget is
+  exceeded. History is moved, never deleted; archives are grep-only reference.
 - **Heavy ops are explicit commands, not auto-fired hooks.** Sanitizer builds (`/sanitize`) and the opt-in auto-fix loop (`/verify --fix`, bounded to ≤ 2 fresh-evaluated cycles) far exceed the ≤ 5s warn-only hook budget — a hook may *suggest* `/sanitize`, but never runs it inline.
 - **C/C++ first-class.** Build system auto-detect (CMake/Meson/Make/Bazel), `compile_commands.json`-aware clang-tidy, sanitizer build templates.
 

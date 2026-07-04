@@ -1,5 +1,5 @@
 ---
-description: Guided end-of-session ritual. Writes structured handoff (session-handoff.md), appends progress.md entry, and offers TOC refresh + git commit.
+description: Guided end-of-session ritual. Writes structured handoff (session-handoff.md), appends progress.md entry, and offers over-budget state archival + TOC refresh + git commit.
 allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
 ---
 
@@ -46,17 +46,26 @@ End the current session cleanly. Implements the "clean restart path" lifecycle p
    - If blocked → status='blocked', blockedReason populated
    - Otherwise → leave status='in-progress'
    - Then keep entries actionable-first: `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-sort.mjs feature_list.json` (best-effort, deterministic reorder only — skip silently if node is unavailable).
-   - **Verify id uniqueness before committing:** `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-validate.mjs feature_list.json` (best-effort; skip silently if node is unavailable). If it exits non-zero, it prints the duplicate id(s) — resolve by **renaming the newer entry** to the suggested unique id (never rename an existing id, never commit a colliding ledger) before step 8.
+   - **Verify id uniqueness before committing:** `node ${CLAUDE_PLUGIN_ROOT}/scripts/feature-list-validate.mjs feature_list.json` (best-effort; skip silently if node is unavailable). If it exits non-zero, it prints the duplicate id(s) — resolve by **renaming the newer entry** to the suggested unique id (never rename an existing id, never commit a colliding ledger) before step 9.
 
-6. **Flywheel reflection (capture the session's lessons).** Ask one quick question — *"Did anything recur this session that should change a shared artifact (a golden rule, a convention, or a skill)?"*
+6. **State-file budget check (archival offer).** Run `node ${CLAUDE_PLUGIN_ROOT}/scripts/state-archive.mjs --dry-run`. If node is unavailable, say so in one line and move on (archival needs Node; the hot files keep working and the SessionStart sentinel will keep reminding — do **not** hand-move entries between files as a substitute). If the output is `nothing to archive`, move on without comment. Otherwise it reports the backlog (progress.md sections beyond the newest 20; `pass` features beyond the 10 most recently completed) — ask the user:
+
+   *"State files exceed their hot windows: <dry-run report>. Archive the excess now? It is moved verbatim — evidence intact — to git-tracked `progress-archive.md` / `feature_archive.json`; history is never deleted."* (Archive / Skip)
+
+   - **Archive** → run the same command without `--dry-run`, then re-run `feature-list-validate.mjs` (it cross-checks archived ids). Include both archive files in step 9's state-file commit.
+   - **Skip** → if the overage is large, note it in the handoff's Risks. Never archive without confirmation; never edit archive files by hand.
+   - **Trim pointers (non-archivable files, informational):** if `golden-rules.md` / `AGENTS.md` exceed their caps (8KB each — the SessionStart sentinel's thresholds), archival does not apply: golden-rules wants **pruning** of stale rules (a natural fit for step 7's flywheel reflection — see `capturing-golden-rules`), AGENTS.md wants thinning back to a map (~80 lines). An oversized `session-handoff.md` self-heals at step 3's rewrite if you keep it ≤ 300 words.
+   - Housekeeping (informational only, no action): if `.harness-anchor/` exceeds ~5MB, mention that old `drift-*` / `coverage-*` / `sanitize-*` logs there are gitignored evidence and can be deleted freely.
+
+7. **Flywheel reflection (capture the session's lessons).** Ask one quick question — *"Did anything recur this session that should change a shared artifact (a golden rule, a convention, or a skill)?"*
    - If yes and it's a **failure / anti-pattern** → capture it as a `GR-<n>` in `golden-rules.md` via the `capturing-golden-rules` skill. Route other signals to their home (a missing fact → AGENTS.md; a reliable prompt / workflow → a skill or AGENTS.md).
    - Usually the answer is no — say so and move on. This is a few-seconds reflex anchored to session-end (the feedback flywheel), **not** a ceremony.
 
-7. **Offer TOC refresh.** If git diff suggests structural changes (new/renamed/deleted files), ask the user:
+8. **Offer TOC refresh.** If git diff suggests structural changes (new/renamed/deleted files), ask the user:
 
    *"Project structure changed. Refresh PROJECT-TOC.md now?"* (Yes / Skip)
 
-8. **Surface uncommitted source, then offer the state-file commit.**
+9. **Surface uncommitted source, then offer the state-file commit.**
 
    a. **Full-tree scan (not just state files).** Run `git status --short` over the *whole* tree. If any source / test / build files beyond the harness state files are modified or untracked, list them and tell the user:
 
@@ -66,7 +75,7 @@ End the current session cleanly. Implements the "clean restart path" lifecycle p
 
    b. **HEAD-buildability caveat.** If the tree is dirty, note that the verification evidence reflects the **working tree**, not the committed `HEAD`. To prove the committed state reproduces green, recommend (do not run) a throwaway checkout: `git worktree add --detach /tmp/ha-head HEAD && <configure cmd> /tmp/ha-head` — a configure/build failure (e.g. a missing committed source file) means HEAD is broken even though the working tree builds.
 
-   c. **Offer the state-file commit.** Show `git status` of the state files (handoff/progress/feature_list/TOC). Ask: *"Commit these state changes?"* (Yes / I'll commit later / Show diff). If Yes: stage the **state files only** and commit with message `chore(harness): session N handoff — <active feature id>`. **Do not auto-commit source** — surfacing it in (a) is the help; committing it stays the user's call.
+   c. **Offer the state-file commit.** Show `git status` of the state files (handoff/progress/feature_list/TOC — plus progress-archive.md/feature_archive.json when step 6 archived). Ask: *"Commit these state changes?"* (Yes / I'll commit later / Show diff). If Yes: stage the **state files only** and commit with message `chore(harness): session N handoff — <active feature id>`. **Do not auto-commit source** — surfacing it in (a) is the help; committing it stays the user's call.
 
 ## Scope — a session-pause checkpoint, not branch completion
 
@@ -77,6 +86,7 @@ End the current session cleanly. Implements the "clean restart path" lifecycle p
 - Verification before handoff so the handoff reflects ground truth, not optimism.
 - Handoff before progress.md so the "right-now" snapshot is current first.
 - feature_list.json status change last so it depends on the evidence collected.
+- Budget check after the ledger update so features passed *this* session count toward the pass window — and before the commit so the archives ride the same state-file commit.
 - TOC and commit are optional; do not block on them.
 
 ## Refusal cases

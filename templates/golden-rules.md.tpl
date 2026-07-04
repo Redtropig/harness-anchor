@@ -18,6 +18,9 @@ Each rule should tie to a real failure and be checkable. The Check can start as
 "manual review" and graduate to a grep/lint command only when the rule is violated often
 enough to be worth automating — not every rule needs a tool. Prune rules that no longer
 apply: entropy applies to this file too.
+
+Budget: ~30 rules / 8KB — the SessionStart banner warns beyond that. Rules are curated,
+never archived: pruning is the maintenance action (see /gc + capturing-golden-rules).
 -->
 
 ## Rules

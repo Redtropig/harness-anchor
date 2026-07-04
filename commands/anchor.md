@@ -62,6 +62,8 @@ If `feature_list.json` exists and is **already valid**: skip it by default, ment
 
 If `golden-rules.md` exists and is **non-empty**: **skip by default** (like `feature_list.json`) — it accumulates the project's hard-won rules, so overwriting it with the empty template would wipe the feedback flywheel's value.
 
+If existing state files exceed their hot-window budgets (progress.md > ~64KB / 20 sections; feature_list.json > 32KB / > 10 `pass` entries): say so and point at `/session-end`, whose budget step offers deterministic archival (`state-archive.mjs`). Do **not** archive during scaffolding — archival keeps a single entry point.
+
 ## Verification
 
 After completion, the user should be able to:
