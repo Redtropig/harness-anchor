@@ -12,6 +12,8 @@
  *
  * Usage:
  *   node index-builder.mjs --target /path/to/project [--output PROJECT-TOC.md]
+ * Exit: 0 = TOC written; 1 = usage error (missing/empty/flag-like flag value —
+ *       nothing written); 2 = fatal (logged to <target>/.harness-anchor/last-error.log).
  *
  * Security note: uses execFileSync (no shell) to avoid injection — see PR-review
  * guidance, even though our argv is hardcoded git commands.
@@ -23,11 +25,26 @@ import { resolve, join, basename } from 'node:path';
 import { argv, exit } from 'node:process';
 
 // ---- args ----
+/**
+ * Both value-taking flags feed writeFileSync paths (TARGET/OUTPUT). A missing/empty
+ * value (e.g. an unset shell variable in --target "$DIR") must not silently fall
+ * back to a default, and a following flag must not be eaten as the value — either
+ * way the TOC is written into the wrong place. Same contract as state-archive.mjs.
+ */
+function flagValue(flag, what, fallbackDesc, next) {
+    if (next === undefined || next === '' || next.startsWith('-')) {
+        const got = (next === undefined || next === '') ? 'nothing' : `'${next}'`;
+        console.error(`index-builder: ${flag} requires a ${what} argument (got ${got}); refusing to fall back to ${fallbackDesc}. For a value that starts with '-', pass it as ./<name>.`);
+        exit(1);
+    }
+    return next;
+}
+
 const args = {};
 for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--target') args.target = argv[++i];
-    else if (a === '--output') args.output = argv[++i];
+    if (a === '--target') { args.target = flagValue('--target', 'directory', 'the current directory', argv[i + 1]); i++; }
+    else if (a === '--output') { args.output = flagValue('--output', 'filename', "the default 'PROJECT-TOC.md'", argv[i + 1]); i++; }
     else if (a === '--help' || a === '-h') {
         console.log('Usage: node index-builder.mjs --target <dir> [--output PROJECT-TOC.md]');
         exit(0);
