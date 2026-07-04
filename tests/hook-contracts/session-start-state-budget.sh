@@ -81,6 +81,21 @@ n=$(printf '%s' "$ctx" | grep -c 'State budget:')
 if [ "$n" -eq 1 ]; then ok "still exactly one sentinel line"; else bad "expected 1 sentinel line, got $n"; fi
 
 echo ""
+echo "=== barely over cap (65537B) -> size rounds UP: 65KB>64KB, never self-equal 64KB>64KB ==="
+printf '{ "project": "s", "features": [] }\n' > feature_list.json
+rm -f golden-rules.md
+python3 - <<'PY'
+# ASCII-only so char count == byte count: exactly 65537 bytes, one over the cap.
+s = '# Progress Log\n\n---\n\n## 2026-06-02 - Session X\n\n- '
+s += 'x' * (65537 - len(s))
+open('progress.md', 'w').write(s)
+PY
+ctx=$(decode_ctx "$(run_hook "$T")")
+sline=$(printf '%s' "$ctx" | grep 'State budget:' || true)
+printf '%s' "$sline" | grep -q 'progress.md 65KB>64KB' && ok "boundary renders 65KB>64KB" || bad "boundary not ceiled: $sline"
+if printf '%s' "$sline" | grep -q '64KB>64KB'; then bad "self-equal 64KB>64KB rendered: $sline"; else ok "no self-equal rendering"; fi
+
+echo ""
 echo "==================================="
 echo " Pass: $PASS    Fail: $FAIL"
 if [ "$FAIL" -eq 0 ]; then echo " STATUS: PASSED"; exit 0; else echo " STATUS: FAILED"; exit 1; fi

@@ -142,7 +142,10 @@ except Exception:
         sb_size=$(wc -c < "$sb_path" 2>/dev/null | tr -cd '0-9')
         [ -n "$sb_size" ] || continue
         if [ "$sb_size" -gt "$sb_cap" ]; then
-            sb_entry="${sb_file} $((sb_size / 1024))KB>$((sb_cap / 1024))KB"
+            # Caps are exact KiB multiples (floor = exact); the size rounds UP, so a
+            # barely-over file (cap+1 bytes) renders 65KB>64KB — never a self-equal
+            # 64KB>64KB. The > relation carries the verdict and must stay visibly true.
+            sb_entry="${sb_file} $(( (sb_size + 1023) / 1024 ))KB>$((sb_cap / 1024))KB"
             if [ -z "$sb_over" ]; then sb_over="$sb_entry"; else sb_over="${sb_over}, ${sb_entry}"; fi
         fi
     done
