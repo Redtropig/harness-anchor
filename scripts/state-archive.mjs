@@ -38,9 +38,24 @@ const PASS_KEEP = 10;
 let dryRun = false;
 let target = process.cwd();
 for (let i = 2; i < argv.length; i++) {
-    if (argv[i] === '--dry-run') dryRun = true;
-    else if (argv[i] === '--target') target = argv[++i] || target;
-    else { console.error(`state-archive: unknown argument '${argv[i]}'`); exit(1); }
+    if (argv[i] === '--dry-run') {
+        dryRun = true;
+    } else if (argv[i] === '--target') {
+        // This tool WRITES into join(target, ...). A missing/empty value (e.g. an unset
+        // shell variable) must not silently fall back to the cwd, and a flag must not be
+        // eaten as a path — either way it would relocate the wrong project's state.
+        const next = argv[i + 1];
+        if (next === undefined || next === '' || next.startsWith('-')) {
+            const got = (next === undefined || next === '') ? 'nothing' : `'${next}'`;
+            console.error(`state-archive: --target requires a directory argument (got ${got}); refusing to fall back to the current directory. For a directory whose name starts with '-', pass it as ./<name>.`);
+            exit(1);
+        }
+        target = next;
+        i++;
+    } else {
+        console.error(`state-archive: unknown argument '${argv[i]}'`);
+        exit(1);
+    }
 }
 target = resolve(target);
 

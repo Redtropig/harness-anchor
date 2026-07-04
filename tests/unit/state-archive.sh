@@ -201,6 +201,22 @@ printf '%s' "$out" | grep -q 'dup-x' && ok "refusal names the duplicated id" || 
 [ "$(sha "$D/feature_list.json")" = "$b1" ] && [ ! -f "$D/feature_archive.json" ] \
   && ok "no writes on duplicate-id ledger" || bad "wrote despite corrupt ledger"
 
+echo "=== 11. --target argument hardening (missing/empty/flag-like -> refuse, cwd untouched) ==="
+# The decoy cwd holds an over-window ledger: with lax parsing, a missing/empty --target value
+# silently falls back to cwd and ARCHIVES THE WRONG PROJECT. All three forms must exit 1
+# and leave the decoy byte-identical.
+D="$TMP/argv"; mkdir -p "$D"; make_features "$D" 15
+b1=$(sha "$D/feature_list.json")
+out=$( cd "$D" && node "$ARCHIVE" --target 2>&1 ); rc=$?
+[ "$rc" -eq 1 ] && ok "missing value exits 1" || bad "missing value: expected exit 1, got $rc ($out)"
+printf '%s' "$out" | grep -q -- '--target requires' && ok "missing value names the problem" || bad "no clear error: $out"
+out=$( cd "$D" && node "$ARCHIVE" --target "" 2>&1 ); rc=$?
+[ "$rc" -eq 1 ] && ok "empty value (unset shell var) exits 1" || bad "empty value: expected exit 1, got $rc ($out)"
+out=$( cd "$D" && node "$ARCHIVE" --target --dry-run 2>&1 ); rc=$?
+[ "$rc" -eq 1 ] && ok "flag-like value exits 1 (does not eat --dry-run)" || bad "flag-like value: expected exit 1, got $rc ($out)"
+[ "$(sha "$D/feature_list.json")" = "$b1" ] && [ ! -f "$D/feature_archive.json" ] \
+  && ok "cwd decoy untouched by all three" || bad "argv mishandling wrote into the cwd"
+
 echo ""
 echo "==================================="
 echo " Pass: $PASS    Fail: $FAIL"
