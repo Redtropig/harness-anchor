@@ -255,6 +255,11 @@ if (dryRun) {
     console.log('(dry-run: no files written)');
     exit(0);
 }
-for (const [p, content] of writes) writeFileSync(p, content);   // archive queued before hot
+try {
+    for (const [p, content] of writes) writeFileSync(p, content);   // archive queued before hot
+} catch (err) {
+    console.error(`state-archive: write failed: ${err && err.message ? err.message : err} — state may be mid-relocation (archive-first order); fix the cause and re-run: the duplicate guard makes re-runs converge`);
+    exit(1);
+}
 console.log('archived.');
 exit(0);

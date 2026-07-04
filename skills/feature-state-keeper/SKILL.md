@@ -52,6 +52,9 @@ lives in `progress-archive.md` and `feature_archive.json` (moved verbatim by
 `state-archive.mjs`; hot windows: newest 20 progress sections; live features + the 10 most
 recently completed `pass` entries). History questions → **grep the archives**; never load
 them whole. They are read-only history: never hand-edit them, never reuse an archived id.
+One retired signal to know about: the PostToolUse regression-warn matches evidence artifacts
+against the **hot** ledger only, so an archived feature's file-specific warning retires with
+it — the generic "source changed after pass" nudge continues via the retained pass entries.
 
 ## Active-feature rule
 
