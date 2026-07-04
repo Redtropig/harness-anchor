@@ -1,7 +1,7 @@
 # Troubleshooting — harness-anchor
 
-<!-- doc-align: 9801eacb02d6fd316829be3b56b8af1bc31cc809 · 2026-06-03 · harness-anchor v0.3.2 -->
-> **Aligned with commit** [`9801eac`](https://github.com/Redtropig/harness-anchor/commit/9801eacb02d6fd316829be3b56b8af1bc31cc809) (harness-anchor v0.3.2, 2026-06-03). Verified against the hooks and scripts at this commit; re-verify and bump this marker if they change.
+<!-- doc-align: 10b742dc0869b64b9d23d068480b1a1216ae1627 · 2026-07-04 · harness-anchor v0.9.0 -->
+> **Aligned with commit** [`10b742d`](https://github.com/Redtropig/harness-anchor/commit/10b742dc0869b64b9d23d068480b1a1216ae1627) (harness-anchor v0.9.0, 2026-07-04). Verified against the hooks and scripts at this commit; re-verify and bump this marker if they change.
 
 Common failure modes with diagnosis and fix steps.
 

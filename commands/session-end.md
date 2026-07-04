@@ -54,6 +54,7 @@ End the current session cleanly. Implements the "clean restart path" lifecycle p
 
    - **Archive** → run the same command without `--dry-run`, then re-run `feature-list-validate.mjs` (it cross-checks archived ids). Include both archive files in step 9's state-file commit.
    - **Skip** → if the overage is large, note it in the handoff's Risks. Never archive without confirmation; never edit archive files by hand.
+   - **Trim pointers (non-archivable files, informational):** if `golden-rules.md` / `AGENTS.md` exceed their caps (8KB each — the SessionStart sentinel's thresholds), archival does not apply: golden-rules wants **pruning** of stale rules (a natural fit for step 7's flywheel reflection — see `capturing-golden-rules`), AGENTS.md wants thinning back to a map (~80 lines). An oversized `session-handoff.md` self-heals at step 3's rewrite if you keep it ≤ 300 words.
    - Housekeeping (informational only, no action): if `.harness-anchor/` exceeds ~5MB, mention that old `drift-*` / `coverage-*` / `sanitize-*` logs there are gitignored evidence and can be deleted freely.
 
 7. **Flywheel reflection (capture the session's lessons).** Ask one quick question — *"Did anything recur this session that should change a shared artifact (a golden rule, a convention, or a skill)?"*

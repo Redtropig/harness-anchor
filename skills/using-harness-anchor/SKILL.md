@@ -71,7 +71,7 @@ say why in one line, and let the user run it.
 - `/gc` — after a batch of generated code, before `/session-end`: fresh-context drift/entropy scan against `golden-rules.md` + slop heuristics (dead code, duplication, doc-drift). Read-only, report-only (not `git gc`).
 - `/sanitize` — after a C/C++ source change, or before merging C/C++: ASan+UBSan run (TSan separately), findings in fixed sections with an evidence log.
 - `/status` — whenever the user asks "where am I / what's the state": read-only snapshot, writes nothing.
-- `/session-end` — at a stopping point or before ending: writes handoff, appends `progress.md`, offers a commit.
+- `/session-end` — at a stopping point or before ending: writes handoff, appends `progress.md`, offers over-budget state archival + a commit.
 
 ## When to NOT use this
 

@@ -39,10 +39,13 @@ with open('progress.md', 'w') as f:
     for i in range(400):
         f.write(f'\n## 2026-06-01 10:{i % 60:02d} — Session {i}\n\n- ' + 'x' * 160 + '\n')
 PY
+# Discriminator note: 'progress.md' / '/session-end' also occur in the injected meta-skill
+# body, so line-content assertions must be scoped to the sentinel line itself.
 out=$(run_hook "$T"); ctx=$(decode_ctx "$out")
-printf '%s' "$ctx" | grep -q 'State budget:' && ok "sentinel line present" || bad "sentinel missing"
-printf '%s' "$ctx" | grep -q 'progress.md' && ok "names progress.md" || bad "progress.md not named"
-printf '%s' "$ctx" | grep -q '/session-end' && ok "points at /session-end" || bad "no /session-end pointer"
+sline=$(printf '%s' "$ctx" | grep 'State budget:' || true)
+[ -n "$sline" ] && ok "sentinel line present" || bad "sentinel missing"
+printf '%s' "$sline" | grep -q 'progress.md' && ok "sentinel names progress.md" || bad "progress.md not on sentinel line: $sline"
+printf '%s' "$sline" | grep -q '/session-end' && ok "sentinel points at /session-end" || bad "no /session-end pointer on sentinel line: $sline"
 len=${#ctx}
 if [ "$len" -le 8000 ]; then ok "context ${len} <= 8000"; else bad "context ${len} > 8000"; fi
 
@@ -57,10 +60,25 @@ for i in range(60):
 json.dump({"project": "s", "features": feats}, open('feature_list.json', 'w'), indent=2)
 PY
 ctx=$(decode_ctx "$(run_hook "$T")")
-printf '%s' "$ctx" | grep -q 'feature_list.json' && ok "names feature_list.json" || bad "feature_list.json not named"
-printf '%s' "$ctx" | grep -q 'progress.md' && ok "still names progress.md" || bad "progress.md dropped"
+sline=$(printf '%s' "$ctx" | grep 'State budget:' || true)
+printf '%s' "$sline" | grep -q 'feature_list.json' && ok "sentinel names feature_list.json" || bad "feature_list.json not on sentinel line: $sline"
+printf '%s' "$sline" | grep -q 'progress.md' && ok "sentinel still names progress.md" || bad "progress.md dropped from sentinel line: $sline"
 n=$(printf '%s' "$ctx" | grep -c 'State budget:')
 if [ "$n" -eq 1 ]; then ok "exactly one sentinel line"; else bad "expected 1 sentinel line, got $n"; fi
+
+echo ""
+echo "=== golden-rules.md > 8KB (non-archivable file) -> also named on the sentinel line ==="
+python3 - <<'PY'
+with open('golden-rules.md', 'w') as f:
+    f.write('# Golden Rules\n\n## Rules\n')
+    for i in range(1, 60):
+        f.write(f'\n### GR-{i} — rule {i}\n- **Why / origin:** ' + 'y' * 120 + '\n- **Check:** manual review\n')
+PY
+ctx=$(decode_ctx "$(run_hook "$T")")
+sline=$(printf '%s' "$ctx" | grep 'State budget:' || true)
+printf '%s' "$sline" | grep -q 'golden-rules.md' && ok "sentinel names golden-rules.md" || bad "golden-rules.md not on sentinel line: $sline"
+n=$(printf '%s' "$ctx" | grep -c 'State budget:')
+if [ "$n" -eq 1 ]; then ok "still exactly one sentinel line"; else bad "expected 1 sentinel line, got $n"; fi
 
 echo ""
 echo "==================================="

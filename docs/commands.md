@@ -48,7 +48,7 @@ use it.
 | [`/gc`](#gc) | Fresh-context code-drift / entropy scan | After a batch of generated code, before `/session-end` | 🔒 read-only | any |
 | [`/sanitize`](#sanitize) | Run tests under ASan+UBSan (TSan separately) | After a C/C++ change, or before merging C/C++ | ✍️ build + log only | C/C++ |
 | [`/status`](#status) | Read-only "where am I" snapshot | Anytime you want the current state | 🔒 read-only | any |
-| [`/session-end`](#session-end) | Write handoff + progress, offer commit | At a stopping point / before ending | ✍️ writes state files | any |
+| [`/session-end`](#session-end) | Write handoff + progress, offer archival + commit | At a stopping point / before ending | ✍️ writes state files | any |
 
 ---
 

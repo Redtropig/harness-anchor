@@ -15,7 +15,7 @@ Read-only project status overview. Shows everything at a glance without modifyin
 4. **`### Git working tree`** — output of `git status --porcelain` (or "not a git repo")
 5. **`### TOC freshness`** — output of `scripts/toc-freshness.sh` (fresh / stale / absent / no-anchor / not-git)
 6. **`### Session handoff (head)`** — first 15 lines of `session-handoff.md`, or "(no handoff file)"
-7. **`### Harness health`** — golden-rules count, last `/gc` drift-scan age + verdict, active-feature staleness, handoff age
+7. **`### Harness health`** — golden-rules count, last `/gc` drift-scan age + verdict, active-feature staleness, handoff age, state-file sizes vs budgets
 
 ## Steps
 
