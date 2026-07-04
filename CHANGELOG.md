@@ -16,9 +16,10 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
     `progress.md` sections beyond the newest 20 to `progress-archive.md`, and `pass`
     features beyond the 10 most recently completed — evidence intact — to
     `feature_archive.json` (same schema shape). Archive-first write order + verbatim-
-    duplicate convergence make it crash-safe; malformed JSON aborts with no writes (it
-    never "repairs" the ledger). History is moved, never deleted; archives are git-tracked
-    and grep-only.
+    duplicate convergence make it crash-safe; malformed JSON — or a ledger with duplicate
+    feature ids — aborts with no writes (it never "repairs" the ledger, and never operates
+    on a corrupt one). History is moved, never deleted; archives are git-tracked and
+    grep-only.
   - **`/session-end` budget step** — after the ledger update, a `--dry-run` backlog check
     offers archival (explicit confirmation; the archives ride the same state-file commit);
     flags `.harness-anchor/` > ~5MB as deletable runtime evidence (informational).

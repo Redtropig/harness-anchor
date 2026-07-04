@@ -18,8 +18,9 @@
  *     loss; the duplicate guard makes the re-run converge (identical content already
  *     archived → skipped on write, still removed from hot). Same key with DIFFERENT
  *     content → abort, no writes (never silently merge).
- *   - Malformed JSON / unexpected shape → exit 1, no writes. This tool never
- *     "repairs" the ledger.
+ *   - Malformed JSON / unexpected shape / a ledger with duplicate feature ids →
+ *     exit 1, no writes. This tool never "repairs" the ledger — and never operates
+ *     on a corrupt one (feature-list-validate.mjs is the fix path).
  *   - Moves, never deletes: archives are ordinary git-tracked files (grep-friendly).
  *   - Hot progress.md rewrite normalizes inter-section spacing to one blank line.
  *
@@ -183,6 +184,22 @@ function archiveFeatures() {
         report.push(`feature_list.json: ${passes.length} pass within hot window (${PASS_KEEP})`);
         return;
     }
+
+    // Refuse to archive from an invalid ledger: a duplicate id would either land twice in
+    // the archive or manufacture a hot∩archive collision (one copy moves, one stays).
+    // "Never repairs" implies never operating on corrupt input — feature-list-validate.mjs
+    // is the fix path (rename the newer entry), then re-run.
+    const idCounts = new Map();
+    for (const f of data.features) {
+        if (f && typeof f.id === 'string') idCounts.set(f.id, (idCounts.get(f.id) || 0) + 1);
+    }
+    const hotDups = [...idCounts.entries()].filter(([, n]) => n > 1).map(([id]) => id);
+    if (hotDups.length > 0) {
+        console.error(`state-archive: duplicate feature id(s) in feature_list.json: ${hotDups.map(i => `'${i}'`).join(', ')} — resolve via feature-list-validate.mjs guidance first; aborting (no writes)`);
+        hardError = true;
+        return;
+    }
+
     const moveSet = new Set([...passes].sort(byNewestFirst).slice(PASS_KEEP));
 
     let arch;

@@ -179,6 +179,28 @@ ids = [f["id"] for f in arch["features"]]
 assert len(ids) == len(set(ids)) == 5, f"archive not single-copy: {ids}"
 PY
 
+echo "=== 10. duplicate-id ledger -> refuse (never operate on corrupt input) ==="
+# Both copies of 'dup-x' are the oldest pass entries (=> both would move); unguarded
+# archival would write a duplicate id into the archive. The tool must refuse instead.
+D="$TMP/dup"; mkdir -p "$D"
+python3 - "$D/feature_list.json" <<'PY'
+import json, sys
+feats = []
+for i in range(1, 13):
+    fid = "dup-x" if i in (1, 2) else f"done-{i:02d}"
+    feats.append({"id": fid, "name": f"D{i}", "description": "d", "status": "pass",
+                  "done_criteria": ["x"],
+                  "evidence": {"timestamp": f"2026-02-{i:02d}T00:00:00Z", "commit": "c", "artifacts": ["a.log"]},
+                  "createdAt": "2026-01-01T00:00:00Z", "completedAt": f"2026-03-01T{i:02d}:00:00Z"})
+json.dump({"project": "adv", "features": feats}, open(sys.argv[1], "w"), indent=2)
+PY
+b1=$(sha "$D/feature_list.json")
+out=$(node "$ARCHIVE" --target "$D" 2>&1); rc=$?
+[ "$rc" -eq 1 ] && ok "exit 1 on duplicate-id ledger" || bad "expected exit 1, got $rc: $out"
+printf '%s' "$out" | grep -q 'dup-x' && ok "refusal names the duplicated id" || bad "id not named: $out"
+[ "$(sha "$D/feature_list.json")" = "$b1" ] && [ ! -f "$D/feature_archive.json" ] \
+  && ok "no writes on duplicate-id ledger" || bad "wrote despite corrupt ledger"
+
 echo ""
 echo "==================================="
 echo " Pass: $PASS    Fail: $FAIL"
