@@ -1,5 +1,5 @@
 ---
-description: Guided end-of-session ritual. Writes structured handoff (session-handoff.md), appends progress.md entry, and offers TOC refresh + git commit.
+description: Guided end-of-session ritual. Writes structured handoff (session-handoff.md), appends progress.md entry, and offers over-budget state archival + TOC refresh + git commit.
 allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
 ---
 
@@ -75,7 +75,7 @@ End the current session cleanly. Implements the "clean restart path" lifecycle p
 
    b. **HEAD-buildability caveat.** If the tree is dirty, note that the verification evidence reflects the **working tree**, not the committed `HEAD`. To prove the committed state reproduces green, recommend (do not run) a throwaway checkout: `git worktree add --detach /tmp/ha-head HEAD && <configure cmd> /tmp/ha-head` — a configure/build failure (e.g. a missing committed source file) means HEAD is broken even though the working tree builds.
 
-   c. **Offer the state-file commit.** Show `git status` of the state files (handoff/progress/feature_list/TOC). Ask: *"Commit these state changes?"* (Yes / I'll commit later / Show diff). If Yes: stage the **state files only** and commit with message `chore(harness): session N handoff — <active feature id>`. **Do not auto-commit source** — surfacing it in (a) is the help; committing it stays the user's call.
+   c. **Offer the state-file commit.** Show `git status` of the state files (handoff/progress/feature_list/TOC — plus progress-archive.md/feature_archive.json when step 6 archived). Ask: *"Commit these state changes?"* (Yes / I'll commit later / Show diff). If Yes: stage the **state files only** and commit with message `chore(harness): session N handoff — <active feature id>`. **Do not auto-commit source** — surfacing it in (a) is the help; committing it stays the user's call.
 
 ## Scope — a session-pause checkpoint, not branch completion
 
