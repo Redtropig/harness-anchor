@@ -41,7 +41,9 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
   adds the ~400-line hard read rule; `feature-state-keeper` documents the hot windows and
   grep-only archives; `context-budget-discipline` carries the budget table.
 - Templates document their budgets (progress hot window; handoff ≤ 300 words / ~4KB;
-  golden-rules ~30 rules / 8KB with prune-not-archive).
+  golden-rules ~30 rules / 8KB with prune-not-archive). Existing projects adopt the updated
+  template wording by re-running `/anchor` (Overwrite/Skip/Diff prompt); the archival step,
+  sentinel, and archive-aware validation are plugin-side and need no migration.
 - `/status` merges archived `pass` counts (`pass: N (+M archived)`) and adds a state-budget
   line to Harness health; `/anchor` points over-budget legacy projects at `/session-end`
   instead of archiving during scaffolding.
