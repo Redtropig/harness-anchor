@@ -49,6 +49,13 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
   instead of archiving during scaffolding.
 - `scripts/validate-anchor.sh` [2/9] now also `node --check`s every `scripts/*.mjs` (glob,
   not an enumerated list).
+- **`templates/context-budget.md.tpl`: Tier-1 table re-measured** — its estimates predated
+  several releases (harness-anchor's injection was listed at ~700 tokens vs ~1900 actual),
+  and the row structure misrepresented the banner / TOC-head / handoff-head lines as blocks
+  separate from that injection. Rows now mirror the real blocks (state banner + adaptive TOC
+  view + meta-skill body) under the stated 8000-char cap, with a re-measure pointer
+  (`measure-context.sh`); the Tier-2 note carries the measured largest skill.
+  `context-budget-discipline`'s Tier-1 row now states cap vs measured (treat as full).
 
 ## [0.8.0] - 2026-07-03
 
