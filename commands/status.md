@@ -11,7 +11,7 @@ Read-only project status overview. Shows everything at a glance without modifyin
 
 1. **`## Status — <project>`** — project name from `feature_list.json` or directory name
 2. **`### Active feature`** — the `in-progress` entry from `feature_list.json`, or "(none)"
-3. **`### Feature counts`** — planned / in-progress / pass / blocked tallies
+3. **`### Feature counts`** — planned / in-progress / pass (+archived) / blocked tallies
 4. **`### Git working tree`** — output of `git status --porcelain` (or "not a git repo")
 5. **`### TOC freshness`** — output of `scripts/toc-freshness.sh` (fresh / stale / absent / no-anchor / not-git)
 6. **`### Session handoff (head)`** — first 15 lines of `session-handoff.md`, or "(no handoff file)"
