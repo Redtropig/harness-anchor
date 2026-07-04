@@ -4,6 +4,49 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-04
+
+### Added
+
+- **State-file entropy governance.** The SessionStart *injection* was already hard-capped,
+  but the state files themselves grew without bound on long-lived projects — and the startup
+  ritual reads them every session (a year-scale project puts `feature_list.json` at ~100KB /
+  20k+ tokens per session start). Now:
+  - **`scripts/state-archive.mjs`** — deterministic, idempotent checkpoint archival: moves
+    `progress.md` sections beyond the newest 20 to `progress-archive.md`, and `pass`
+    features beyond the 10 most recently completed — evidence intact — to
+    `feature_archive.json` (same schema shape). Archive-first write order + verbatim-
+    duplicate convergence make it crash-safe; malformed JSON aborts with no writes (it
+    never "repairs" the ledger). History is moved, never deleted; archives are git-tracked
+    and grep-only.
+  - **`/session-end` budget step** — after the ledger update, a `--dry-run` backlog check
+    offers archival (explicit confirmation; the archives ride the same state-file commit);
+    flags `.harness-anchor/` > ~5MB as deletable runtime evidence (informational).
+  - **SessionStart state-budget sentinel** (warn-only) — one banner line when a budgeted
+    file exceeds its cap (progress 64KB · feature_list 32KB · golden-rules 8KB · AGENTS 8KB
+    · handoff 4KB), pointing at `/session-end`. Observation point + residual blind spots
+    documented per hook rule 5 (byte size is a proxy: a quiet sentinel is not proof of
+    context health). New contract test.
+  - **`feature-list-validate.mjs` is archive-aware** — `feature_archive.json` shares the id
+    namespace: `--check` treats archived ids as taken (suggestion clears both files),
+    whole-file mode reports hot∩archive collisions, and a corrupt archive is a hard error
+    rather than a silently disabled guard.
+
+### Changed
+
+- **Read discipline for long-lived state** (zero structural change): `AGENTS.md.tpl`
+  startup rules now say *read the head* of `feature_list.json` (actionable-first keeps live
+  entries on top) and *Grep, don't full-read* a large `PROJECT-TOC.md`; `project-indexing`
+  adds the ~400-line hard read rule; `feature-state-keeper` documents the hot windows and
+  grep-only archives; `context-budget-discipline` carries the budget table.
+- Templates document their budgets (progress hot window; handoff ≤ 300 words / ~4KB;
+  golden-rules ~30 rules / 8KB with prune-not-archive).
+- `/status` merges archived `pass` counts (`pass: N (+M archived)`) and adds a state-budget
+  line to Harness health; `/anchor` points over-budget legacy projects at `/session-end`
+  instead of archiving during scaffolding.
+- `scripts/validate-anchor.sh` [2/9] now also `node --check`s every `scripts/*.mjs` (glob,
+  not an enumerated list).
+
 ## [0.8.0] - 2026-07-03
 
 ### Fixed
@@ -274,7 +317,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Redtropig/harness-anchor/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Redtropig/harness-anchor/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/Redtropig/harness-anchor/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/Redtropig/harness-anchor/compare/v0.7.0...v0.7.1
