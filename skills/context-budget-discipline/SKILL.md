@@ -56,7 +56,7 @@ If you delegate a noisy task, ask for a SUMMARY back, not a transcript.
 
 | Tier | Budget | Source |
 |---|---|---|
-| Tier 1 (always loaded) | ~2000 tokens (cap; ~1900 measured at v0.9.0 — treat as full) | SessionStart hook injection (hard-capped 8000 chars; `measure-context.sh`) |
+| Tier 1 (always loaded) | ~2000 tokens (cap; ~1900 measured at v0.9.0 — treat as full) | SessionStart hook injection (hard-capped 8000 chars; `${CLAUDE_PLUGIN_ROOT}/scripts/measure-context.sh` re-measures the baseline) |
 | System prompt + tools | Model-defined | Outside your control |
 | Working context | Most of remaining window | Your edits + reads accumulate here |
 

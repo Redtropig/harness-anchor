@@ -8,7 +8,7 @@
 | Block | Source | Approx tokens | Notes |
 |---|---|---|---|
 | `using-superpowers` | superpowers SessionStart | ~1500 | If superpowers is installed — its own budget, separate from harness-anchor's cap |
-| harness-anchor injection (= the three parts below) | this plugin's SessionStart | **~1900 measured / 2000 cap** | Hard-capped at 8000 chars; re-measure anytime: `bash scripts/measure-context.sh` |
+| harness-anchor injection (= the three parts below) | this plugin's SessionStart | **~1900 measured / 2000 cap** | Hard-capped at 8000 chars; re-measure the plugin baseline anytime: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/measure-context.sh` |
 | ├ state banner | `<harness-anchor-state>` block | ~150 | active feature, project type, TOC freshness, golden-rules count, state-budget sentinel, handoff head (first 10 lines) |
 | ├ TOC view | `<project-toc>` adaptive block | ~250 on a small repo | full `## Files` when it fits; directory map (or just its top levels) on large repos — sized to the leftover budget |
 | └ meta-skill body | `using-harness-anchor` SKILL.md | ~1500 | truncated last if the cap would be exceeded |

@@ -54,8 +54,13 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
   and the row structure misrepresented the banner / TOC-head / handoff-head lines as blocks
   separate from that injection. Rows now mirror the real blocks (state banner + adaptive TOC
   view + meta-skill body) under the stated 8000-char cap, with a re-measure pointer
-  (`measure-context.sh`); the Tier-2 note carries the measured largest skill.
-  `context-budget-discipline`'s Tier-1 row now states cap vs measured (treat as full).
+  (`${CLAUDE_PLUGIN_ROOT}/scripts/measure-context.sh`); the Tier-2 note carries the
+  measured largest skill. `context-budget-discipline`'s Tier-1 row now states cap vs
+  measured (treat as full), and its sibling reference `context-budget-template.md` —
+  whose same-era table even summed superpowers into the "≤2000 Tier-1 total" (that cap
+  is harness-anchor's own) and described the pre-adaptive TOC truncation — is rebuilt
+  on the same corrected structure, plus a watch-point for the new `State budget:`
+  sentinel line.
 
 ## [0.8.0] - 2026-07-03
 
