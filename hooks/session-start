@@ -7,7 +7,8 @@
 #   - Project type (cpp|generic, via scripts/cpp-detect.sh)
 #   - State-file budget sentinel (only when a budgeted file exceeds its cap; see step 2d)
 #   - Session handoff head (first 10 lines of session-handoff.md)
-#   - using-harness-anchor SKILL.md body (the meta-skill)
+#   - using-harness-anchor SKILL.md body (the meta-skill, injected slimmed:
+#     frontmatter stripped; cpp-only regions gated by cpp-detect — see step 7)
 #
 # Hard constraints:
 #   - Token budget ≤ 3000 (~ 12000 chars). Skill body truncated to fit.
