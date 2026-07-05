@@ -4,6 +4,20 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-07-05
+
+### Fixed
+
+- **`index-builder.mjs`: `--target`/`--output` require a real value.** Both flags feed the
+  `PROJECT-TOC.md` write path; the lax `argv[++i]` parse let a missing or empty value
+  (e.g. an unset shell variable in `--target "$DIR"`) silently fall back and rewrite the
+  *current directory's* index, and a following flag was eaten as the value (probe-confirmed:
+  a junk `./--output/.harness-anchor/` dir and a file literally named `--target`). A
+  missing/empty/flag-like value is now a one-line usage error — exit 1, distinct from the
+  runtime-fatal exit 2, raised before any target-derived path (including the error-log dir)
+  is computed — the same argument contract `state-archive.mjs` adopted in 0.9.0. New unit
+  test pins all six refusals plus valid-value consumption.
+
 ## [0.9.0] - 2026-07-04
 
 ### Added
@@ -332,7 +346,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/Redtropig/harness-anchor/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Redtropig/harness-anchor/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Redtropig/harness-anchor/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/Redtropig/harness-anchor/compare/v0.7.1...v0.7.2
