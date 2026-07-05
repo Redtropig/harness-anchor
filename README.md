@@ -105,7 +105,7 @@ bash init.sh     # health-check the environment
 
 | Hook | Purpose |
 |---|---|
-| SessionStart | Injects state banner: active feature, project type, TOC freshness, golden-rules count, state-file budget sentinel, handoff head, meta-skill body (≤ 2000 token budget) |
+| SessionStart | Injects state banner: active feature, project type, TOC freshness, golden-rules count, state-file budget sentinel, handoff head, slimmed meta-skill body — frontmatter stripped, cpp-only sections injected only in C/C++ projects (≤ 3000 token budget) |
 | PostToolUse | After Edit/Write: regression-warn on pass-feature files; duplicate feature-`id` warn when `feature_list.json` is written; **new-code-module scope-creep warn** when a new module is written while a feature is in-progress (action-side companion to the prompt-side scope-jump check); clang-tidy on C/C++ files when `compile_commands.json` present (sysroot-aware on macOS; failed-parse diagnostics suppressed with one honest notice); one-line `/sanitize` nudge on C/C++ edits (never runs sanitizers inline) |
 | Stop | Nudges progress.md update, session-handoff refresh; never blocks |
 | UserPromptSubmit | Detects scope-jump phrases ("顺便", "also", "by the way"); surfaces active feature for confirmation |
@@ -116,7 +116,7 @@ bash init.sh     # health-check the environment
 
 - **Warn-only hooks.** PostToolUse / Stop / UserPromptSubmit hooks **never block** — they inject `additionalContext` for self-correction per Anthropic's "feedback loops > gates" guidance.
 - **Default-FAIL contracts.** Done criteria start `false`; the agent must produce a concrete evidence path (build log, test output, lint report) to flip them to `true`. See `skills/anti-hallucination-gates/`.
-- **Progressive Disclosure.** SessionStart injects ≤ 2000 tokens (banner + an adaptive `PROJECT-TOC` view — the directory map, or the full file list on a small repo — + meta-skill). Deeper references live in skill subfolders, loaded on demand.
+- **Progressive Disclosure.** SessionStart injects ≤ 3000 tokens (banner + an adaptive `PROJECT-TOC` view — the directory map, or the full file list on a small repo — + the meta-skill, injected slimmed: frontmatter stripped, cpp-only sections gated by cpp-detect). Deeper references live in skill subfolders, loaded on demand.
 - **docs-lookup is canonical.** No inline Context7 → WebSearch waterfalls in other skills — they all reference `docs-lookup` for the procedure (including failure-mode detection and calibrated-uncertainty fallback).
 - **Fresh-context evaluator.** `/verify` dispatches `verification-runner` in a subagent with read-only tools; mitigates "self-grading" leniency per Anthropic's March 2026 three-agent architecture.
 - **Test coverage is post-implementation.** `/test-plan` + `coverage-analyst` derive what *must* be tested from code + spec and flag paths outside the runner's scope — the code-aware pass superpowers' (deliberately code-blind) TDD can't do; pre-implementation test-first stays TDD's job. Reliability against correlated LLM blind spots (code and tests both LLM-generated) leans on oracle-independent tests (metamorphic / differential / property) + a risk-construct checklist, not the model's judgement.
@@ -152,7 +152,7 @@ bash scripts/validate-manifests.sh     # manifest validation (name, version, syn
 bash tests/hook-contracts/post-tool-use-warn.sh  # PostToolUse hook contract
 bash scripts/cpp-detect.sh --target tests/cpp-detection/cmake-fixture
                                        # cpp-detect on a known fixture
-bash scripts/measure-context.sh        # SessionStart context budget vs 8000-char cap
+bash scripts/measure-context.sh        # SessionStart context budget vs 12000-char cap (cpp + generic fixtures)
 ```
 
 CI runs all of these on push/PR (ubuntu + macos) — see `.github/workflows/validate.yml`.

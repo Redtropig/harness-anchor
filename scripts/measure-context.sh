@@ -21,8 +21,9 @@ if [ -z "$FIXTURE_DIR" ] || [ ! -d "$FIXTURE_DIR" ]; then
     echo "FAIL: bootstrap.sh did not produce a temp dir"
     exit 1
 fi
-trap 'rm -rf "$FIXTURE_DIR"' EXIT
-echo "Fixture: $FIXTURE_DIR"
+GEN_DIR=""
+trap 'rm -rf "$FIXTURE_DIR" "$GEN_DIR"' EXIT
+echo "Fixture: $FIXTURE_DIR (C/C++ — cpp-only regions injected)"
 
 # ---- 2. Invoke session-start hook ----
 OUTPUT=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$FIXTURE_DIR" \
@@ -73,13 +74,45 @@ echo "  Cap:                     ${CAP} chars"
 echo "  Usage:                   $(( TOTAL * 100 / CAP ))%"
 echo ""
 
+RC=0
 if [ "$TOTAL" -gt "$CAP" ]; then
     echo "FAIL: total ${TOTAL} chars exceeds ${CAP} char cap (invariant #2)"
-    exit 1
+    RC=1
 elif [ "$TOTAL" -ge "$WARN" ]; then
     echo "WARN: total ${TOTAL} chars is ≥ 90% of cap (${WARN} chars)"
-    exit 0
 else
     echo "OK: within budget"
-    exit 0
 fi
+
+# ---- 5. Second pass: bare generic fixture (the per-project fixed cost) ----
+# The e2e fixture above is a C/C++ project, so its injection includes the
+# cpp-only regions. A generic project is the slimmer, more common shape —
+# measure it too, so the generic fixed-cost baseline stays visible.
+GEN_DIR=$(mktemp -d)
+git -C "$GEN_DIR" init -q 2>/dev/null
+printf '# scratch\n' > "$GEN_DIR/README.md"
+OUTPUT2=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$GEN_DIR" \
+    bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
+CONTEXT2=$(printf '%s' "$OUTPUT2" | python3 -c "
+import json, sys
+try:
+    print(json.load(sys.stdin).get('hookSpecificOutput', {}).get('additionalContext', ''))
+except Exception:
+    pass
+" 2>/dev/null)
+TOTAL2=${#CONTEXT2}
+echo ""
+echo "Generic fixture (no TOC/handoff, cpp-only regions dropped):"
+echo "  Total:                   ${TOTAL2} chars"
+if [ "$TOTAL2" -le 0 ]; then
+    echo "FAIL: generic pass produced no context"
+    RC=1
+elif [ "$TOTAL2" -gt "$CAP" ]; then
+    echo "FAIL: generic total ${TOTAL2} chars exceeds ${CAP} char cap (invariant #2)"
+    RC=1
+elif [ "$TOTAL2" -ge "$WARN" ]; then
+    echo "WARN: generic total ${TOTAL2} chars is ≥ 90% of cap (${WARN} chars)"
+else
+    echo "OK: generic within budget"
+fi
+exit $RC
