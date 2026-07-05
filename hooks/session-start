@@ -244,10 +244,25 @@ Last session handoff: (no session-handoff.md — run /anchor or /session-end)"
         toc_dirmap_section=$(printf '%s' "$toc_dirmap_section" | awk 'NF{p=1} p' | awk 'BEGIN{lines=""} {lines=lines $0 "\n"} END{sub(/\n+$/, "", lines); print lines}')
     fi
 
-    # ---- 7. Read meta-skill body ----
+    # ---- 7. Read + slim the meta-skill body ----
+    # Injected form = a pure filter of the file: strip the YAML frontmatter
+    # (metadata for the skill lister, not the session) and, in non-C/C++
+    # projects, the <!-- cpp-only-start/end --> regions (invariant #5 —
+    # cpp-detect gates C/C++ content). Marker lines are never injected.
+    # The file itself stays intact for the Skill-tool path.
     skill_content=""
     if [ -f "$SKILL_FILE" ]; then
-        skill_content="$(cat "$SKILL_FILE")"
+        is_cpp=0
+        case "$project_type" in cpp*) is_cpp=1 ;; esac
+        skill_content="$(awk -v cpp="$is_cpp" '
+            NR==1 && /^---$/          { fm=1; next }
+            fm && /^---$/             { fm=0; next }
+            fm                        { next }
+            /<!-- cpp-only-start -->/ { if (!cpp) skip=1; next }
+            /<!-- cpp-only-end -->/   { skip=0; next }
+            skip                      { next }
+            { print }
+        ' "$SKILL_FILE")"
     else
         skill_content="(using-harness-anchor SKILL.md missing — plugin install incomplete)"
     fi

@@ -9,7 +9,7 @@
 #   [3-4/9] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
 #   [5/9]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
 #   [6/9]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
-#   [7/9]   SessionStart hook is executable and produces valid JSON when run
+#   [7/9]   SessionStart hook is executable and produces valid JSON when run; meta-skill cpp-only markers balanced
 #   [8/9]   Commands directory consistency (each commands/*.md is a usable /command)
 #   [9/9]   Every template referenced from commands/anchor.md exists
 
@@ -183,6 +183,19 @@ if [ -x hooks/session-start ]; then
     fi
 else
     fail "hooks/session-start not executable"
+fi
+# Injection-source sanity: cpp-only marker pairs in the meta-skill must balance —
+# an unmatched start marker would make the session-start awk filter's skip state
+# swallow everything after it in generic projects.
+ms="skills/using-harness-anchor/SKILL.md"
+if [ -f "$ms" ]; then
+    starts=$(grep -c '<!-- cpp-only-start -->' "$ms")
+    ends=$(grep -c '<!-- cpp-only-end -->' "$ms")
+    if [ "$starts" -eq "$ends" ]; then
+        ok "meta-skill cpp-only markers balanced (${starts} region(s))"
+    else
+        fail "meta-skill cpp-only markers unbalanced: ${starts} start vs ${ends} end"
+    fi
 fi
 echo ""
 
