@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# measure-context.sh — Measure SessionStart hook context output vs the 8000-char cap.
+# measure-context.sh — Measure SessionStart hook context output vs the 12000-char cap.
 #
 # Bootstraps the e2e fixture, invokes hooks/session-start with it, decodes the
 # JSON additionalContext, and prints a byte breakdown per section.
-# Exit 1 if total exceeds 8000 chars; warn at ≥ 7200 chars (90%).
+# Exit 1 if total exceeds 12000 chars; warn at ≥ 10800 chars (90%).
 #
 # Usage: bash scripts/measure-context.sh
 
@@ -52,8 +52,8 @@ fi
 
 # ---- 4. Measure per-section byte counts ----
 TOTAL=${#CONTEXT}
-CAP=8000
-WARN=$((CAP * 90 / 100))  # 7200
+CAP=12000
+WARN=$((CAP * 90 / 100))  # 10800
 
 # Extract sections by marker tags
 STATE_SECTION=$(printf '%s' "$CONTEXT" | awk '/<harness-anchor-state>/,/<\/harness-anchor-state>/' || true)

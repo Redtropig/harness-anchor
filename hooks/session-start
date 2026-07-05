@@ -10,7 +10,7 @@
 #   - using-harness-anchor SKILL.md body (the meta-skill)
 #
 # Hard constraints:
-#   - Token budget ≤ 2000 (~ 8000 chars). Skill body truncated to fit.
+#   - Token budget ≤ 3000 (~ 12000 chars). Skill body truncated to fit.
 #   - Defensive: every sub-check fails silently, never aborts the hook.
 #   - sub-commands wall-clocked to 3s where possible.
 #   - Total watchdog: 5s cap (R1). On timeout, emit nothing, exit 0 (warn-only).
@@ -267,9 +267,9 @@ Last session handoff: (no session-handoff.md — run /anchor or /session-end)"
         skill_content="(using-harness-anchor SKILL.md missing — plugin install incomplete)"
     fi
 
-    # ---- 8. Combine + token budget hard cap (≤ ~2000 tokens ≈ 8000 chars) ----
+    # ---- 8. Combine + token budget hard cap (≤ ~3000 tokens ≈ 12000 chars) ----
     # Priority: banner (always full) → skill body → TOC (adaptive; dropped first).
-    MAX_CHARS=8000
+    MAX_CHARS=12000
     banner_len=${#banner}
     skill_len=${#skill_content}
 

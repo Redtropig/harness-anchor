@@ -147,7 +147,9 @@ fi
 # ---- Deep repo → directory-map injection + budget-at-scale (piece 4b/4c) ----
 # A real index-builder run on a deep tree produces a TOC whose ## Files and ## Directory map
 # both exceed the Tier-1 budget, forcing the adaptive degradation. The map (not the file list)
-# must be injected, and — crucially — the decoded context must stay within the 8000-char cap.
+# must be injected, and — crucially — the decoded context must stay within the 12000-char cap.
+# 600 dirs — sized so BOTH sections exceed the 12000-cap TOC leftover (~5-7K); at 200 the
+# full ## Files fit the raised budget and the degradation path went untested.
 TMPDIR4=$(mktemp -d)
 trap 'rm -rf "$TMPDIR" "$TMPDIR2" "$TMPDIR3" "$TMPDIR4"' EXIT
 cd "$TMPDIR4" || exit 1
@@ -156,7 +158,7 @@ git config user.email test@example.com
 git config user.name test
 printf '{ "project": "big", "features": [] }\n' > feature_list.json
 i=0
-while [ "$i" -lt 200 ]; do
+while [ "$i" -lt 600 ]; do
     d=$(printf 'd%03d' "$i")
     mkdir -p "$d"
     printf '// %s file\n' "$d" > "$d/f.txt"
@@ -177,10 +179,10 @@ else
     assert_contains "(root)" "$ctx5"        # the "(root)" line is map-only — proves map injection
     assert_contains "for the full" "$ctx5"  # a "see ... for the full ..." pointer (degraded view)
     len5=${#ctx5}
-    if [ "$len5" -le 8000 ]; then
-        echo "  OK   budget held at scale: ${len5} <= 8000"; PASS=$((PASS+1))
+    if [ "$len5" -le 12000 ]; then
+        echo "  OK   budget held at scale: ${len5} <= 12000"; PASS=$((PASS+1))
     else
-        echo "  FAIL budget blown at scale: ${len5} > 8000"; FAIL=$((FAIL+1))
+        echo "  FAIL budget blown at scale: ${len5} > 12000"; FAIL=$((FAIL+1))
     fi
 fi
 
@@ -215,10 +217,10 @@ else
     assert_contains "file000.cpp" "$ctx6"                        # head of the list present
     assert_contains "see PROJECT-TOC.md for full index" "$ctx6"  # legacy pointer
     len6=${#ctx6}
-    if [ "$len6" -le 8000 ]; then
-        echo "  OK   legacy budget held: ${len6} <= 8000"; PASS=$((PASS+1))
+    if [ "$len6" -le 12000 ]; then
+        echo "  OK   legacy budget held: ${len6} <= 12000"; PASS=$((PASS+1))
     else
-        echo "  FAIL legacy budget blown: ${len6} > 8000"; FAIL=$((FAIL+1))
+        echo "  FAIL legacy budget blown: ${len6} > 12000"; FAIL=$((FAIL+1))
     fi
 fi
 

@@ -2,7 +2,7 @@
 # hook-timing.sh — Wall-clock benchmark for the four warn-only hooks (P1).
 #
 # Complements scripts/measure-context.sh: that guards the *byte* budget
-# (invariant #2, SessionStart ≤ 8000 chars); this guards the *time* budget
+# (invariant #2, SessionStart ≤ 12000 chars); this guards the *time* budget
 # (invariant #7, hooks ≤ 5s). Same e2e fixture harness, orthogonal axis.
 #
 # It bootstraps the e2e C/C++ fixture and invokes each hook the way Claude Code
