@@ -4,6 +4,34 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-05
+
+### Added
+
+- **cpp-gated, slimmed SessionStart injection.** The meta-skill body is now injected as a
+  pure filter of `using-harness-anchor/SKILL.md`: YAML frontmatter stripped, and
+  `<!-- cpp-only -->` regions (the four `cpp-*` sibling skills, `/cpp-init`, `/sanitize`)
+  dropped in non-C/C++ projects — catching invariant #5 up at the injection layer. The file
+  itself is untouched for the Skill-tool path. New contract test pins both modes plus the
+  skip-leak guard; `validate-anchor` checks the marker pairs stay balanced.
+- **`measure-context.sh` second pass** on a bare generic fixture, so the generic fixed-cost
+  baseline (the common case) is measured alongside the C/C++ e2e fixture.
+
+### Changed
+
+- **Injection budget raised: ≤ 2000 → ≤ 3000 tokens (8000 → 12000 chars) — invariant #2.**
+  The old cap was 94% consumed and the squeeze fell entirely on the project-specific
+  `<project-toc>` block (the banner never truncates). With the slimmed body a generic
+  project's fixed cost drops to ~4.6KB (≈1160 tokens measured) and the TOC budget grows
+  ~5×, so repos up to ~150 files get the full `## Files` view instead of the degraded
+  directory map. All cap reference points (hook, measure script, three test files,
+  CLAUDE.md, README, both context-budget references) moved in lockstep; the deep-repo
+  contract fixture rescaled 200→600 dirs so the degradation path stays exercised.
+- **Meta-skill body compressed ~5.9KB → ~5.0KB** — packaging only: rules, trigger keywords,
+  read order, and command timing preserved item-for-item (contract-suite verified; a live
+  three-scenario spot-check — scope-jump, TOC-before-Glob, no-done-without-evidence — gates
+  the merge).
+
 ## [0.9.1] - 2026-07-05
 
 ### Fixed
@@ -346,7 +374,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/Redtropig/harness-anchor/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/Redtropig/harness-anchor/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Redtropig/harness-anchor/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Redtropig/harness-anchor/compare/v0.7.2...v0.8.0
