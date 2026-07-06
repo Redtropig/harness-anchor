@@ -3,7 +3,7 @@
 #
 # The sentinel line must appear ONLY when a budgeted state file exceeds its byte
 # threshold, must name every offending file on ONE line, must point at /session-end,
-# and must never push the decoded context past the 8000-char cap (invariant #2).
+# and must never push the decoded context past the 12000-char cap (invariant #2).
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -47,7 +47,7 @@ sline=$(printf '%s' "$ctx" | grep 'State budget:' || true)
 printf '%s' "$sline" | grep -q 'progress.md' && ok "sentinel names progress.md" || bad "progress.md not on sentinel line: $sline"
 printf '%s' "$sline" | grep -q '/session-end' && ok "sentinel points at /session-end" || bad "no /session-end pointer on sentinel line: $sline"
 len=${#ctx}
-if [ "$len" -le 8000 ]; then ok "context ${len} <= 8000"; else bad "context ${len} > 8000"; fi
+if [ "$len" -le 12000 ]; then ok "context ${len} <= 12000"; else bad "context ${len} > 12000"; fi
 
 echo ""
 echo "=== feature_list.json also > 32KB -> both named on ONE line ==="

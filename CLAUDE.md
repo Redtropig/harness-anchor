@@ -17,7 +17,7 @@ Stop. Read this before doing anything.
 ## Design Invariants (do not break)
 
 1. **Warn-only hooks.** No PostToolUse / Stop / UserPromptSubmit hook may produce JSON with `"permissionDecision": "deny"` or `"stopReason"`. PostToolUse / UserPromptSubmit / SessionStart surface `additionalContext` for self-correction; the **Stop** event has no `additionalContext` channel, so its reminder uses `systemMessage` (still non-blocking — never `decision: "block"`).
-2. **SessionStart token budget ≤ 2000 tokens.** Roughly 8000 chars of injected content. Hard-truncate with a pointer to the on-disk file.
+2. **SessionStart token budget ≤ 3000 tokens.** Roughly 12000 chars of injected content. Hard-truncate with a pointer to the on-disk file. The meta-skill body is injected *slimmed* (frontmatter stripped; `cpp-only` regions dropped in non-C/C++ projects) — headroom belongs to the project-specific TOC/handoff, not to a fatter generic body.
 3. **Subagents are single-level.** Every subagent prompt must end with: *"Do not invoke other subagents from this one."*
 4. **State files are git-tracked by default.** `.harness-anchor/` (error log dir) is the only gitignored runtime path.
 5. **C/C++ skills are gated by `cpp-detect.sh`.** They must include a frontmatter trigger condition referencing the detected build system; they must not activate in non-C/C++ projects.

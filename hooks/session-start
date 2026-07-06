@@ -7,10 +7,11 @@
 #   - Project type (cpp|generic, via scripts/cpp-detect.sh)
 #   - State-file budget sentinel (only when a budgeted file exceeds its cap; see step 2d)
 #   - Session handoff head (first 10 lines of session-handoff.md)
-#   - using-harness-anchor SKILL.md body (the meta-skill)
+#   - using-harness-anchor SKILL.md body (the meta-skill, injected slimmed:
+#     frontmatter stripped; cpp-only regions gated by cpp-detect — see step 7)
 #
 # Hard constraints:
-#   - Token budget ≤ 2000 (~ 8000 chars). Skill body truncated to fit.
+#   - Token budget ≤ 3000 (~ 12000 chars). Skill body truncated to fit.
 #   - Defensive: every sub-check fails silently, never aborts the hook.
 #   - sub-commands wall-clocked to 3s where possible.
 #   - Total watchdog: 5s cap (R1). On timeout, emit nothing, exit 0 (warn-only).
@@ -244,17 +245,34 @@ Last session handoff: (no session-handoff.md — run /anchor or /session-end)"
         toc_dirmap_section=$(printf '%s' "$toc_dirmap_section" | awk 'NF{p=1} p' | awk 'BEGIN{lines=""} {lines=lines $0 "\n"} END{sub(/\n+$/, "", lines); print lines}')
     fi
 
-    # ---- 7. Read meta-skill body ----
+    # ---- 7. Read + slim the meta-skill body ----
+    # Injected form = a pure filter of the file: strip the YAML frontmatter
+    # (metadata for the skill lister, not the session) and, in non-C/C++
+    # projects, the <!-- cpp-only-start/end --> regions (invariant #5 —
+    # cpp-detect gates C/C++ content). Marker lines are never injected.
+    # Regions are FLAT by contract — this single-boolean filter cannot parse
+    # nesting; validate-anchor [7/9] rejects nested/misordered markers at
+    # authoring time. The file itself stays intact for the Skill-tool path.
     skill_content=""
     if [ -f "$SKILL_FILE" ]; then
-        skill_content="$(cat "$SKILL_FILE")"
+        is_cpp=0
+        case "$project_type" in cpp*) is_cpp=1 ;; esac
+        skill_content="$(awk -v cpp="$is_cpp" '
+            NR==1 && /^---$/          { fm=1; next }
+            fm && /^---$/             { fm=0; next }
+            fm                        { next }
+            /<!-- cpp-only-start -->/ { if (!cpp) skip=1; next }
+            /<!-- cpp-only-end -->/   { skip=0; next }
+            skip                      { next }
+            { print }
+        ' "$SKILL_FILE")"
     else
         skill_content="(using-harness-anchor SKILL.md missing — plugin install incomplete)"
     fi
 
-    # ---- 8. Combine + token budget hard cap (≤ ~2000 tokens ≈ 8000 chars) ----
+    # ---- 8. Combine + token budget hard cap (≤ ~3000 tokens ≈ 12000 chars) ----
     # Priority: banner (always full) → skill body → TOC (adaptive; dropped first).
-    MAX_CHARS=8000
+    MAX_CHARS=12000
     banner_len=${#banner}
     skill_len=${#skill_content}
 
@@ -332,7 +350,12 @@ ${truncated_files}
         fi
     fi
 
-    # ---- 9. JSON-escape (pure bash, no jq dependency) ----
+    # ---- 9. JSON-escape (python3 O(n) fast path; pure-bash fallback, no jq) ----
+    # The bash ${var//} escaper is quadratic in matches×length: a ~12KB, ~700-line
+    # payload (deep-repo TOC) costs seconds on slow CPUs — pessimal macOS CI
+    # runners burned the entire 5s watchdog in this step alone (locally ~0.15s).
+    # json.dumps is O(n) and escapes control chars the bash path misses; [1:-1]
+    # strips its outer quotes to fit the printf template below.
     escape_for_json() {
         local s="$1"
         s="${s//\\/\\\\}"
@@ -343,7 +366,11 @@ ${truncated_files}
         printf '%s' "$s"
     }
 
-    context="$(escape_for_json "$combined")"
+    context=""
+    if command -v python3 >/dev/null 2>&1; then
+        context=$(printf '%s' "$combined" | python3 -c 'import json,sys; sys.stdout.write(json.dumps(sys.stdin.read())[1:-1])' 2>/dev/null || true)
+    fi
+    [ -n "$context" ] || context="$(escape_for_json "$combined")"
 
     # ---- 10. Emit to stdout (parent captures via redirect for R1) ----
     printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
@@ -354,17 +381,26 @@ ${truncated_files}
 # and emit nothing. Only emit the tempfile if main() exited cleanly (rc=0).
 # This avoids the partial-JSON pitfall: a mid-write kill would produce truncated
 # JSON, so we buffer to file and only release the full output on success.
+#
+# Both kills are SIGKILL, and the watchdog's stdio is detached — measured on
+# macOS bash 3.2: a subshell blocked on `sleep` DEFERS SIGTERM until the sleep
+# completes, which (a) made the parent's `wait $watchdog_pid` burn the whole 5s
+# window on every run (main finished in ~0.4s; consumers saw ~5s wall), and
+# (b) meant a genuinely runaway main was never actually killed on that bash —
+# the deferred TERM aborts the subshell before its `kill` line runs. SIGKILL
+# cannot be deferred; the stdio detach keeps the sleeping subshell from holding
+# a command-substitution consumer's pipe open for the same 5s.
 OUTPUT_FILE=$(mktemp)
 main > "$OUTPUT_FILE" 2>/dev/null &
 main_pid=$!
 
-# Watchdog: kill main after 5 seconds
-( sleep 5 && kill -TERM $main_pid 2>/dev/null ) &
+# Watchdog: hard-kill main after 5 seconds
+( sleep 5; kill -9 $main_pid 2>/dev/null ) >/dev/null 2>&1 &
 watchdog_pid=$!
 
 wait $main_pid 2>/dev/null
 main_rc=$?
-kill $watchdog_pid 2>/dev/null
+kill -9 $watchdog_pid 2>/dev/null
 wait $watchdog_pid 2>/dev/null
 
 if [ "$main_rc" -eq 0 ] && [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then

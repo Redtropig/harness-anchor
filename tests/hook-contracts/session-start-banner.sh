@@ -145,9 +145,15 @@ else
 fi
 
 # ---- Deep repo → directory-map injection + budget-at-scale (piece 4b/4c) ----
-# A real index-builder run on a deep tree produces a TOC whose ## Files and ## Directory map
-# both exceed the Tier-1 budget, forcing the adaptive degradation. The map (not the file list)
-# must be injected, and — crucially — the decoded context must stay within the 8000-char cap.
+# A TOC whose ## Files and ## Directory map BOTH exceed the Tier-1 leftover (~7K under
+# the 12000 cap) forces the adaptive degradation. The map (not the file list) must be
+# injected, and — crucially — the decoded context must stay within the 12000-char cap.
+# The TOC is hand-built at 600 entries (Files ~16KB, map ~11KB — both over budget with
+# margin): the degradation logic consumes only this file + budget arithmetic, and a REAL
+# 600-dir tree's git/find cost pushed pessimal macOS CI runners past the hook's 5s
+# watchdog ("no output emitted") — a latency artifact, not the contract under test.
+# index-builder's real output format is pinned by tests/unit/index-builder-dirmap.sh
+# and exercised through the hook by the e2e fixture (measure-context, happy path).
 TMPDIR4=$(mktemp -d)
 trap 'rm -rf "$TMPDIR" "$TMPDIR2" "$TMPDIR3" "$TMPDIR4"' EXIT
 cd "$TMPDIR4" || exit 1
@@ -155,16 +161,27 @@ git init -q
 git config user.email test@example.com
 git config user.name test
 printf '{ "project": "big", "features": [] }\n' > feature_list.json
-i=0
-while [ "$i" -lt 200 ]; do
-    d=$(printf 'd%03d' "$i")
-    mkdir -p "$d"
-    printf '// %s file\n' "$d" > "$d/f.txt"
-    i=$((i+1))
-done
+printf 'x\n' > seed.txt
 git add -A >/dev/null 2>&1
 git commit -qm init >/dev/null 2>&1 || true
-node "$PLUGIN_ROOT/scripts/index-builder.mjs" --target "$TMPDIR4" >/dev/null 2>&1 || true
+anchor4=$(git rev-parse HEAD 2>/dev/null | cut -c1-12)
+{
+    printf '<!-- generated-at-commit: %s -->\n' "$anchor4"
+    echo '# PROJECT TOC'
+    echo ''
+    echo '## Directory map'
+    echo ''
+    echo '- `.` (root) — 2 files, 600 subdirs'
+    i=0
+    while [ "$i" -lt 600 ]; do printf -- '- `d%03d/` — 1 file\n' "$i"; i=$((i+1)); done
+    echo ''
+    echo '## Files'
+    echo ''
+    echo '- `feature_list.json` — { "project": "big", "features": [] }'
+    echo '- `seed.txt` — x'
+    i=0
+    while [ "$i" -lt 600 ]; do printf -- '- `d%03d/f.txt` — d%03d file\n' "$i" "$i"; i=$((i+1)); done
+} > PROJECT-TOC.md
 
 echo ""
 echo "=== session-start (deep repo → directory-map injected, budget held) ==="
@@ -177,10 +194,10 @@ else
     assert_contains "(root)" "$ctx5"        # the "(root)" line is map-only — proves map injection
     assert_contains "for the full" "$ctx5"  # a "see ... for the full ..." pointer (degraded view)
     len5=${#ctx5}
-    if [ "$len5" -le 8000 ]; then
-        echo "  OK   budget held at scale: ${len5} <= 8000"; PASS=$((PASS+1))
+    if [ "$len5" -le 12000 ]; then
+        echo "  OK   budget held at scale: ${len5} <= 12000"; PASS=$((PASS+1))
     else
-        echo "  FAIL budget blown at scale: ${len5} > 8000"; FAIL=$((FAIL+1))
+        echo "  FAIL budget blown at scale: ${len5} > 12000"; FAIL=$((FAIL+1))
     fi
 fi
 
@@ -215,10 +232,10 @@ else
     assert_contains "file000.cpp" "$ctx6"                        # head of the list present
     assert_contains "see PROJECT-TOC.md for full index" "$ctx6"  # legacy pointer
     len6=${#ctx6}
-    if [ "$len6" -le 8000 ]; then
-        echo "  OK   legacy budget held: ${len6} <= 8000"; PASS=$((PASS+1))
+    if [ "$len6" -le 12000 ]; then
+        echo "  OK   legacy budget held: ${len6} <= 12000"; PASS=$((PASS+1))
     else
-        echo "  FAIL legacy budget blown: ${len6} > 8000"; FAIL=$((FAIL+1))
+        echo "  FAIL legacy budget blown: ${len6} > 12000"; FAIL=$((FAIL+1))
     fi
 fi
 

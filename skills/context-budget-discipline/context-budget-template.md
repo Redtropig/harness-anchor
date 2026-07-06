@@ -7,10 +7,10 @@ Use this format in `context-budget.md` (scaffolded by `/anchor`) to track per-se
 | Block | Source | Tier | Budget | Current | Status |
 |---|---|---|---|---|---|
 | superpowers system context | superpowers SessionStart | 1 | ~1500 t | — | always on; its own budget, **outside** the harness-anchor cap below |
-| harness-anchor injection (= the three parts below) | this plugin SessionStart | 1 | **≤2000 t (8000-char hard cap); ~1900 measured at v0.9.0** | — | treat as full |
+| harness-anchor injection (= the three parts below) | this plugin SessionStart | 1 | **≤3000 t (12000-char hard cap); measured at v0.10.0: generic ≈1160 t / C/C++ ≈1580 t** | — | headroom is deliberate — it belongs to the TOC block |
 | ├ state banner | `<harness-anchor-state>` block | 1 | ~150 t | — | active feature, project type, TOC freshness, golden-rules count, state-budget sentinel, handoff head (10 lines) |
-| ├ TOC view | `<project-toc>` adaptive block | 1 | leftover-sized (~250 t on a small repo) | — | full `## Files` → `## Directory map` → top-level dirs, as budget allows |
-| └ meta-skill body | using-harness-anchor SKILL.md | 1 | ~1500 t | — | truncated last if the cap would be exceeded |
+| ├ TOC view | `<project-toc>` adaptive block | 1 | leftover-sized (~1700 t available on a generic project) | — | full `## Files` → `## Directory map` → top-level dirs, as budget allows |
+| └ meta-skill body | using-harness-anchor SKILL.md | 1 | ~1050 t generic / ~1200 t C/C++ | — | injected slimmed (no frontmatter; cpp-only regions gated); truncated last if the cap would be exceeded |
 | Loaded skills (on demand) | Skill tool | 2 | ~1000-3000 t each (largest ≈2800 at v0.9.0) | varies | unloaded when not in use |
 | Reference docs | skill subdirectories | 3 | varies | varies | loaded by Read |
 | Working context | file reads, edits, command outputs | — | model window − the always-on blocks | varies | the big variable |

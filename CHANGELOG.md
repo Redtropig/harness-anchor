@@ -4,6 +4,57 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-05
+
+### Added
+
+- **cpp-gated, slimmed SessionStart injection.** The meta-skill body is now injected as a
+  pure filter of `using-harness-anchor/SKILL.md`: YAML frontmatter stripped, and
+  `<!-- cpp-only-start -->` / `<!-- cpp-only-end -->` regions (the four `cpp-*` sibling
+  skills, `/cpp-init`, `/sanitize`) dropped in non-C/C++ projects — catching invariant #5
+  up at the injection layer. The file itself is untouched for the Skill-tool path. New
+  contract test pins both modes plus the skip-leak guard; `validate-anchor` checks the
+  regions are flat — sequenced, non-nested, closed (a nested pair would leak past the
+  filter's single skip boolean with start/end counts still equal) — and that every
+  `cpp-only` line is exactly one of the two markers.
+- **`measure-context.sh` second pass** on a bare generic fixture, so the generic fixed-cost
+  baseline (the common case) is measured alongside the C/C++ e2e fixture.
+
+### Fixed
+
+- **SessionStart watchdog: kills are now SIGKILL and the watchdog's stdio is detached.**
+  Measured on macOS bash 3.2: a subshell blocked on `sleep 5` defers SIGTERM until the
+  sleep completes, so (a) the parent's `wait $watchdog_pid` burned the full 5-second
+  window on every session start even though `main()` finished in ~0.4s — any consumer
+  waiting on the hook saw ~5s of wall per invocation — and (b) a genuinely runaway
+  `main()` was never actually killed on that bash (the deferred TERM aborts the subshell
+  before its `kill` line runs), leaving invariant #7's enforcement partly fictional.
+  Exposed on CI by the rescaled 600-dir deep-repo fixture: slow runners pushed `main()`
+  past 5s and the still-armed watchdog hard-killed it ("no output emitted"). Deep-repo
+  hook wall: 5047ms → 502ms; the timeout contract (genuine overrun → silent, exit 0)
+  re-verified at 5054ms.
+- **SessionStart JSON escaping is O(n) via python3 (pure-bash fallback retained).** The
+  `${var//…}` escaper is quadratic in matches×length: a ~12KB, ~700-line payload (a
+  deep-repo directory map at the raised cap) burned the remaining watchdog window in
+  this one step on pessimal macOS CI runners (~0.15s on a fast machine — which masked
+  it). `json.dumps` is linear and also escapes control characters the bash path misses;
+  environments without python3 keep the old escaper. Deep-repo hook wall: 502ms → 165ms.
+
+### Changed
+
+- **Injection budget raised: ≤ 2000 → ≤ 3000 tokens (8000 → 12000 chars) — invariant #2.**
+  The old cap was 94% consumed and the squeeze fell entirely on the project-specific
+  `<project-toc>` block (the banner never truncates). With the slimmed body a generic
+  project's fixed cost drops to ~4.6KB (≈1160 tokens measured) and the TOC budget grows
+  ~5×, so repos up to ~150 files get the full `## Files` view instead of the degraded
+  directory map. All cap reference points (hook, measure script, three test files,
+  CLAUDE.md, README, both context-budget references) moved in lockstep; the deep-repo
+  contract fixture rescaled 200→600 dirs so the degradation path stays exercised.
+- **Meta-skill body compressed ~5.9KB → ~5.0KB** — packaging only: rules, trigger keywords,
+  read order, and command timing preserved item-for-item (contract-suite verified; a live
+  three-scenario spot-check — scope-jump, TOC-before-Glob, no-done-without-evidence — gates
+  the merge).
+
 ## [0.9.1] - 2026-07-05
 
 ### Fixed
@@ -346,7 +397,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/Redtropig/harness-anchor/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/Redtropig/harness-anchor/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Redtropig/harness-anchor/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Redtropig/harness-anchor/compare/v0.7.2...v0.8.0
