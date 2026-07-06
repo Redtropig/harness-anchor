@@ -370,17 +370,26 @@ ${truncated_files}
 # and emit nothing. Only emit the tempfile if main() exited cleanly (rc=0).
 # This avoids the partial-JSON pitfall: a mid-write kill would produce truncated
 # JSON, so we buffer to file and only release the full output on success.
+#
+# Both kills are SIGKILL, and the watchdog's stdio is detached — measured on
+# macOS bash 3.2: a subshell blocked on `sleep` DEFERS SIGTERM until the sleep
+# completes, which (a) made the parent's `wait $watchdog_pid` burn the whole 5s
+# window on every run (main finished in ~0.4s; consumers saw ~5s wall), and
+# (b) meant a genuinely runaway main was never actually killed on that bash —
+# the deferred TERM aborts the subshell before its `kill` line runs. SIGKILL
+# cannot be deferred; the stdio detach keeps the sleeping subshell from holding
+# a command-substitution consumer's pipe open for the same 5s.
 OUTPUT_FILE=$(mktemp)
 main > "$OUTPUT_FILE" 2>/dev/null &
 main_pid=$!
 
-# Watchdog: kill main after 5 seconds
-( sleep 5 && kill -TERM $main_pid 2>/dev/null ) &
+# Watchdog: hard-kill main after 5 seconds
+( sleep 5; kill -9 $main_pid 2>/dev/null ) >/dev/null 2>&1 &
 watchdog_pid=$!
 
 wait $main_pid 2>/dev/null
 main_rc=$?
-kill $watchdog_pid 2>/dev/null
+kill -9 $watchdog_pid 2>/dev/null
 wait $watchdog_pid 2>/dev/null
 
 if [ "$main_rc" -eq 0 ] && [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then

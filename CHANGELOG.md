@@ -19,6 +19,20 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 - **`measure-context.sh` second pass** on a bare generic fixture, so the generic fixed-cost
   baseline (the common case) is measured alongside the C/C++ e2e fixture.
 
+### Fixed
+
+- **SessionStart watchdog: kills are now SIGKILL and the watchdog's stdio is detached.**
+  Measured on macOS bash 3.2: a subshell blocked on `sleep 5` defers SIGTERM until the
+  sleep completes, so (a) the parent's `wait $watchdog_pid` burned the full 5-second
+  window on every session start even though `main()` finished in ~0.4s — any consumer
+  waiting on the hook saw ~5s of wall per invocation — and (b) a genuinely runaway
+  `main()` was never actually killed on that bash (the deferred TERM aborts the subshell
+  before its `kill` line runs), leaving invariant #7's enforcement partly fictional.
+  Exposed on CI by the rescaled 600-dir deep-repo fixture: slow runners pushed `main()`
+  past 5s and the still-armed watchdog hard-killed it ("no output emitted"). Deep-repo
+  hook wall: 5047ms → 502ms; the timeout contract (genuine overrun → silent, exit 0)
+  re-verified at 5054ms.
+
 ### Changed
 
 - **Injection budget raised: ≤ 2000 → ≤ 3000 tokens (8000 → 12000 chars) — invariant #2.**
