@@ -9,7 +9,7 @@
 #   [3-4/9] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
 #   [5/9]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
 #   [6/9]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
-#   [7/9]   SessionStart hook is executable and produces valid JSON when run; meta-skill cpp-only markers balanced
+#   [7/9]   SessionStart hook is executable and produces valid JSON when run; meta-skill cpp-only markers balanced + well-formed
 #   [8/9]   Commands directory consistency (each commands/*.md is a usable /command)
 #   [9/9]   Every template referenced from commands/anchor.md exists
 
@@ -195,6 +195,16 @@ if [ -f "$ms" ]; then
         ok "meta-skill cpp-only markers balanced (${starts} region(s))"
     else
         fail "meta-skill cpp-only markers unbalanced: ${starts} start vs ${ends} end"
+    fi
+    # Well-formedness: any line containing 'cpp-only' must be EXACTLY one of the two
+    # markers, alone on its line. A malformed variant (e.g. a bare '<!-- cpp-only -->'
+    # copied from prose) matches neither awk pattern — it leaks into the injection as
+    # text — and the balance count above stays blind to it.
+    malformed=$(grep -n 'cpp-only' "$ms" | grep -vE '^[0-9]+:<!-- cpp-only-(start|end) -->$' || true)
+    if [ -z "$malformed" ]; then
+        ok "meta-skill cpp-only lines are well-formed (exact markers, own line)"
+    else
+        fail "meta-skill malformed cpp-only line(s) — would slip past the awk filter: $(printf '%s' "$malformed" | head -1)"
     fi
 fi
 echo ""
