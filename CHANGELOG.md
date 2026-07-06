@@ -14,8 +14,9 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
   skills, `/cpp-init`, `/sanitize`) dropped in non-C/C++ projects — catching invariant #5
   up at the injection layer. The file itself is untouched for the Skill-tool path. New
   contract test pins both modes plus the skip-leak guard; `validate-anchor` checks the
-  marker pairs stay balanced and every `cpp-only` line is exactly one of the two
-  markers (a malformed variant slips past the filter and the balance count).
+  regions are flat — sequenced, non-nested, closed (a nested pair would leak past the
+  filter's single skip boolean with start/end counts still equal) — and that every
+  `cpp-only` line is exactly one of the two markers.
 - **`measure-context.sh` second pass** on a bare generic fixture, so the generic fixed-cost
   baseline (the common case) is measured alongside the C/C++ e2e fixture.
 

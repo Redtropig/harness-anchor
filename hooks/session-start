@@ -250,7 +250,9 @@ Last session handoff: (no session-handoff.md — run /anchor or /session-end)"
     # (metadata for the skill lister, not the session) and, in non-C/C++
     # projects, the <!-- cpp-only-start/end --> regions (invariant #5 —
     # cpp-detect gates C/C++ content). Marker lines are never injected.
-    # The file itself stays intact for the Skill-tool path.
+    # Regions are FLAT by contract — this single-boolean filter cannot parse
+    # nesting; validate-anchor [7/9] rejects nested/misordered markers at
+    # authoring time. The file itself stays intact for the Skill-tool path.
     skill_content=""
     if [ -f "$SKILL_FILE" ]; then
         is_cpp=0

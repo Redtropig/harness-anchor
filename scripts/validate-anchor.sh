@@ -9,7 +9,7 @@
 #   [3-4/9] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
 #   [5/9]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
 #   [6/9]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
-#   [7/9]   SessionStart hook is executable and produces valid JSON when run; meta-skill cpp-only markers balanced + well-formed
+#   [7/9]   SessionStart hook is executable and produces valid JSON when run; meta-skill cpp-only regions well-formed + flat (sequenced, non-nested)
 #   [8/9]   Commands directory consistency (each commands/*.md is a usable /command)
 #   [9/9]   Every template referenced from commands/anchor.md exists
 
@@ -184,18 +184,24 @@ if [ -x hooks/session-start ]; then
 else
     fail "hooks/session-start not executable"
 fi
-# Injection-source sanity: cpp-only marker pairs in the meta-skill must balance —
-# an unmatched start marker would make the session-start awk filter's skip state
-# swallow everything after it in generic projects.
+# Injection-source sanity: cpp-only regions in the meta-skill must be FLAT —
+# properly ordered, non-nested, closed. The session-start filter is a single
+# on/off boolean: a nested pair lets the inner 'end' clear the skip early and
+# leak the rest of the outer region into generic injections, and a stray 'end'
+# before 'start' swallows the file tail — in both cases raw start/end COUNTS
+# still match, so this scan subsumes a plain count balance (miscounts surface
+# as "unclosed region" / "end without start").
 ms="skills/using-harness-anchor/SKILL.md"
 if [ -f "$ms" ]; then
-    starts=$(grep -c '<!-- cpp-only-start -->' "$ms")
-    ends=$(grep -c '<!-- cpp-only-end -->' "$ms")
-    if [ "$starts" -eq "$ends" ]; then
-        ok "meta-skill cpp-only markers balanced (${starts} region(s))"
-    else
-        fail "meta-skill cpp-only markers unbalanced: ${starts} start vs ${ends} end"
-    fi
+    seq_err=$(awk '
+        /^<!-- cpp-only-start -->$/ { if (inr) { printf "nested start at line %d", NR; bad=1; exit } inr=1; n++; next }
+        /^<!-- cpp-only-end -->$/   { if (!inr) { printf "end without start at line %d", NR; bad=1; exit } inr=0; next }
+        END { if (!bad) { if (inr) printf "unclosed region at EOF"; else printf "OK %d", n } }
+    ' "$ms")
+    case "$seq_err" in
+        OK*) ok "meta-skill cpp-only regions properly sequenced (${seq_err#OK } region(s), flat)" ;;
+        *)   fail "meta-skill cpp-only region sequencing: ${seq_err}" ;;
+    esac
     # Well-formedness: any line containing 'cpp-only' must be EXACTLY one of the two
     # markers, alone on its line. A malformed variant (e.g. a bare '<!-- cpp-only -->'
     # copied from prose) matches neither awk pattern — it leaks into the injection as
