@@ -10,10 +10,11 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - **cpp-gated, slimmed SessionStart injection.** The meta-skill body is now injected as a
   pure filter of `using-harness-anchor/SKILL.md`: YAML frontmatter stripped, and
-  `<!-- cpp-only -->` regions (the four `cpp-*` sibling skills, `/cpp-init`, `/sanitize`)
-  dropped in non-C/C++ projects — catching invariant #5 up at the injection layer. The file
-  itself is untouched for the Skill-tool path. New contract test pins both modes plus the
-  skip-leak guard; `validate-anchor` checks the marker pairs stay balanced.
+  `<!-- cpp-only-start -->` / `<!-- cpp-only-end -->` regions (the four `cpp-*` sibling
+  skills, `/cpp-init`, `/sanitize`) dropped in non-C/C++ projects — catching invariant #5
+  up at the injection layer. The file itself is untouched for the Skill-tool path. New
+  contract test pins both modes plus the skip-leak guard; `validate-anchor` checks the
+  marker pairs stay balanced.
 - **`measure-context.sh` second pass** on a bare generic fixture, so the generic fixed-cost
   baseline (the common case) is measured alongside the C/C++ e2e fixture.
 
