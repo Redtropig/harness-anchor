@@ -348,7 +348,12 @@ ${truncated_files}
         fi
     fi
 
-    # ---- 9. JSON-escape (pure bash, no jq dependency) ----
+    # ---- 9. JSON-escape (python3 O(n) fast path; pure-bash fallback, no jq) ----
+    # The bash ${var//} escaper is quadratic in matches×length: a ~12KB, ~700-line
+    # payload (deep-repo TOC) costs seconds on slow CPUs — pessimal macOS CI
+    # runners burned the entire 5s watchdog in this step alone (locally ~0.15s).
+    # json.dumps is O(n) and escapes control chars the bash path misses; [1:-1]
+    # strips its outer quotes to fit the printf template below.
     escape_for_json() {
         local s="$1"
         s="${s//\\/\\\\}"
@@ -359,7 +364,11 @@ ${truncated_files}
         printf '%s' "$s"
     }
 
-    context="$(escape_for_json "$combined")"
+    context=""
+    if command -v python3 >/dev/null 2>&1; then
+        context=$(printf '%s' "$combined" | python3 -c 'import json,sys; sys.stdout.write(json.dumps(sys.stdin.read())[1:-1])' 2>/dev/null || true)
+    fi
+    [ -n "$context" ] || context="$(escape_for_json "$combined")"
 
     # ---- 10. Emit to stdout (parent captures via redirect for R1) ----
     printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$context"

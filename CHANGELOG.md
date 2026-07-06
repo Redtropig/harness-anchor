@@ -32,6 +32,12 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
   past 5s and the still-armed watchdog hard-killed it ("no output emitted"). Deep-repo
   hook wall: 5047ms → 502ms; the timeout contract (genuine overrun → silent, exit 0)
   re-verified at 5054ms.
+- **SessionStart JSON escaping is O(n) via python3 (pure-bash fallback retained).** The
+  `${var//…}` escaper is quadratic in matches×length: a ~12KB, ~700-line payload (a
+  deep-repo directory map at the raised cap) burned the remaining watchdog window in
+  this one step on pessimal macOS CI runners (~0.15s on a fast machine — which masked
+  it). `json.dumps` is linear and also escapes control characters the bash path misses;
+  environments without python3 keep the old escaper. Deep-repo hook wall: 502ms → 165ms.
 
 ### Changed
 
