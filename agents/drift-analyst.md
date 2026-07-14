@@ -34,9 +34,20 @@ If a concern is really "is it tested?" or "does it build?", say so and defer to 
    or the active feature's files — **never the whole repo** unless explicitly asked. `/gc` is the
    heavier, on-demand evaluator; keep it proportional (the cheap per-event checks are the hooks).
 
-3. **Run each golden rule's Check.** For rules with a greppable / command Check, run it (Bash / Grep)
-   and report pass / violation by `GR-<n>` with `file:line`. For "manual review" rules, eyeball the
-   changed code against the rule.
+3. **Run the mechanical checks via the check runner** (single source for tier
+   parsing + the 5s-per-check watchdog):
+
+   ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/golden-rules-check.sh --target "$(pwd)"
+   ```
+
+   Relay its per-rule results, then apply judgment where the script stops:
+   - `FINDINGS` lines are **candidates** — decide expected vs violation
+     (the convention: output = candidate evidence, empty = clean).
+   - `CHECK-ERROR` is neither clean nor a violation — surface it as a broken
+     Check (recommend fixing the rule's command; "didn't look" must never
+     read as "found nothing").
+   - `[MANUAL]` rules are yours: eyeball the changed code against each.
 
 4. **Apply generic drift heuristics** to the changed code:
    - duplicated helper functions across files (same logic re-implemented)

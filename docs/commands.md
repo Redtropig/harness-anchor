@@ -1,7 +1,7 @@
 # Command Manual — harness-anchor
 
-<!-- doc-align: 5e0faded83f563bbc7489c15de58892d704077f4 · 2026-07-04 · harness-anchor v0.9.0 -->
-> **Aligned with commit** [`5e0faded83f563bbc7489c15de58892d704077f4`](https://github.com/Redtropig/harness-anchor/commit/5e0faded83f563bbc7489c15de58892d704077f4) (harness-anchor v0.9.0, 2026-07-04). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
+<!-- doc-align: 5a14fc040db37a3b4a90cae832f4d418b565953c · 2026-07-14 · harness-anchor v0.11.0 -->
+> **Aligned with commit** [`5a14fc040db37a3b4a90cae832f4d418b565953c`](https://github.com/Redtropig/harness-anchor/commit/5a14fc040db37a3b4a90cae832f4d418b565953c) (harness-anchor v0.11.0, 2026-07-14). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
 
 Reference for every slash command shipped by harness-anchor: what it does, **when to
 reach for it**, its arguments, prerequisites, outputs, and how the harness reminds you to
@@ -20,8 +20,16 @@ use it.
 
 - **Never silent-overwrite.** A command that would write a file that already exists and is
   non-empty asks first via `AskUserQuestion` `[Overwrite / Skip / Show diff]` — this applies
-  to the scaffolding commands `/anchor` and `/cpp-init`. (`/session-end` deliberately
-  *overwrites* `session-handoff.md` each session — it is a living snapshot, not user content.)
+  to the scaffolding commands `/anchor` and `/cpp-init`. Since v0.11.0 this is enforced
+  **structurally**: `scaffold.sh`'s default path physically has no overwrite branch — approved
+  files are written only via an explicit `--overwrite <allowlist>` follow-up call.
+  (`/session-end` deliberately *overwrites* `session-handoff.md` each session — it is a living
+  snapshot, not user content.)
+- **Mechanical halves are scripts (v0.11.0).** `/status`, `/anchor`, `/cpp-init`, and
+  `/session-end` are thin wrappers: a deterministic `scripts/*` helper does the gathering /
+  template placement (single source of truth, unit-tested, byte-stable output); the command
+  markdown keeps only judgment and interaction. If the script fails, the command reports the
+  error and stops — **only read-only `/status` may degrade to a manual snapshot**.
 - **Never auto-commit.** Commands stage or *suggest* a commit but leave the decision to you;
   source-code changes are always your call. `/session-end` and `/index-project` offer a
   commit of *state files only*, never your source.
@@ -75,10 +83,16 @@ End of session     /session-end ──▶ offers TOC refresh + commit of state f
 **When to use.** The very first time you bring a project under harness-anchor — i.e. there's
 no `feature_list.json` yet. Run it once per project.
 
-**What it does.** Detects project type (`cpp-detect.sh`), then scaffolds, with placeholder
-substitution (project name, ISO-8601 timestamp, git SHA):
-`AGENTS.md`, `feature_list.json`, `feature_list.schema.json`, `init.sh` (chmod +x),
-`progress.md`, `session-handoff.md`, `PROJECT-TOC.md`, `context-budget.md`.
+**What it does.** Runs `scripts/scaffold.sh --target "$(pwd)"` — the single source of truth
+for the template map, placeholder substitution (project name, ISO-8601 timestamp, git SHA),
+writes, and chmod. Targets: `AGENTS.md`, `golden-rules.md`, `feature_list.json`,
+`feature_list.schema.json`, `init.sh` (+x), `progress.md`, `session-handoff.md`,
+`PROJECT-TOC.md`, `context-budget.md`. The script writes only **missing/empty** targets and
+reports the rest as `kept (skip-by-default)` (feature_list.json, golden-rules.md — accumulated
+value) or `conflicts (need decision)`. The agent's job is the interaction: AskUserQuestion per
+conflict (`Show diff` uses `--render <file>`), then ONE `--overwrite <f1,f2>` call for the
+approved set. If the script fails, the error is reported verbatim — templates are never
+hand-copied as a substitute.
 
 **Arguments.** None.
 
@@ -108,16 +122,21 @@ step instead of archiving during scaffolding).
 **When to use.** Right **after `/anchor`** in a C/C++ project — especially when the project
 has no `.clang-format` / `.clang-tidy` yet.
 
-**What it does.** Confirms `/anchor` ran (refuses otherwise), detects the build system via
-`cpp-detect.sh`, then:
+**What it does.** Runs `scripts/scaffold.sh --target "$(pwd)" --cpp`, which confirms the
+prerequisites itself (exit 4 = not anchored → run `/anchor` first; exit 3 = not a C/C++
+project), detects the build system via `cpp-detect.sh`, and places the C/C++ map:
 
-- Replaces `init.sh` with a build-system template (`cmake` / `meson`; `make`/`bazel` keep
-  the generic one with a warning).
-- Drops `.clang-format` (LLVM base, 4-space indent, 100-col) and `.clang-tidy`
+- `init.sh` from the build-system template (`cmake` / `meson`; `make`/`bazel` keep the
+  generic one — the report carries a `note:` line).
+- `.clang-format` (LLVM base, 4-space indent, 100-col) and `.clang-tidy`
   (bugprone / cert / clang-analyzer / cppcoreguidelines baseline).
-- Drops `scripts/lint.sh` — the sysroot-correct clang-tidy entry point (macOS Homebrew
+- `scripts/lint.sh` — the sysroot-correct clang-tidy entry point (macOS Homebrew
   clang-tidy fails to parse without the SDK sysroot; see `cpp-static-analysis`).
-- Drops `scripts/sanitizer-build.sh` (CMake projects; other build systems: asks).
+- `scripts/sanitizer-build.sh` (CMake projects).
+
+Same conflict protocol as `/anchor`: existing non-empty files (a customized `init.sh`,
+`.clang-format`, `.clang-tidy`) land in `conflicts (need decision)` — resolved interactively,
+applied via `--cpp --overwrite <list>`.
 
 **Arguments.** None.
 
@@ -278,7 +297,10 @@ harness-engineering's Concept ⑥ — **not** `git gc`.
 
 **What it does.** Dispatches the `drift-analyst` subagent (read-only, fresh-context), which loads
 `golden-rules.md`, bounds the scope to **changed files** (`git diff` vs `HEAD`) or the active
-feature, runs each rule's Check, applies generic drift heuristics (duplication, dead code, oversized
+feature, runs the rules' **mechanical tier via `golden-rules-check.sh`** (three-state:
+CLEAN / FINDINGS / CHECK-ERROR — a broken or timed-out Check is surfaced, never counted clean;
+FINDINGS lines are candidates the analyst adjudicates) and hand-reviews the `[MANUAL]` tier,
+applies generic drift heuristics (duplication, dead code, oversized
 files, TODO pileup, **doc-drift**), grades findings **must / should / nice**, and persists
 `.harness-anchor/drift-<ts>.md`. Returns a fixed report (`### Golden-rule violations` ·
 `### Generic drift findings` · `### Recommended actions` · `### Verdict` CLEAN / DRIFT FOUND ·
@@ -359,14 +381,21 @@ nothing written.
 fresh agent asks "what's going on here?". It's the on-demand, read-only sibling of the
 SessionStart banner.
 
-**What it does.** Prints, in fixed order: `## Status — <project>`, `### Active feature`,
-`### Feature counts` (planned / in-progress / pass / blocked), `### Git working tree`
-(`git status --porcelain`), `### TOC freshness` (`toc-freshness.sh`),
-`### Session handoff (head)` (first 15 lines of `session-handoff.md`), and `### Harness health`
-(golden-rules count, last `/gc` scan + verdict, active-feature + handoff staleness, and a
-state-budget line using the SessionStart sentinel's thresholds — a few signals, not a
-dashboard). Feature counts show archived `pass` entries as `pass: N (+M archived)` when
-`feature_archive.json` exists.
+**What it does.** Runs `scripts/status-report.sh --target "$(pwd)"` and prints its output
+**verbatim** — the script is the single source of truth for all 7 sections, in fixed order:
+`## Status — <project>`, `### Active feature`, `### Feature counts`
+(planned / in-progress / pass / blocked), `### Git working tree` (`git status --porcelain`),
+`### TOC freshness` (`toc-freshness.sh`), `### Session handoff (head)` (first 15 lines), and
+`### Harness health` (golden-rules count as `N rule(s) (K mechanical)` via
+`golden-rules-check.sh --count`, last `/gc` scan age + verdict, active-feature + handoff
+staleness, and a state-budget line using the SessionStart sentinel's thresholds — a few
+signals, not a dashboard). Feature counts show archived `pass` entries as
+`pass: N (+M archived)`. The agent appends at most ONE suggestion line (`/anchor` when
+un-anchored; `/session-end` on an `OVER` budget entry; `/index-project` on a stale/absent
+TOC). JSON parsing runs python3→node; if both are missing only the JSON-derived lines degrade
+to `(needs python3 or node)` — the other sections still report. If the script itself fails,
+the error is reported first; being read-only, `/status` may then fall back to a minimal
+manual snapshot (the only thin-wrapper command allowed to).
 
 **Arguments.** None.
 
@@ -394,25 +423,31 @@ can resume from disk, not from chat memory.
 
 **What it does (in order).**
 
-1. Identifies the active feature (asks if none).
-2. Runs `init.sh` to capture ground-truth build/test state.
+1. **Gathers all facts in ONE call** — `scripts/session-end-precheck.sh --target "$(pwd)"`
+   reports: active feature + counts · init.sh result (60 s watchdog; `--skip-init` only on
+   explicit request) · archival backlog (`state-archive.mjs --dry-run` relay) · ledger
+   validation (`feature-list-validate.mjs` relay) · the working tree in two columns
+   (state files / source) · TOC structural changes since the anchor. If the script fails the
+   ritual stops and reports — the gathering is never hand-replayed (writes follow it).
+2. Identifies the active feature from the facts (asks if none).
 3. **Overwrites** `session-handoff.md` (timestamp, active feature, what's in flight,
    build/test/lint state, the ONE next action, risks; ≤ 300 words).
 4. **Prepends** a dated entry to `progress.md` (append-only history) — via
    `progress-prepend.mjs`, which inserts after the header without loading the whole file.
 5. Updates `feature_list.json` status if warranted (`pass` only with evidence; else
-   `blocked` / stays `in-progress`), keeps it **actionable-first** via `feature-list-sort.mjs`,
-   then **validates feature `id` uniqueness** via `feature-list-validate.mjs` (resolve any
-   duplicate before committing).
-6. **Budget check** — `state-archive.mjs --dry-run`; on a backlog (progress.md beyond its
-   newest 20 sections / `pass` features beyond the 10 most recent) it **offers** archival to
-   `progress-archive.md` / `feature_archive.json` (verbatim move, evidence intact, explicit
-   confirmation; archives join the state-file commit). Also flags `.harness-anchor/` > ~5MB
-   (informational).
+   `blocked` / stays `in-progress`), keeps it **actionable-first** via `feature-list-sort.mjs`;
+   a duplicate-id fact from step 1 is resolved by renaming the newer entry before committing.
+6. **Archival (consent-gated)** — step 1's dry-run fact is the backlog; on a backlog
+   (progress.md beyond its newest 20 sections / `pass` features beyond the 10 most recent) it
+   **offers** archival to `progress-archive.md` / `feature_archive.json` (verbatim move,
+   evidence intact, explicit confirmation; archives join the state-file commit).
 7. **Flywheel reflection** — asks whether anything recurred this session worth capturing as a
    golden rule / convention (the `capturing-golden-rules` skill); usually nothing, a few-seconds reflex.
-8. Offers a `PROJECT-TOC.md` refresh if structure changed.
-9. **Surfaces any uncommitted source** (full `git status`, not just state files) with a HEAD-buildability caveat — a `pass` whose source isn't committed leaves the committed HEAD unbuildable — then offers to commit **state files only** (`chore(harness): session N handoff — <feature id>`); it still never auto-commits your source.
+8. Offers a `PROJECT-TOC.md` refresh if step 1's structural-change fact is non-empty.
+9. **Surfaces uncommitted source** (step 1's two-column tree fact) with a HEAD-buildability
+   caveat — a `pass` whose source isn't committed leaves the committed HEAD unbuildable —
+   then offers to commit **state files only** (`chore(harness): session N handoff —
+   <feature id>`); it still never auto-commits your source.
 
 **Arguments.** None.
 

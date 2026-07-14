@@ -5,71 +5,53 @@ allowed-tools: Read, Write, Edit, Bash, AskUserQuestion, Glob
 
 # /anchor
 
-Initialize harness-anchor state files in the current project. Implements the **Initializer Agent** pattern from Anthropic's Nov 2025 harness guidance.
+Initialize harness-anchor state files in the current project. The mechanical
+work (existence checks, placeholder substitution, writes, chmod) is done by
+`scripts/scaffold.sh` — the **single source of truth**. Your job is the
+decisions the script refuses to make.
 
 ## Steps
 
-1. **Detect project type.** Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-detect.sh` if it exists (Phase 4+). If it returns `is_cpp_project: true`, prefer C/C++ templates from `templates/cpp/` where applicable.
+1. **If the directory is not a git repository**, ask first: continue anyway
+   (TOC freshness will report `not-git`) or run `git init` (recommended)?
+   The script itself only reports the fact; this decision is yours to ask.
 
-2. **List target files.** These templates exist (drop the `.tpl` suffix on write):
+2. **Run the scaffold:**
 
-   | Template | Target in user project |
-   |---|---|
-   | `templates/AGENTS.md.tpl` | `AGENTS.md` |
-   | `templates/golden-rules.md.tpl` | `golden-rules.md` |
-   | `templates/feature_list.json.tpl` | `feature_list.json` |
-   | `templates/feature_list.schema.json` | `feature_list.schema.json` (copied as-is) |
-   | `templates/init.sh.tpl` | `init.sh` (chmod +x) |
-   | `templates/progress.md.tpl` | `progress.md` |
-   | `templates/session-handoff.md.tpl` | `session-handoff.md` |
-   | `templates/PROJECT-TOC.md.tpl` | `PROJECT-TOC.md` |
-   | `templates/context-budget.md.tpl` | `context-budget.md` |
-
-3. **For each target file, check existence.**
-   - **Not present (or empty)** → write the template content, substituting placeholders (project name, current ISO timestamp, current git SHA if available).
-   - **Present and non-empty** → invoke `AskUserQuestion` with options `[Overwrite, Skip, Show diff]`. **Never silently overwrite.** This is a hard rule from `learn-harness-engineering` gotchas: destructive behaviour must be explicit.
-
-4. **After all files are placed:** print a concise next-step list:
-
+   ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/scaffold.sh --target "$(pwd)"
    ```
-   ✓ harness-anchor scaffold complete.
 
-   Next:
-   1. Edit AGENTS.md "Project Context" and "Verification Commands" sections.
-   2. Replace the example entry in feature_list.json with a real first feature.
-   3. Run `bash init.sh` to verify it executes.
-   4. (Optional) Run /index-project to generate PROJECT-TOC.md from your sources.
-   5. (Optional, C/C++ only) Run /cpp-init to add clang-format/.clang-tidy.
-   6. Leave golden-rules.md empty for now — add your first rule when a pattern recurs (see the capturing-golden-rules skill).
-   ```
+   The report lists `written:` / `kept (skip-by-default):` /
+   `conflicts (need decision):` and prints the next-steps block.
+
+3. **Resolve conflicts — never silently overwrite.** For each file under
+   `conflicts (need decision):`, AskUserQuestion with options
+   `[Overwrite / Skip / Show diff]`.
+   - **Show diff** → run
+     `diff "$(pwd)/<file>" <(bash ${CLAUDE_PLUGIN_ROOT}/scripts/scaffold.sh --target "$(pwd)" --render <file>)`
+     and show it, then re-ask.
+   - Collect the approved files and apply them in ONE call:
+     `bash ${CLAUDE_PLUGIN_ROOT}/scripts/scaffold.sh --target "$(pwd)" --overwrite <f1,f2>`
+   - `kept (skip-by-default)` files (feature_list.json, golden-rules.md) hold
+     accumulated value — only overwrite if the user explicitly asks; mention
+     they were kept.
+
+4. **Print the script's next-steps block verbatim** (it is the report tail).
 
 5. **Do NOT auto-commit.** Let the user review the diff first.
 
-## Placeholder substitution
+## Refusal / edge cases
 
-When writing templates:
-- `PROJECT_NAME_PLACEHOLDER` → directory basename (e.g., `my-project`)
-- `2026-05-28T00:00:00Z` → current ISO-8601 UTC timestamp
-- `PLACEHOLDER_COMMIT_SHA` (in PROJECT-TOC.md.tpl) → `git rev-parse HEAD` if inside a repo, else `uninitialized`
-
-## Refusal cases
-
-If the current directory is **not a git repository**, surface this and ask whether to:
-- Continue anyway (TOC freshness can't be verified — reports `not-git`)
-- Run `git init` first (recommended)
-
-If `feature_list.json` exists and is **already valid**: skip it by default, mention to the user.
-
-If `golden-rules.md` exists and is **non-empty**: **skip by default** (like `feature_list.json`) — it accumulates the project's hard-won rules, so overwriting it with the empty template would wipe the feedback flywheel's value.
-
-If existing state files exceed their hot-window budgets (progress.md > ~64KB / 20 sections; feature_list.json > 32KB / > 10 `pass` entries): say so and point at `/session-end`, whose budget step offers deterministic archival (`state-archive.mjs`). Do **not** archive during scaffolding — archival keeps a single entry point.
+- Existing state files over their hot-window budgets (the report's facts or
+  the SessionStart sentinel say so) → point at `/session-end`, whose budget
+  step offers deterministic archival. Do **not** archive during scaffolding.
+- If the script itself fails, report its error verbatim. Do not hand-copy
+  templates as a substitute — scaffolding writes state and must stay
+  deterministic (only /status has a manual degraded path).
 
 ## Verification
 
-After completion, the user should be able to:
-
-```bash
-bash init.sh    # Reports OK or specific missing pieces
-```
-
-And starting a new Claude Code session should show `<harness-anchor-state>` in the SessionStart banner (Phase 3+ shows feature id; Phase 1 still shows skeleton banner).
+After completion the user should be able to run `bash init.sh` (reports OK or
+specific missing pieces), and a new session should show `<harness-anchor-state>`
+in the SessionStart banner.

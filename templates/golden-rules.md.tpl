@@ -19,6 +19,12 @@ Each rule should tie to a real failure and be checkable. The Check can start as
 enough to be worth automating — not every rule needs a tool. Prune rules that no longer
 apply: entropy applies to this file too.
 
+Check convention (what /gc executes mechanically): put ONE backtick-quoted command
+in the Check line and golden-rules-check.sh runs it (5s cap, cwd = project root).
+Its OUTPUT is the candidate-violation evidence; NO output = clean. Write "manual
+review" anywhere in the line to keep a rule human-judged (that wins even if the
+line also contains backticks).
+
 Budget: ~30 rules / 8KB — the SessionStart banner warns beyond that. Rules are curated,
 never archived: pruning is the maintenance action (see /gc + capturing-golden-rules).
 -->
@@ -29,7 +35,7 @@ never archived: pruning is the maintenance action (see /gc + capturing-golden-ru
 
 ### GR-N — Use the shared logger; never bare stdout/print in library code
 - **Why / origin:** a change shipped stray debug prints that leaked into program output.
-- **Check:** `grep -rn "console.log\|printf(\|println!" src/` returns nothing unexpected.
+- **Check:** `grep -rn "console.log\|printf(\|println!" src/` — output is candidate violations; empty = clean.
 
 -->
 
