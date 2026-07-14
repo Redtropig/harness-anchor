@@ -5,75 +5,38 @@ allowed-tools: Read, Write, Bash, AskUserQuestion
 
 # /cpp-init
 
-Add C/C++-specific config files to a project already anchored via `/anchor`. Tunes `init.sh` for the detected build system; drops `.clang-format`, `.clang-tidy`, and a sanitizer build script.
+Add the C/C++ config layer to a project already anchored via `/anchor`.
+The mechanical work is `scripts/scaffold.sh --cpp` — same conflict protocol
+as `/anchor`, C/C++ template map (init.sh per build system, `.clang-format`,
+`.clang-tidy`, `scripts/lint.sh`, and `scripts/sanitizer-build.sh` on CMake).
 
 ## Steps
 
-1. **Verify `/anchor` already ran** — check `feature_list.json` exists. If not, refuse and tell the user to run `/anchor` first.
-
-2. **Detect project type**:
+1. **Run the C/C++ scaffold:**
 
    ```bash
-   bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-detect.sh
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/scaffold.sh --target "$(pwd)" --cpp
    ```
 
-   Parse the JSON. If `is_cpp_project: false`, refuse: this command is C/C++ only.
+   Refusals (surface the message, suggest the fix, stop):
+   - exit 4 — not anchored: run `/anchor` first.
+   - exit 3 — not a C/C++ project: this command does not apply.
 
-3. **Replace `init.sh`** with the build-system-specific template:
+2. **Resolve conflicts** exactly as in `/anchor` step 3 — AskUserQuestion
+   `[Overwrite / Skip / Show diff]` per conflict, `--render <file>` (with
+   `--cpp`) for the diff, then one
+   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/scaffold.sh --target "$(pwd)" --cpp --overwrite <f1,f2>`
+   call for the approved set. A user-customized `init.sh`, `.clang-format`,
+   or `.clang-tidy` encodes work/taste — that is exactly why they land in
+   conflicts instead of being replaced.
 
-   | Detected build system | Template |
-   |---|---|
-   | `cmake` | `templates/cpp/cmake-init.sh.tpl` → `init.sh` |
-   | `meson` | `templates/cpp/meson-init.sh.tpl` → `init.sh` |
-   | `make` / `bazel` / `unknown` | Keep generic `init.sh`; warn that auto-init.sh isn't customized for this build system yet |
-
-   Use AskUserQuestion before overwriting — never silently replace user-customized init.sh.
-
-4. **Drop `.clang-format` and `.clang-tidy`** from `templates/cpp/*.tpl` (skip if present and non-empty — ask user).
-
-5. **Drop `scripts/sanitizer-build.sh`** from `templates/cpp/sanitizer-build.sh.tpl` if the project is CMake (other build systems: ask user, sanitizer setup is build-system-specific).
-
-6. **Drop `scripts/lint.sh`** from `templates/cpp/lint.sh.tpl` (any C/C++ project —
-   clang-tidy is build-system-agnostic given `compile_commands.json`). Same skip-if-present
-   ask policy. This is the sysroot-correct lint entry point (macOS Homebrew clang-tidy
-   fails without it — see `cpp-static-analysis`).
-
-7. **chmod +x** the shell scripts written.
-
-8. **Print next-steps**:
-
-   ```
-   ✓ /cpp-init complete:
-     - init.sh tuned for <build system>
-     - .clang-format applied (LLVM base + 4-space indent + 100 col)
-     - .clang-tidy applied (bugprone/cert/clang-analyzer/cppcoreguidelines baseline)
-     - scripts/lint.sh applied (sysroot-correct clang-tidy entry point)
-     - scripts/sanitizer-build.sh available for ASan+UBSan runs
-
-   Next:
-     1. Run `bash init.sh` — should succeed if your project is well-configured
-     2. Review .clang-tidy and disable any checks too noisy for this codebase
-     3. Run `bash scripts/lint.sh` for a clang-tidy pass (sysroot handled)
-     4. Run `clang-format --dry-run -Werror $(git ls-files '*.cpp' '*.h')` to see what would change
-     5. Optionally run scripts/sanitizer-build.sh to do a full ASan+UBSan pass
-   ```
-
-## Overwrite policy (hard rule)
-
-The same policy as `/anchor`: any existing non-empty file gets AskUserQuestion[overwrite/skip/diff]. Never silently overwrite. Especially:
-
-- A user-customized `init.sh` reflects work; don't lose it
-- A `.clang-format` already in the repo encodes team taste; ask before changing
-- A `.clang-tidy` already there may suppress noisy checks; ask before changing
-
-## When NOT to invoke
-
-- Project is not C/C++ → cpp-detect.sh returns `is_cpp_project: false`
-- Build system is `unknown` with no `.c/.cpp/.h` files anywhere → strongly suggest the user pick a build system first
+3. **Print the script's next-steps block verbatim.** If the report carries a
+   `note:` line (make/bazel/unknown build system — no canned init.sh), relay
+   it and point at the `cpp-build-systems` skill.
 
 ## Related
 
-- `cpp-build-systems` skill — explains what each command does
-- `cpp-static-analysis` skill — explains what `.clang-tidy` config controls
-- `cpp-formatting` skill — explains `.clang-format` choices
-- `/anchor` — the generic scaffold this layers on top of
+- `cpp-build-systems` / `cpp-static-analysis` / `cpp-formatting` skills —
+  what each dropped config controls.
+- `/anchor` — the generic scaffold this layers on top of.
+- `/sanitize` — uses `scripts/sanitizer-build.sh` dropped here.
