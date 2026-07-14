@@ -76,6 +76,11 @@ This mirrors LoopDetection middleware ("reconsider the approach after N edits on
 
 If you can't articulate WHY, your fix is suspicious — even if green. State this uncertainty per `anti-hallucination-gates`.
 
+**Before moving on:** if the failure you just fixed is a *recurrence* (second+ time you've seen
+the class), capture it as a golden rule **in this same turn** — a rough stub via
+`capturing-golden-rules` — not as a mental note for session end. Deferred captures get distorted
+or forgotten when context compacts.
+
 ## Anti-patterns
 
 - **Silencing instead of fixing**: `// @ts-ignore`, `--no-verify`, deleting failing tests, broadening exception catches. These hide problems; sometimes they're warranted but require explicit user note.
@@ -101,6 +106,7 @@ A fresh-context sensor's report — `/verify` (`verification-runner`), `/test-pl
 ## Related
 
 - `anti-hallucination-gates` — keep claims honest while looping
+- `capturing-golden-rules` — a recurring failure you just fixed becomes a rule in the same turn
 - `receiving-code-review` (superpowers) — the discipline for triaging a fresh-context sensor's findings (verify each, push back with reasoning, don't blind-apply)
 - `systematic-debugging` (superpowers) — for deep debugging beyond surface signals
 - `verification-runner` (agent) — for fresh-eyes evaluation of "is this really fixed?"
