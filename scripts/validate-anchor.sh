@@ -3,15 +3,16 @@
 # Run inside the plugin root, or pass the plugin root as the first positional
 # argument (validate-anchor.sh [plugin-root]); it defaults to the repo root.
 #
-# Checks (labelled [1/9]..[9/9] in the output):
-#   [1/9]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
-#   [2/9]   JSON files parse; scripts/*.mjs pass node --check
-#   [3-4/9] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
-#   [5/9]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
-#   [6/9]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
-#   [7/9]   SessionStart hook is executable and produces valid JSON when run; meta-skill cpp-only regions well-formed + flat (sequenced, non-nested)
-#   [8/9]   Commands directory consistency (each commands/*.md is a usable /command)
-#   [9/9]   Every template referenced from commands/anchor.md exists
+# Checks (labelled [1/10]..[9/10] in the output):
+#   [1/10]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
+#   [2/10]   JSON files parse; scripts/*.mjs pass node --check
+#   [3-4/10] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
+#   [5/10]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
+#   [6/10]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
+#   [7/10]   SessionStart hook is executable and produces valid JSON when run; meta-skill cpp-only regions well-formed + flat (sequenced, non-nested)
+#   [8/10]   Commands directory consistency (each commands/*.md is a usable /command)
+#   [9/10]   Every template referenced from commands/anchor.md + cpp-init.md AND from scaffold.sh's template map exists
+#   [10/10]  Command↔script wiring: the four mechanism scripts exist + executable + bash -n; every ${CLAUDE_PLUGIN_ROOT}/scripts/* referenced by a command/agent md resolves
 
 set -uo pipefail   # no -e so we report all failures, not abort on first
 
@@ -31,7 +32,7 @@ echo "Root: $PLUGIN_ROOT"
 echo ""
 
 # ---- 1. Required files ----
-echo "[1/9] Required files..."
+echo "[1/10] Required files..."
 for f in \
     .claude-plugin/plugin.json \
     .claude-plugin/marketplace.json \
@@ -49,7 +50,7 @@ done
 echo ""
 
 # ---- 2. JSON validity ----
-echo "[2/9] JSON parse + scripts/*.mjs syntax..."
+echo "[2/10] JSON parse + scripts/*.mjs syntax..."
 while IFS= read -r f; do
     if python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
         ok "parse $f"
@@ -72,7 +73,7 @@ fi
 echo ""
 
 # ---- 3 & 4. SKILL.md frontmatter ----
-echo "[3-4/9] SKILL.md frontmatter (name + description, ≤500 chars desc)..."
+echo "[3-4/10] SKILL.md frontmatter (name + description, ≤500 chars desc)..."
 while IFS= read -r skill; do
     if ! head -1 "$skill" | grep -q '^---$'; then
         fail "$skill: missing frontmatter opener"
@@ -96,7 +97,7 @@ done < <(find skills -name SKILL.md 2>/dev/null)
 echo ""
 
 # ---- 5. Agent frontmatter (name + description) ----
-echo "[5/9] Agent frontmatter + single-level constraint (invariant #3) + fresh-dir evidence contract (invariant #4)..."
+echo "[5/10] Agent frontmatter + single-level constraint (invariant #3) + fresh-dir evidence contract (invariant #4)..."
 if [ -d agents ]; then
     while IFS= read -r agent; do
         [ -e "$agent" ] || continue
@@ -141,7 +142,7 @@ fi
 echo ""
 
 # ---- 6. Command frontmatter (description, no name required) ----
-echo "[6/9] Command frontmatter (description ≤500 chars + allowed-tools shape)..."
+echo "[6/10] Command frontmatter (description ≤500 chars + allowed-tools shape)..."
 if [ -d commands ]; then
     while IFS= read -r cmd; do
         [ -e "$cmd" ] || continue
@@ -173,7 +174,7 @@ fi
 echo ""
 
 # ---- 7. SessionStart hook smoke test ----
-echo "[7/9] SessionStart hook smoke test..."
+echo "[7/10] SessionStart hook smoke test..."
 if [ -x hooks/session-start ]; then
     if out=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash hooks/session-start 2>/dev/null) && \
        echo "$out" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'hookSpecificOutput' in d, 'missing hookSpecificOutput'; assert d['hookSpecificOutput'].get('hookEventName')=='SessionStart'" 2>/dev/null; then
@@ -216,7 +217,7 @@ fi
 echo ""
 
 # ---- 8. Commands referenced ----
-echo "[8/9] Commands directory consistency..."
+echo "[8/10] Commands directory consistency..."
 if [ -d commands ]; then
     for cmd in commands/*.md; do
         [ -e "$cmd" ] || continue
@@ -229,7 +230,7 @@ fi
 echo ""
 
 # ---- 9. Templates referenced in /anchor + /cpp-init exist ----
-echo "[9/9] Templates referenced by /anchor + /cpp-init..."
+echo "[9/10] Templates referenced by /anchor + /cpp-init..."
 found_any_cmd=0
 for src in commands/anchor.md commands/cpp-init.md; do
     [ -f "$src" ] || continue
@@ -252,6 +253,45 @@ done
 if [ "$found_any_cmd" -eq 0 ]; then
     warn "commands/anchor.md and commands/cpp-init.md not present yet — skipping template cross-check"
 fi
+# 9b: templates referenced by scaffold.sh's map — the thin /anchor + /cpp-init
+# no longer name template paths (the map moved into the script), so the
+# existence cross-check follows the map or it checks nothing.
+if [ -f scripts/scaffold.sh ]; then
+    while IFS= read -r tpl; do
+        [ -n "$tpl" ] || continue
+        if [ -f "templates/$tpl" ]; then
+            ok "templates/$tpl (scaffold.sh map)"
+        else
+            fail "missing template: templates/$tpl (scaffold.sh map)"
+        fi
+    done < <(grep -oE '[A-Za-z0-9._/-]+\.tpl\|' scripts/scaffold.sh | sed 's/|$//' | sort -u)
+    if grep -q 'feature_list\.schema\.json|' scripts/scaffold.sh; then
+        if [ -f templates/feature_list.schema.json ]; then
+            ok "templates/feature_list.schema.json (scaffold.sh map)"
+        else
+            fail "missing template: templates/feature_list.schema.json (scaffold.sh map)"
+        fi
+    fi
+fi
+echo ""
+
+# ---- 10. Command↔script wiring (thin-wrapper single point) ----
+echo "[10/10] Command↔script wiring..."
+for s in \
+    scripts/golden-rules-check.sh \
+    scripts/status-report.sh \
+    scripts/scaffold.sh \
+    scripts/session-end-precheck.sh
+do
+    if [ -x "$s" ]; then ok "$s executable"; else fail "$s missing or not executable"; fi
+    if [ -f "$s" ] && bash -n "$s" 2>/dev/null; then ok "$s bash -n"; else fail "$s fails bash -n"; fi
+done
+# Every scripts/* path referenced from commands/ or agents/ must exist —
+# a thin wrapper whose script reference rots is a dead command.
+while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    if [ -f "$ref" ]; then ok "referenced $ref"; else fail "dangling script reference: $ref (from commands/ or agents/)"; fi
+done < <(grep -rhoE '\{CLAUDE_PLUGIN_ROOT\}/scripts/[A-Za-z0-9._-]+' commands/ agents/ 2>/dev/null | sed 's|.*{CLAUDE_PLUGIN_ROOT}/||' | sort -u)
 echo ""
 
 # ---- Summary ----
