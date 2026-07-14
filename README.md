@@ -129,6 +129,7 @@ bash init.sh     # health-check the environment
   "repairing" the ledger). The SessionStart banner warns (warn-only) when a budget is
   exceeded. History is moved, never deleted; archives are grep-only reference.
 - **Heavy ops are explicit commands, not auto-fired hooks.** Sanitizer builds (`/sanitize`) and the opt-in auto-fix loop (`/verify --fix`, bounded to ≤ 2 fresh-evaluated cycles) far exceed the ≤ 5s warn-only hook budget — a hook may *suggest* `/sanitize`, but never runs it inline.
+- **Mechanical halves are scripts.** `/status`, `/anchor`, `/cpp-init`, `/session-end` and the golden-rules Check tier run deterministic `scripts/*` helpers (single source of truth, unit-tested, byte-stable output); the command markdown keeps only judgment + interaction. Cheaper per invocation, and "never silently overwrite" is enforced as interface shape — `scaffold.sh`'s default path has no overwrite branch at all.
 - **C/C++ first-class.** Build system auto-detect (CMake/Meson/Make/Bazel), `compile_commands.json`-aware clang-tidy, sanitizer build templates.
 
 ---

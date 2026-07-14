@@ -4,6 +4,50 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-14
+
+### Added
+
+- `scripts/golden-rules-check.sh` — mechanical Check runner for golden rules: parses
+  `### GR-<n>` blocks, executes the first backtick-quoted command per Check line (5s SIGKILL
+  watchdog each, per-check isolation), three-state verdicts — CLEAN / FINDINGS(n) /
+  CHECK-ERROR — so "found nothing" is never conflated with "didn't look"; `--count` feeds
+  /status. Check convention documented in the golden-rules template + capturing-golden-rules
+  skill: output = candidate violations, empty = clean, "manual review" in the line wins over
+  backticks.
+- `scripts/status-report.sh` — the whole 7-section /status snapshot in one deterministic run
+  (python3→node JSON engine chain; if both are missing only the JSON-derived lines degrade,
+  the rest still reports; reuses toc-freshness.sh and golden-rules-check --count).
+- `scripts/scaffold.sh` — template placement for /anchor and /cpp-init (`--cpp`): placeholder
+  substitution, chmod, skip-by-default for feature_list.json/golden-rules.md,
+  `conflicts (need decision)` reporting, `--render` for diffs, `--overwrite <allowlist>` as
+  the only write path over non-empty files — the default path physically has no overwrite
+  branch.
+- `scripts/session-end-precheck.sh` — one-call fact block for /session-end: active feature +
+  counts, init.sh under a 60s watchdog, state-archive dry-run + ledger-validate relays,
+  two-column (state/source) tree scan, TOC structural-change hint (A/D/R + untracked, capped
+  at 20).
+- validate-anchor `[10/10]` — the four mechanism scripts must be executable and parse, and
+  every `{CLAUDE_PLUGIN_ROOT}/scripts/*` reference in commands/ + agents/ must resolve (thin
+  wrappers made script paths a single point of failure); plus `[9b]` — template existence is
+  now cross-checked against scaffold.sh's map (the old [9] check went silently empty once the
+  command mds stopped naming template paths).
+- Unit suites for all four scripts (tier precedence, three-state verdicts incl. timeout,
+  rerun byte-inertness by checksum, --overwrite allowlist, --render fidelity, cpp dotfile
+  drops, refusal exit codes 3/4, engine-degradation via PATH shims, duplicate-id relay).
+
+### Changed
+
+- `/status`, `/anchor`, `/cpp-init`, `/session-end` are now thin wrappers over the scripts
+  above — the script is the single source of truth for the mechanical half; the markdown
+  keeps judgment and interaction (AskUserQuestion conflict round-trips, Default-FAIL flips,
+  consent-gated archival, flywheel). Only read-only /status retains a manual degraded path.
+  Saves the template/gathering round-trips through context (~6-18 tool calls → 1-2 per
+  command) and pins the outputs byte-level.
+- `drift-analyst` runs the golden-rules mechanical tier via golden-rules-check.sh and keeps
+  judgment: adjudicating FINDINGS lines (expected vs violation), reviewing MANUAL rules,
+  surfacing CHECK-ERROR as a broken Check rather than a pass.
+
 ## [0.10.0] - 2026-07-05
 
 ### Added
@@ -397,7 +441,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/Redtropig/harness-anchor/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Redtropig/harness-anchor/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/Redtropig/harness-anchor/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Redtropig/harness-anchor/compare/v0.8.0...v0.9.0
