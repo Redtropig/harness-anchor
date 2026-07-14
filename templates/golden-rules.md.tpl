@@ -19,6 +19,9 @@ Each rule should tie to a real failure and be checkable. The Check can start as
 enough to be worth automating — not every rule needs a tool. Prune rules that no longer
 apply: entropy applies to this file too.
 
+Write the rule IN THE TURN you spot the recurrence — a rough stub (origin = pasted evidence,
+Check = "manual review") captured now beats a polished rule reconstructed at session end.
+
 Check convention (what /gc executes mechanically): put ONE backtick-quoted command
 in the Check line and golden-rules-check.sh runs it (5s cap, cwd = project root).
 Its OUTPUT is the candidate-violation evidence; NO output = clean. Write "manual
