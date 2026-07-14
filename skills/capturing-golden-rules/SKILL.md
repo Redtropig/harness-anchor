@@ -24,6 +24,26 @@ Capture when the signal is **recurring**, not a one-off:
 One-off edge cases and personal style stay personal — capture what *recurs*, or what *any* contributor
 would hit. (The archive's lesson: **3 rules, not 30**.)
 
+## When to write — the same turn, not session end
+
+Capture happens **in the turn you recognize the signal** — append the rule, then continue the
+task. Context is a volatile medium: compaction and attention dilution mean a deferred write gets
+reconstructed from decayed memory (bias) or never happens at all (the intent itself is displaced).
+
+A **rough stub written now beats a polished rule written later**:
+
+```
+### GR-<n> — <one-line rule>
+- **Why / origin:** <paste the evidence at hand: exact error text, file:line, commit sha>
+- **Check:** manual review — <what to look at>
+```
+
+- **Quote, don't summarize.** An origin pasted at the moment of failure cannot be misremembered;
+  a session-end reconstruction can. This is the anti-bias mechanism, not a convenience.
+- A `manual review` Check lands in `/gc`'s [MANUAL] tier — mechanically harmless until graduated.
+- Polishing (Check upgrades, tighter wording) is idempotent — `/gc` adjudication and
+  `/session-end`'s flywheel do it later; a lost lesson cannot be recovered.
+
 ## Route the signal to its right home (don't dump everything here)
 
 `golden-rules.md` is specifically the home for **failure → guardrail / anti-pattern** signals. Other
@@ -92,4 +112,4 @@ trusts is worse than none. Review it when it stops matching how the project actu
 - `anti-hallucination-gates` — a recurring "claimed done without evidence" is itself a capturable rule.
 - `self-correction-loop` — a recurring fix pattern is a candidate rule.
 - `docs-lookup` — when unsure how to phrase a Check command for an unfamiliar tool.
-- `/session-end` — its flywheel reflection is the natural moment to capture the session's lessons.
+- `/session-end` — its flywheel reflection is the **safety net** for anything missed; the preferred capture moment is the turn the signal appears (see "When to write").

@@ -134,7 +134,9 @@ This is the calibrated-uncertainty pattern. Bluffing breaks user trust.
 
 ## Updating progress.md
 
-At every `/session-end` (or when you reach a meaningful stopping point):
+At every `/session-end` — and at mid-session milestones (a status flip, a verified chunk):
+prepending a short entry **now** beats reconstructing the session at its end from a compacted
+context. The template header carries HH:MM, so several entries per session are fine:
 
 1. Compose a concise new section (5-10 lines max) in the template format
 2. **Prepend** it (most recent first). Prefer the tool — `node ${CLAUDE_PLUGIN_ROOT}/scripts/progress-prepend.mjs progress.md <entry-file>` — which inserts after the header **without loading the whole file** (cheap on a long history). Fallback: Read + prepend + Write.

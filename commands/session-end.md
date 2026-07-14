@@ -60,11 +60,13 @@ consumes its facts.
      `capturing-golden-rules`), AGENTS.md wants thinning back to a map.
      An oversized handoff self-heals at step 3 if you keep it ≤ 300 words.
 
-7. **Flywheel reflection.** Ask once: *"Did anything recur this session that
-   should change a shared artifact (a golden rule, a convention, or a skill)?"*
-   Failure/anti-pattern → `capturing-golden-rules`; a missing fact → AGENTS.md;
-   a reliable workflow → a skill or AGENTS.md. Usually the answer is no —
-   move on; this is a reflex, not a ceremony.
+7. **Flywheel reflection — safety net, not the capture moment.** Lessons
+   should already be on disk (`capturing-golden-rules` writes in the turn a
+   signal appears). Ask once: *"Anything that recurred this session and is
+   still chat-only (a golden rule, a convention, a skill tweak)?"* If yes,
+   write it now — failure/anti-pattern → `capturing-golden-rules`; a missing
+   fact → AGENTS.md; a reliable workflow → a skill or AGENTS.md. Usually the
+   answer is no — move on; this is a reflex, not a ceremony.
 
 8. **Offer TOC refresh** if step 1's structural-change fact is non-empty:
    *"Project structure changed. Refresh PROJECT-TOC.md now?"* (Yes / Skip)

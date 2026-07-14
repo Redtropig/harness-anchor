@@ -7,6 +7,7 @@
 #   - Project type (cpp|generic, via scripts/cpp-detect.sh)
 #   - State-file budget sentinel (only when a budgeted file exceeds its cap; see step 2d)
 #   - Session handoff head (first 10 lines of session-handoff.md)
+#   - Compact notice line (only when the hook fired with stdin source=="compact")
 #   - using-harness-anchor SKILL.md body (the meta-skill, injected slimmed:
 #     frontmatter stripped; cpp-only regions gated by cpp-detect — see step 7)
 #
@@ -17,6 +18,16 @@
 #   - Total watchdog: 5s cap (R1). On timeout, emit nothing, exit 0 (warn-only).
 
 set -uo pipefail
+
+# ---- Read stdin BEFORE backgrounding (bg commands get /dev/null stdin) ----
+# BOUNDED read: callers that hold stdin open without EOF (nested runners, agent
+# harnesses invoking this bare) must not hang the hook — give up after 1s and
+# proceed with whatever arrived. Claude Code writes the JSON and closes (EOF in
+# ms); a TTY invocation is skipped outright. bash 3.2: read -t takes integers.
+HOOK_STDIN=""
+if [ ! -t 0 ]; then
+    IFS= read -r -d '' -t 1 HOOK_STDIN || true
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -43,6 +54,18 @@ fi
 
 # ---- main() — assembles full output, writes to tempfile ----
 main() {
+    # ---- 0. Hook event source from stdin JSON ("startup"|"clear"|"compact"; empty if absent) ----
+    hook_source=""
+    if [ -n "$HOOK_STDIN" ]; then
+        hook_source=$(printf '%s' "$HOOK_STDIN" | python3 -c "
+import json, sys
+try:
+    print(json.load(sys.stdin).get('source', ''))
+except Exception:
+    pass
+" 2>/dev/null || echo "")
+    fi
+
     # ---- 1. Active feature from feature_list.json ----
     active_feature="none (run /anchor to scaffold)"
     flist="$PROJECT_DIR/feature_list.json"
@@ -202,6 +225,13 @@ Project root:     ${PROJECT_DIR}
 Active feature:   ${active_feature}
 Project type:     ${project_type}
 TOC freshness:    ${toc_status}"
+
+    # ---- 5b. Compact caution (v0.12.0) — only when this SessionStart fired on a compaction ----
+    # Post-compaction, memory-from-recall is the distortion vector; point at disk evidence.
+    if [ "$hook_source" = "compact" ]; then
+        banner="${banner}
+Compact notice:   context was just compacted — memory written from recall is unreliable; reconstruct from on-disk evidence (git diff, test output, progress.md) and state uncertainty rather than guess."
+    fi
 
     if [ -n "$golden_rules_line" ]; then
         banner="${banner}
