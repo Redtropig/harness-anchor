@@ -27,9 +27,22 @@
 
 set -uo pipefail   # no -e: a single check failure should not abort other checks
 
-# ---- Read stdin BEFORE backgrounding (bash redirects bg stdin to /dev/null) ----
+# Context-fill flush threshold (bytes of transcript JSONL; Check 1d). Transcript bytes are a
+# COARSE proxy for context tokens (tool-result share varies per session) — 6 MiB approximates
+# a long session nearing its first auto-compaction. Warn-only + warn-once: a miscalibration
+# costs at most one extra (or one late) reminder line. Tune here.
+FLUSH_THRESHOLD_BYTES=6291456
+
+# ---- Read stdin BEFORE backgrounding (bg commands get /dev/null stdin) ----
+# BOUNDED read (1s; same hazard class as session-start): callers holding stdin
+# open without EOF must not hang the hook; a TTY invocation is skipped outright.
+# Claude Code writes the event JSON and closes — EOF arrives in ms.
 INPUT_FILE=$(mktemp)
-cat > "$INPUT_FILE" 2>/dev/null || true
+HOOK_STDIN=""
+if [ ! -t 0 ]; then
+    IFS= read -r -d '' -t 1 HOOK_STDIN || true
+fi
+printf '%s' "$HOOK_STDIN" > "$INPUT_FILE" 2>/dev/null || true
 
 # ---- main() — all logic wrapped for R1 total watchdog ----
 main() {
@@ -55,17 +68,26 @@ except Exception:
         return 0
     fi
 
-    # Extract tool_name (needed by the scope-expansion check, Check 1c below).
+    # Extract tool_name (Check 1c) + transcript_path/session_id (Check 1d) in ONE parse
+    # (keeps the per-event python3 process count unchanged).
     tool_name=""
+    transcript_path=""
+    session_id=""
     if [ -n "$input" ]; then
-        tool_name=$(printf '%s' "$input" | python3 -c "
+        tn_tp_sid=$(printf '%s' "$input" | python3 -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
     print(d.get('tool_name', ''))
+    print(d.get('transcript_path', ''))
+    print(d.get('session_id', ''))
 except Exception:
     pass
 " 2>/dev/null || echo "")
+        tool_name=$(printf '%s\n' "$tn_tp_sid" | sed -n '1p')
+        transcript_path=$(printf '%s\n' "$tn_tp_sid" | sed -n '2p')
+        # session_id feeds a marker FILENAME — strip to a safe charset.
+        session_id=$(printf '%s\n' "$tn_tp_sid" | sed -n '3p' | tr -cd 'A-Za-z0-9._-')
     fi
 
     # Find project root (where feature_list.json lives) — walk up from file_path.
@@ -208,6 +230,33 @@ PY
         esac
     fi
 
+    # ---- Check 1d: context-fill flush reminder (v0.12.0) ----
+    # Observation point (CLAUDE.md hook rule 5):
+    #   Y (failure surface): durable memory (golden-rule lessons, decisions, milestones)
+    #     lost or distorted because its write was deferred past a context compaction.
+    #   X (observed signal): transcript file size crossing FLUSH_THRESHOLD_BYTES.
+    #   Coverage: X ⊉ Y. Residual blind spots (silence is NOT proof nothing needs flushing):
+    #     - bytes ≠ tokens (tool-result share varies), and the transcript file is written
+    #       asynchronously (docs: may lag the in-memory conversation) → may fire early or late;
+    #     - warn-once per session: the transcript keeps growing after the first compaction,
+    #       so only the FIRST approach is guarded (the highest-value one);
+    #     - subagent transcripts are separate files — their fill is invisible here;
+    #     - fires only on Edit|Write inside an ANCHORED project (the hook's global gate) —
+    #       sessions editing elsewhere fill context unobserved;
+    #     - unwritable .harness-anchor/ → reminder suppressed (fail-silent beats repeat-nagging).
+    if [ -n "$transcript_path" ] && [ -n "$session_id" ] && [ -f "$transcript_path" ]; then
+        flush_marker="$project_root/.harness-anchor/flush-warned-$session_id"
+        if [ ! -f "$flush_marker" ]; then
+            t_size=$(wc -c < "$transcript_path" 2>/dev/null | tr -cd '0-9')
+            if [ -n "$t_size" ] && [ "$t_size" -gt "$FLUSH_THRESHOLD_BYTES" ]; then
+                mkdir -p "$project_root/.harness-anchor" 2>/dev/null || true
+                if : > "$flush_marker" 2>/dev/null; then
+                    warnings+=("Context is filling (transcript ≈$(( t_size / 1048576 )) MB). If any durable memory is still chat-only — golden-rule stubs, feature status, progress milestones — flush it to disk now while details are exact (write-at-realization; see capturing-golden-rules).")
+                fi
+            fi
+        fi
+    fi
+
     # ---- Check 2: C/C++ static analysis (clang-tidy on changed files) ----
     # Phase 4: invoke clang-tidy if file is C/C++ and prerequisites are in place.
     # Silent skip on anything missing — never pollute agent context with infra errors.
@@ -307,16 +356,21 @@ $w"; fi
 }
 
 # ---- R1: Total watchdog (5s cap, tempfile-guarded) ----
+# SIGKILL + detached stdio, mirroring hooks/session-start (v0.10.0 lesson, measured
+# on macOS bash 3.2): a subshell blocked on `sleep` DEFERS SIGTERM until the sleep
+# completes, so the TERM watchdog (a) made every consumer's `wait` burn the full 5s
+# window and (b) never actually killed a runaway main; an attached-stdio watchdog
+# also holds a command-substitution consumer's pipe open for the same 5s.
 OUTPUT_FILE=$(mktemp)
 main > "$OUTPUT_FILE" 2>/dev/null &
 main_pid=$!
 
-( sleep 5 && kill -TERM $main_pid 2>/dev/null ) &
+( sleep 5; kill -9 $main_pid 2>/dev/null ) >/dev/null 2>&1 &
 watchdog_pid=$!
 
 wait $main_pid 2>/dev/null
 main_rc=$?
-kill $watchdog_pid 2>/dev/null
+kill -9 $watchdog_pid 2>/dev/null
 wait $watchdog_pid 2>/dev/null
 
 if [ "$main_rc" -eq 0 ] && [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then
