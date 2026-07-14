@@ -110,6 +110,7 @@ if [ -n "$output" ]; then
     assert_valid_stop_schema "$output"
     assert_contains "systemMessage" "$output"
     assert_contains "feat-active" "$output"
+    assert_contains "flush it to disk" "$output"
 else
     fail "no output emitted; expected wrap-up reminder for in-progress feature"
 fi

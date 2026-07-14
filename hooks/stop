@@ -2,7 +2,16 @@
 # Stop hook for harness-anchor.
 #
 # Triggered when agent wants to stop. Warn-only — never blocks (no stopReason).
-# Purpose: nudge wrap-up rituals (update progress.md, write handoff).
+# Purpose: nudge wrap-up rituals (update progress.md, write handoff) and remind that
+# chat-only durable memory should be flushed (write-at-realization backstop).
+#
+# Observation point (CLAUDE.md hook rule 5):
+#   Y (failure surface): durable memory (lessons/decisions) still chat-only when the
+#     session actually ends (this Stop may be the last one).
+#   X (observed signal): state-file mtimes (progress.md staleness heuristic).
+#   Coverage: X ⊉ Y — the hook cannot see chat content; fresh mtimes with an uncaptured
+#   lesson stay invisible, and systemMessage reaches the USER, not the model. A silent
+#   stop is NOT proof everything durable is on disk.
 
 set -uo pipefail
 
@@ -49,7 +58,7 @@ fi
 if [ -f "$project_root/progress.md" ]; then
     # session start heuristic: file older than 30 minutes is "stale this session"
     if find "$project_root/progress.md" -mmin +30 -print 2>/dev/null | grep -q .; then
-        reminders+=("progress.md may not have been updated this session. Consider /session-end to write handoff + log.")
+        reminders+=("progress.md may not have been updated this session. If durable memory is still chat-only (golden-rule stubs, decisions, milestones), flush it to disk now — then /session-end writes handoff + log.")
     fi
 fi
 
