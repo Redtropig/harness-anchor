@@ -53,6 +53,10 @@ Append a rule to `golden-rules.md`:
 - **Make it checkable.** Start with "manual review"; graduate the Check to a grep one-liner or a lint
   rule **only** when the rule is violated often enough to be worth it (invest by frequency × impact —
   not every rule needs a tool).
+- **The mechanical convention** (what makes a Check runnable by `/gc`): one backtick-quoted command in
+  the Check line → `golden-rules-check.sh` executes it (5s cap); its output is candidate-violation
+  evidence, empty output = clean. Keep "manual review" in the line to stay human-judged — that takes
+  precedence even when the line contains backticked prose.
 - **Keep IDs unique** (`GR-1`, `GR-2`, …) so `/gc` and `/status` can reference and count them.
 
 ## The flywheel
