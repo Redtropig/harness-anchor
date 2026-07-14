@@ -4,6 +4,34 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-14
+
+### Added
+
+- **Write-at-realization contract** for durable memory: `capturing-golden-rules` now mandates
+  capture in the turn the signal appears, with a legitimate rough-stub form (origin = pasted
+  evidence at hand; Check defaults `manual review` → /gc's [MANUAL] tier); template note synced.
+- `hooks/post-tool-use` Check 1d — **context-fill flush reminder**: transcript-size threshold
+  (6 MiB const), warn-once per session via a `.harness-anchor/flush-warned-<session_id>` marker;
+  X-vs-Y blind spots documented in the check header.
+- `hooks/session-start` — **compact caution line**: fired with stdin `source=="compact"`, the
+  banner warns that memory-from-recall is unreliable and points at on-disk evidence; stdin read
+  is `-t 0`-guarded (non-blocking), regular startups zero-increment.
+- Contract tests: `post-tool-use-flush-sentinel.sh`, `session-start-compact-caution.sh`.
+
+### Changed
+
+- `hooks/stop` — the stale-progress nudge now also reminds to flush chat-only durable memory;
+  observation-point header documents the mtime-proxy blind spot (cannot see chat content).
+- `hooks/post-tool-use` — stdin capture bounded (1s `read -t`; callers holding stdin open no
+  longer hang the hook) and watchdog hardened to the SIGKILL/stdio-detached idiom
+  (session-start's v0.10.0 lesson): the TERM version added ~5s wall to every
+  command-substitution consumer and could not actually kill a runaway main.
+- Same-turn flush cross-links: `self-correction-loop` (capture hop after a recurrent fix),
+  `context-budget-discipline` (flush-before-compress ritual + rebuild-from-disk after
+  compaction), `feature-state-keeper` (mid-session milestone `progress.md` prepends),
+  `/session-end` step 7 reframed as the safety net rather than the capture moment.
+
 ## [0.11.0] - 2026-07-14
 
 ### Added
@@ -441,7 +469,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Redtropig/harness-anchor/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Redtropig/harness-anchor/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Redtropig/harness-anchor/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/Redtropig/harness-anchor/compare/v0.9.0...v0.9.1

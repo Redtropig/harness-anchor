@@ -1,7 +1,7 @@
 # Command Manual — harness-anchor
 
-<!-- doc-align: 5a14fc040db37a3b4a90cae832f4d418b565953c · 2026-07-14 · harness-anchor v0.11.0 -->
-> **Aligned with commit** [`5a14fc040db37a3b4a90cae832f4d418b565953c`](https://github.com/Redtropig/harness-anchor/commit/5a14fc040db37a3b4a90cae832f4d418b565953c) (harness-anchor v0.11.0, 2026-07-14). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
+<!-- doc-align: 74a06ebcc802bd784029a376a4f979f2d2d90d4e · 2026-07-14 · harness-anchor v0.12.0 -->
+> **Aligned with commit** [`74a06ebcc802bd784029a376a4f979f2d2d90d4e`](https://github.com/Redtropig/harness-anchor/commit/74a06ebcc802bd784029a376a4f979f2d2d90d4e) (harness-anchor v0.12.0, 2026-07-14). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
 
 Reference for every slash command shipped by harness-anchor: what it does, **when to
 reach for it**, its arguments, prerequisites, outputs, and how the harness reminds you to
@@ -441,8 +441,9 @@ can resume from disk, not from chat memory.
    (progress.md beyond its newest 20 sections / `pass` features beyond the 10 most recent) it
    **offers** archival to `progress-archive.md` / `feature_archive.json` (verbatim move,
    evidence intact, explicit confirmation; archives join the state-file commit).
-7. **Flywheel reflection** — asks whether anything recurred this session worth capturing as a
-   golden rule / convention (the `capturing-golden-rules` skill); usually nothing, a few-seconds reflex.
+7. **Flywheel reflection** — the safety net for the write-at-realization contract: lessons
+   should already be on disk (`capturing-golden-rules` writes in the turn a signal appears);
+   this step catches anything still chat-only. Usually nothing, a few-seconds reflex.
 8. Offers a `PROJECT-TOC.md` refresh if step 1's structural-change fact is non-empty.
 9. **Surfaces uncommitted source** (step 1's two-column tree fact) with a HEAD-buildability
    caveat — a `pass` whose source isn't committed leaves the committed HEAD unbuildable —
