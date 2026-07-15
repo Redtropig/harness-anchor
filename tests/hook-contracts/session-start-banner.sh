@@ -193,7 +193,10 @@ else
     assert_json_valid "$output5"
     assert_contains "(root)" "$ctx5"        # the "(root)" line is map-only — proves map injection
     assert_contains "for the full" "$ctx5"  # a "see ... for the full ..." pointer (degraded view)
-    len5=${#ctx5}
+    # CHARACTER count, not bash ${#}: under a C/POSIX locale (Git Bash's default)
+    # ${#} counts BYTES, so multibyte chars (—, etc.) inflate it past the 12000-CHAR
+    # cap the budget targets (macOS/Linux CI run UTF-8, where ${#} already = chars).
+    len5=$(printf '%s' "$output5" | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('hookSpecificOutput',{}).get('additionalContext','')))" 2>/dev/null || echo 999999)
     if [ "$len5" -le 12000 ]; then
         echo "  OK   budget held at scale: ${len5} <= 12000"; PASS=$((PASS+1))
     else
@@ -231,7 +234,8 @@ else
     assert_json_valid "$output6"
     assert_contains "file000.cpp" "$ctx6"                        # head of the list present
     assert_contains "see PROJECT-TOC.md for full index" "$ctx6"  # legacy pointer
-    len6=${#ctx6}
+    # CHARACTER count (see the len5 note above — C-locale ${#} counts bytes).
+    len6=$(printf '%s' "$output6" | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('hookSpecificOutput',{}).get('additionalContext','')))" 2>/dev/null || echo 999999)
     if [ "$len6" -le 12000 ]; then
         echo "  OK   legacy budget held: ${len6} <= 12000"; PASS=$((PASS+1))
     else
