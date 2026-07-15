@@ -58,6 +58,21 @@ while IFS= read -r f; do
         fail "invalid JSON: $f"
     fi
 done < <(find . -name '*.json' -not -path './node_modules/*' -not -path './.harness-anchor/*' -not -path './tests/manifest-fixtures/*' 2>/dev/null)
+# 2c: the skill-local feature-list schema must stay byte-identical to the template.
+# It was a git symlink until v0.13.0; symlinks materialize as broken text stubs on
+# Windows (core.symlinks=false), so it is now a real copy guarded by this parity
+# check instead of the filesystem link (mechanical guarantee replaces the symlink).
+SCHEMA_TPL="templates/feature_list.schema.json"
+SCHEMA_SKILL="skills/feature-state-keeper/feature-list.schema.json"
+if [ -f "$SCHEMA_TPL" ] && [ -f "$SCHEMA_SKILL" ]; then
+    if cmp -s "$SCHEMA_TPL" "$SCHEMA_SKILL"; then
+        ok "schema parity: $SCHEMA_SKILL == $SCHEMA_TPL"
+    else
+        fail "schema drift: $SCHEMA_SKILL differs from $SCHEMA_TPL (re-copy the template)"
+    fi
+else
+    fail "schema parity: one of $SCHEMA_TPL / $SCHEMA_SKILL missing"
+fi
 # 2b: Node tools must at least parse (glob, not an enumerated list — enumeration rots).
 if command -v node >/dev/null 2>&1; then
     while IFS= read -r mjs; do
