@@ -15,29 +15,29 @@ if [ -z "$input" ]; then
     exit 0
 fi
 
-prompt_text=$(printf '%s' "$input" | python3 -c "
-import json, sys
-try:
-    d = json.load(sys.stdin)
-    print(d.get('prompt', ''))
-except Exception:
-    pass
-" 2>/dev/null || echo "")
+# Platform layer (v0.13.0), sourced AFTER the stdin read so nothing can disturb it.
+# Pre-warm the engine once so the exported HA_JSON_ENGINE is inherited by $(...) below.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/../scripts/lib/portable.sh" 2>/dev/null || exit 0
+ha_platform_init
+ha_json_engine_init
+
+# Engine-chained; narrow bash tier flattens newlines (keyword scan unaffected).
+# Residual (v0.13.0): (a) with zero engines AND a prompt the bash tier cannot
+# extract, the hook skips — silence is not proof the prompt was scanned;
+# (b) the 也-heuristic below uses ${#prompt_text}, which counts BYTES under a
+# C/POSIX locale but CHARACTERS under UTF-8 — Git Bash's locale may differ from
+# macOS, shifting the <80 threshold for CJK prompts (accepted: scope-jump
+# detection is a warn-only heuristic, not a correctness gate).
+prompt_text=$(printf '%s' "$input" | ha_json_field prompt)
 
 if [ -z "$prompt_text" ]; then
     exit 0
 fi
 
-# Find project root.
-project_root=""
-search_dir="$(pwd)"
-while [ "$search_dir" != "/" ] && [ -n "$search_dir" ]; do
-    if [ -f "$search_dir/feature_list.json" ]; then
-        project_root="$search_dir"
-        break
-    fi
-    search_dir="$(dirname "$search_dir")"
-done
+# Find project root (fixed-point walk-up: terminates on /, C:/, ., UNC roots).
+project_root=$(ha_find_project_root "$(pwd)" || true)
 
 if [ -z "$project_root" ]; then
     exit 0
@@ -69,19 +69,8 @@ if [ "$scope_jump" -eq 0 ]; then
 fi
 
 # Check for active feature.
-active=$(python3 - "$project_root/feature_list.json" <<'PY' 2>/dev/null || true
-import json, sys
-try:
-    with open(sys.argv[1]) as f:
-        data = json.load(f)
-    for feat in data.get('features', []):
-        if feat.get('status') == 'in-progress':
-            print(f"{feat['id']}: {feat.get('name','')}")
-            break
-except Exception:
-    pass
-PY
-)
+active=$(ha_flist_active "$project_root/feature_list.json")
+case "$active" in "(no in-progress feature)") active="" ;; esac
 
 if [ -z "$active" ]; then
     exit 0
@@ -89,16 +78,7 @@ fi
 
 msg="Scope-jump phrasing detected. Active feature: $active. The new request may be out of scope. Confirm with the user whether to (a) finish active feature first, (b) pause and switch, or (c) record as a planned feature in feature_list.json."
 
-escape_for_json() {
-    local s="$1"
-    s="${s//\\/\\\\}"
-    s="${s//\"/\\\"}"
-    s="${s//$'\n'/\\n}"
-    s="${s//$'\r'/\\r}"
-    s="${s//$'\t'/\\t}"
-    printf '%s' "$s"
-}
-escaped=$(escape_for_json "$msg")
+escaped=$(printf '%s' "$msg" | ha_json_escape)
 
 printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "UserPromptSubmit",\n    "additionalContext": "<harness-anchor scope-check>\\n%s\\n</harness-anchor scope-check>"\n  }\n}\n' "$escaped"
 

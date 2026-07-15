@@ -12,19 +12,22 @@
 #   Coverage: X ⊉ Y — the hook cannot see chat content; fresh mtimes with an uncaptured
 #   lesson stay invisible, and systemMessage reaches the USER, not the model. A silent
 #   stop is NOT proof everything durable is on disk.
+#   v0.13.0: with no JSON engine, Check 1 (ledger) skips silently — mtime checks still run.
 
 set -uo pipefail
 
-# Find project root via feature_list.json walk-up from CWD.
-project_root=""
-search_dir="$(pwd)"
-while [ "$search_dir" != "/" ] && [ -n "$search_dir" ]; do
-    if [ -f "$search_dir/feature_list.json" ]; then
-        project_root="$search_dir"
-        break
-    fi
-    search_dir="$(dirname "$search_dir")"
-done
+# Platform layer (v0.13.0): engine chain + Windows PATH shield. Missing lib =
+# broken install → silent no-op. Pre-warm the engine once so the exported
+# HA_JSON_ENGINE is inherited by the $(...) calls below (no per-call re-probe).
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/../scripts/lib/portable.sh" 2>/dev/null || exit 0
+ha_platform_init
+ha_json_engine_init
+
+# Find project root via feature_list.json walk-up from CWD (fixed-point:
+# terminates on /, C:/, ., UNC roots — the old `!= "/"` loop never ended on Windows).
+project_root=$(ha_find_project_root "$(pwd)" || true)
 
 if [ -z "$project_root" ]; then
     exit 0
@@ -33,38 +36,32 @@ fi
 reminders=()
 
 # ---- Check 1: in-progress feature has no evidence ----
-in_progress_without_evidence=$(python3 - "$project_root/feature_list.json" <<'PY' 2>/dev/null || true
-import json, sys
-try:
-    with open(sys.argv[1]) as f:
-        data = json.load(f)
-    for feat in data.get('features', []):
-        if feat.get('status') == 'in-progress':
-            ev = feat.get('evidence')
-            # not necessarily wrong (in-progress is allowed to lack evidence),
-            # but worth surfacing the active feature so wrap-up is clean
-            print(f"Active feature: '{feat['id']}' is still in-progress.")
-            break
-except Exception:
-    pass
-PY
-)
+in_progress_without_evidence=""
+active_line=$(ha_flist_active "$project_root/feature_list.json")
+case "$active_line" in
+    ""|"(no in-progress feature)") : ;;
+    *) in_progress_without_evidence="Active feature: '${active_line%%:*}' is still in-progress." ;;
+esac
 if [ -n "$in_progress_without_evidence" ]; then
     reminders+=("$in_progress_without_evidence")
 fi
 
 # ---- Check 2: progress.md staleness ----
-# If progress.md exists and hasn't been touched in this session, suggest /session-end.
+# mtime arithmetic (ha_mtime) instead of `find -mmin`: drops the System32-find
+# shadow hazard on Windows AND the BSD/GNU find divergence in one move.
+now_epoch=$(date +%s)
 if [ -f "$project_root/progress.md" ]; then
     # session start heuristic: file older than 30 minutes is "stale this session"
-    if find "$project_root/progress.md" -mmin +30 -print 2>/dev/null | grep -q .; then
+    pm=$(ha_mtime "$project_root/progress.md")
+    if [ -n "$pm" ] && [ $((now_epoch - pm)) -gt 1800 ]; then
         reminders+=("progress.md may not have been updated this session. If durable memory is still chat-only (golden-rule stubs, decisions, milestones), flush it to disk now — then /session-end writes handoff + log.")
     fi
 fi
 
 # ---- Check 3: session-handoff.md staleness (>24h) ----
 if [ -f "$project_root/session-handoff.md" ]; then
-    if find "$project_root/session-handoff.md" -mtime +1 -print 2>/dev/null | grep -q .; then
+    hm=$(ha_mtime "$project_root/session-handoff.md")
+    if [ -n "$hm" ] && [ $((now_epoch - hm)) -gt 86400 ]; then
         reminders+=("session-handoff.md is >24h old. /session-end will refresh it.")
     fi
 fi
@@ -73,22 +70,12 @@ if [ "${#reminders[@]}" -eq 0 ]; then
     exit 0
 fi
 
-escape_for_json() {
-    local s="$1"
-    s="${s//\\/\\\\}"
-    s="${s//\"/\\\"}"
-    s="${s//$'\n'/\\n}"
-    s="${s//$'\r'/\\r}"
-    s="${s//$'\t'/\\t}"
-    printf '%s' "$s"
-}
-
 joined=""
 for r in "${reminders[@]}"; do
     if [ -z "$joined" ]; then joined="$r"; else joined="$joined
 $r"; fi
 done
-escaped=$(escape_for_json "$joined")
+escaped=$(printf '%s' "$joined" | ha_json_escape)
 
 # Warn-only: the Stop event has NO additionalContext channel, and decision:"block"
 # / stopReason would *block* the stop (forbidden by design invariant #1). systemMessage
