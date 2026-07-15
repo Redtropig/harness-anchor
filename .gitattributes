@@ -1,2 +1,16 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Bash-consumed files must check out LF on every platform (Windows Git Bash
+# tolerates CRLF only by MSYS2 leniency; data parsing and byte counts do not).
+*.sh text eol=lf
+*.sh.tpl text eol=lf
+*.mjs text eol=lf
+hooks/session-start text eol=lf
+hooks/post-tool-use text eol=lf
+hooks/stop text eol=lf
+hooks/user-prompt-submit text eol=lf
+
+# hooks/run-hook.cmd stays under `* text=auto` ON PURPOSE: the cmd/bash
+# polyglot needs platform-native endings on each side (CRLF for cmd.exe on
+# Windows checkouts, LF for POSIX sh on Unix checkouts). Do not force eol.
