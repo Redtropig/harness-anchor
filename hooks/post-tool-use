@@ -23,9 +23,21 @@
 #     - parse failure (any clang-diagnostic-error): diagnostics withheld, ONE notice line only;
 #     - >20 findings truncated; 5s watchdog kill or missing clang-tidy/compile_commands → silent skip;
 #     - authoritative lint verdicts come from the project lint script (scripts/lint.sh) or /verify.
+#     - no JSON engine at all (python3/python/py/node): the ledger-derived checks (1, 1b, 1c)
+#       skip silently — quietness is not proof they ran (v0.13.0, scripts/lib/portable.sh).
 #   (Check 1c's observation point is documented at the check itself, lines ~160 below.)
 
 set -uo pipefail   # no -e: a single check failure should not abort other checks
+
+# Platform layer (v0.13.0): engine chain + Windows PATH shield + normalization.
+# Missing lib = broken install → silent no-op (warn-only). Pre-warm the engine
+# ONCE here so the exported HA_JSON_ENGINE is inherited by every $(...) below
+# (avoids per-call re-probing — costly subprocess spawns on Windows).
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/../scripts/lib/portable.sh" 2>/dev/null || exit 0
+ha_platform_init
+ha_json_engine_init
 
 # Context-fill flush threshold (bytes of transcript JSONL; Check 1d). Transcript bytes are a
 # COARSE proxy for context tokens (tool-result share varies per session) — 6 MiB approximates
@@ -52,15 +64,8 @@ main() {
     # Extract file_path field (very narrow JSON parse — avoid jq dependency).
     file_path=""
     if [ -n "$input" ]; then
-        file_path=$(printf '%s' "$input" | python3 -c "
-import json, sys
-try:
-    d = json.load(sys.stdin)
-    fp = d.get('tool_input', {}).get('file_path', '')
-    print(fp)
-except Exception:
-    pass
-" 2>/dev/null || echo "")
+        file_path=$(printf '%s' "$input" | ha_json_field tool_input.file_path)
+        file_path=$(ha_normalize_path "$file_path")
     fi
 
     # No file path → nothing to check.
@@ -74,32 +79,18 @@ except Exception:
     transcript_path=""
     session_id=""
     if [ -n "$input" ]; then
-        tn_tp_sid=$(printf '%s' "$input" | python3 -c "
-import json, sys
-try:
-    d = json.load(sys.stdin)
-    print(d.get('tool_name', ''))
-    print(d.get('transcript_path', ''))
-    print(d.get('session_id', ''))
-except Exception:
-    pass
-" 2>/dev/null || echo "")
+        tn_tp_sid=$(printf '%s' "$input" | ha_json_fields tool_name transcript_path session_id)
         tool_name=$(printf '%s\n' "$tn_tp_sid" | sed -n '1p')
-        transcript_path=$(printf '%s\n' "$tn_tp_sid" | sed -n '2p')
+        transcript_path=$(ha_normalize_path "$(printf '%s\n' "$tn_tp_sid" | sed -n '2p')")
         # session_id feeds a marker FILENAME — strip to a safe charset.
         session_id=$(printf '%s\n' "$tn_tp_sid" | sed -n '3p' | tr -cd 'A-Za-z0-9._-')
     fi
 
-    # Find project root (where feature_list.json lives) — walk up from file_path.
-    project_root=""
-    search_dir="$(dirname "$file_path")"
-    while [ "$search_dir" != "/" ] && [ -n "$search_dir" ]; do
-        if [ -f "$search_dir/feature_list.json" ]; then
-            project_root="$search_dir"
-            break
-        fi
-        search_dir="$(dirname "$search_dir")"
-    done
+    # Find project root (where feature_list.json lives) — fixed-point walk-up
+    # from file_path (terminates on /, C:/, ., UNC roots; ≤64 levels). The old
+    # `!= "/"` loop never terminated on a drive-letter path and burned the 5s
+    # watchdog on every Windows edit.
+    project_root=$(ha_find_project_root "$(dirname "$file_path")" || true)
 
     # No anchored project → nothing to check.
     if [ -z "$project_root" ]; then
@@ -112,7 +103,11 @@ except Exception:
     # If the edited file is referenced in evidence.artifacts of a feature marked
     # status='pass', that's a regression risk. Surface a one-line warning.
     rel_path="${file_path#"$project_root"/}"
-    regression=$(python3 - "$project_root/feature_list.json" "$rel_path" <<'PY' 2>/dev/null || true
+    regression=""
+    case "$HA_JSON_ENGINE" in
+        python3|python|py)
+            # shellcheck disable=SC2086
+            regression=$($HA_PY - "$project_root/feature_list.json" "$rel_path" <<'PY' 2>/dev/null || true
 import json, sys, os
 flist_path, rel = sys.argv[1], sys.argv[2]
 try:
@@ -136,7 +131,27 @@ try:
 except Exception:
     pass
 PY
-)
+) ;;
+        node)
+            regression=$(node -e '
+const fs = require("fs");
+let data; try { data = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch (e) { process.exit(0); }
+const rel = process.argv[2];
+const exts = [".c",".cc",".cpp",".cxx",".h",".hpp",".ts",".js",".py",".rs",".go"];
+for (const feat of (data.features || [])) {
+    if (!feat || feat.status !== "pass") continue;
+    const artifacts = (feat.evidence && feat.evidence.artifacts) || [];
+    if (artifacts.some(a => typeof a === "string" && a.includes(rel))) {
+        console.log("Regression risk: file '" + rel + "' is referenced as evidence for passed feature '" + feat.id + "'. Re-verify before continuing.");
+        process.exit(0);
+    }
+    if (exts.some(e => rel.endsWith(e))) {
+        console.log("Note: feature '" + feat.id + "' is marked pass. Source change may invalidate its evidence. Consider re-running /verify.");
+        process.exit(0);
+    }
+}
+' "$project_root/feature_list.json" "$rel_path" 2>/dev/null || true) ;;
+    esac
 
     if [ -n "$regression" ]; then
         warnings+=("$regression")
@@ -148,7 +163,11 @@ PY
     # invisible to the schema. Warn-only safety net behind the pre-write guidance in
     # feature-state-keeper. Parses the just-written file; fail-silent on a transient parse error.
     if [ "$(basename "$file_path")" = "feature_list.json" ]; then
-        dup_warn=$(python3 - "$file_path" <<'PY' 2>/dev/null || true
+        dup_warn=""
+        case "$HA_JSON_ENGINE" in
+            python3|python|py)
+                # shellcheck disable=SC2086
+                dup_warn=$($HA_PY - "$file_path" <<'PY' 2>/dev/null || true
 import json, sys, re
 try:
     with open(sys.argv[1]) as fh:
@@ -173,7 +192,31 @@ try:
 except Exception:
     pass
 PY
-)
+) ;;
+            node)
+                dup_warn=$(node -e '
+const fs = require("fs");
+let data; try { data = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch (e) { process.exit(0); }
+const ids = (data.features || []).map(f => f && f.id).filter(i => typeof i === "string");
+const counts = {};
+for (const i of ids) counts[i] = (counts[i] || 0) + 1;
+const dups = {};
+for (const [i, n] of Object.entries(counts)) if (n > 1) dups[i] = n;
+if (Object.keys(dups).length) {
+    const existing = new Set(ids);
+    const suggest = (base) => {
+        const m = base.match(/^(.*?)-(\d+)$/);
+        const stem = m ? m[1] : base;
+        let n = m ? parseInt(m[2], 10) + 1 : 2;
+        while (existing.has(stem + "-" + n)) n++;
+        return stem + "-" + n;
+    };
+    const listed = Object.entries(dups).map(([i, n]) => "'" + i + "' (x" + n + ")").join(", ");
+    const first = Object.keys(dups).sort()[0];
+    console.log("Duplicate feature id(s) in feature_list.json: " + listed + ". Feature ids must be unique (they key status/evidence updates). Rename the newer entry to a unique id, e.g. '" + suggest(first) + "'.");
+}
+' "$file_path" 2>/dev/null || true) ;;
+        esac
         if [ -n "$dup_warn" ]; then
             warnings+=("$dup_warn")
         fi
@@ -207,19 +250,8 @@ PY
                            && ! git -C "$project_root" ls-files --error-unmatch -- "$rel_path" >/dev/null 2>&1 \
                            && ! git -C "$project_root" check-ignore -q -- "$rel_path" 2>/dev/null; then
                             # New, untracked, non-ignored code module. Warn only if a feature is in-progress.
-                            active_feat=$(python3 - "$project_root/feature_list.json" <<'PY' 2>/dev/null || true
-import json, sys
-try:
-    with open(sys.argv[1]) as f:
-        data = json.load(f)
-    for feat in data.get('features', []):
-        if feat.get('status') == 'in-progress':
-            print(f"{feat['id']}: {feat.get('name','')}")
-            break
-except Exception:
-    pass
-PY
-)
+                            active_feat=$(ha_flist_active "$project_root/feature_list.json")
+                            case "$active_feat" in "(no in-progress feature)") active_feat="" ;; esac
                             if [ -n "$active_feat" ]; then
                                 warnings+=("New module '$rel_path' was created while feature '$active_feat' is in-progress. If it belongs to that feature, ignore this. If it's new scope, record it as a 'planned' feature first (feature-state-keeper) and confirm direction with the user before continuing.")
                             fi
@@ -333,24 +365,13 @@ $tidy_out
         return 0
     fi
 
-    # Pure-bash JSON escape (no jq).
-    escape_for_json() {
-        local s="$1"
-        s="${s//\\/\\\\}"
-        s="${s//\"/\\\"}"
-        s="${s//$'\n'/\\n}"
-        s="${s//$'\r'/\\r}"
-        s="${s//$'\t'/\\t}"
-        printf '%s' "$s"
-    }
-
-    # Join warnings with newlines, then escape.
+    # Join warnings with newlines, then escape via the shared engine chain.
     joined=""
     for w in "${warnings[@]}"; do
         if [ -z "$joined" ]; then joined="$w"; else joined="$joined
 $w"; fi
     done
-    escaped=$(escape_for_json "$joined")
+    escaped=$(printf '%s' "$joined" | ha_json_escape)
 
     printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "PostToolUse",\n    "additionalContext": "<harness-anchor PostToolUse>\\n%s\\n</harness-anchor PostToolUse>"\n  }\n}\n' "$escaped"
 }

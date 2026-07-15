@@ -35,7 +35,10 @@ THRESH=$(sed -n 's/^FLUSH_THRESHOLD_BYTES=\([0-9]*\).*/\1/p' "$PLUGIN_ROOT/hooks
 [ -n "$THRESH" ] || THRESH=6291456
 
 transcript="$TMPDIR/transcript.jsonl"
-python3 -c "open('$transcript','w').write('x' * ($THRESH + 1024))"
+# Engine-free fixture write (v0.13.0): a python3 -c "open('$transcript',...)" here
+# fails on Windows — a native-Windows interpreter can't open the MSYS-style path
+# embedded in the -c string (the same trap the hooks avoid via stdin/argv).
+head -c "$((THRESH + 1024))" /dev/zero | tr '\0' 'x' > "$transcript"
 
 mkjson() { # $1 = transcript path ("" omits the field entirely)
     if [ -n "$1" ]; then
@@ -96,13 +99,26 @@ fi
 
 echo ""
 echo "=== stdin held open (no EOF) → bounded, still silent ==="
-t0=$(date +%s)
+# Millisecond clock (portable): integer date+%s flaked a legitimate ~2.5s Windows
+# run across the old 3s bound; sub-second resolution + a 3500ms midpoint (correct
+# read -t 1 path ≈ 2.5s, a hung read ≈ sleep 3 + work ≈ 4.5s) is stable. (v0.13.0)
+_now_ms() {
+    if command -v python3 >/dev/null 2>&1 && python3 -c 'print(1)' >/dev/null 2>&1; then
+        python3 -c 'import time; print(int(time.time()*1000))'
+    elif command -v node >/dev/null 2>&1; then
+        node -e 'console.log(Date.now())'
+    else
+        echo $(( $(date +%s) * 1000 ))
+    fi
+}
+t0=$(_now_ms)
 out5=$(bash "$PLUGIN_ROOT/hooks/post-tool-use" < <(mkjson "$small"; sleep 3) 2>/dev/null || true)
-t1=$(date +%s)
-if [ $((t1 - t0)) -lt 3 ]; then
-    echo "  OK   bounded: $((t1 - t0))s < 3s (did not wait for pipe close)"; PASS=$((PASS+1))
+t1=$(_now_ms)
+elapsed_ms=$(( t1 - t0 ))
+if [ "$elapsed_ms" -lt 3500 ]; then
+    echo "  OK   bounded: ${elapsed_ms}ms < 3500ms (did not wait for pipe close)"; PASS=$((PASS+1))
 else
-    echo "  FAIL unbounded stdin wait: $((t1 - t0))s"; FAIL=$((FAIL+1))
+    echo "  FAIL unbounded stdin wait: ${elapsed_ms}ms"; FAIL=$((FAIL+1))
 fi
 if printf '%s' "$out5" | grep -q "Context is filling"; then
     echo "  FAIL fired under threshold (held-open)"; FAIL=$((FAIL+1))
