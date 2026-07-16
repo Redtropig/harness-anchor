@@ -8,6 +8,10 @@ REM Hook scripts use extensionless filenames (e.g. "session-start" not
 REM "session-start.sh") so Claude Code's Windows auto-detection -- which
 REM prepends "bash" to any command containing .sh -- doesn't interfere.
 REM
+REM bash discovery order: system Git, 32-bit Git, user-scope Git, then PATH --
+REM skipping %SystemRoot%\System32\bash.exe (that is WSL bash: hooks launched
+REM there see a Linux world where Windows project paths don't resolve).
+REM
 REM Usage: run-hook.cmd <script-name> [args...]
 
 if "%~1"=="" (
@@ -17,24 +21,30 @@ if "%~1"=="" (
 
 set "HOOK_DIR=%~dp0"
 
-REM Try Git for Windows bash in standard locations
-if exist "C:\Program Files\Git\bin\bash.exe" (
-    "C:\Program Files\Git\bin\bash.exe" "%HOOK_DIR%%~1" %2 %3 %4 %5 %6 %7 %8 %9
+if exist "%ProgramFiles%\Git\bin\bash.exe" (
+    "%ProgramFiles%\Git\bin\bash.exe" "%HOOK_DIR%%~1" %2 %3 %4 %5 %6 %7 %8 %9
     exit /b %ERRORLEVEL%
 )
-if exist "C:\Program Files (x86)\Git\bin\bash.exe" (
-    "C:\Program Files (x86)\Git\bin\bash.exe" "%HOOK_DIR%%~1" %2 %3 %4 %5 %6 %7 %8 %9
+if exist "%ProgramFiles(x86)%\Git\bin\bash.exe" (
+    "%ProgramFiles(x86)%\Git\bin\bash.exe" "%HOOK_DIR%%~1" %2 %3 %4 %5 %6 %7 %8 %9
     exit /b %ERRORLEVEL%
 )
-
-REM Try bash on PATH (e.g. user-installed Git Bash, MSYS2, Cygwin)
-where bash >nul 2>nul
-if %ERRORLEVEL% equ 0 (
-    bash "%HOOK_DIR%%~1" %2 %3 %4 %5 %6 %7 %8 %9
+if exist "%LOCALAPPDATA%\Programs\Git\bin\bash.exe" (
+    "%LOCALAPPDATA%\Programs\Git\bin\bash.exe" "%HOOK_DIR%%~1" %2 %3 %4 %5 %6 %7 %8 %9
     exit /b %ERRORLEVEL%
 )
 
-REM No bash found - exit silently rather than error
+REM PATH fallback (user-installed Git Bash, MSYS2, Cygwin) -- skip WSL's stub.
+set "HA_BASH_EXE="
+for /f "delims=" %%B in ('where bash.exe 2^>nul') do (
+    if /I not "%%B"=="%SystemRoot%\System32\bash.exe" if not defined HA_BASH_EXE set "HA_BASH_EXE=%%B"
+)
+if defined HA_BASH_EXE (
+    "%HA_BASH_EXE%" "%HOOK_DIR%%~1" %2 %3 %4 %5 %6 %7 %8 %9
+    exit /b %ERRORLEVEL%
+)
+
+REM No usable bash found - exit silently rather than error
 REM (plugin still works, just without hook context injection)
 exit /b 0
 CMDBLOCK
