@@ -9,10 +9,15 @@ BUILD_DIR=".build/asan"
 
 echo "=== harness-anchor: sanitizer build (ASan + UBSan) ==="
 
-# LeakSanitizer is unavailable on macOS/Apple toolchains — forcing detect_leaks=1 there
-# makes ASan abort at startup ("detect_leaks is not supported on this platform").
-# Pick per-OS: leak detection on Linux, off on Darwin.
-if [ "$(uname -s)" = "Darwin" ]; then DETECT_LEAKS=0; else DETECT_LEAKS=1; fi
+# LeakSanitizer is unavailable on macOS/Apple toolchains AND on Windows — forcing
+# detect_leaks=1 there makes ASan abort at startup ("detect_leaks is not supported
+# on this platform"). Pick per-OS: leak detection on Linux, off elsewhere.
+# Leak hunting elsewhere: macOS → leaks(1)/Instruments; Windows → CRT debug heap
+# (_CrtDumpMemoryLeaks) or Dr. Memory; or run the LSan suite on Linux CI.
+case "$(uname -s)" in
+    Darwin|MINGW*|MSYS*|CYGWIN*) DETECT_LEAKS=0 ;;
+    *)                           DETECT_LEAKS=1 ;;
+esac
 export ASAN_OPTIONS="${ASAN_OPTIONS:-abort_on_error=1:halt_on_error=1:detect_leaks=${DETECT_LEAKS}:check_initialization_order=1}"
 export UBSAN_OPTIONS="${UBSAN_OPTIONS:-print_stacktrace=1:halt_on_error=1}"
 

@@ -36,6 +36,12 @@ the ≤5s warn-only hook budget (CLAUDE.md invariants #4 and #7). PostToolUse ma
    - **Default: ASan + UBSan** — combinable, covers the most ground (memory errors + UB).
    - For a hang, an intermittent failure, or a suspected data race, run **TSan** in a
      *separate* build dir instead. If the symptom is ambiguous, AskUserQuestion which to run.
+   - **Windows:** TSan is unavailable on Windows toolchains — if TSan is requested or
+     indicated, report Verdict **INFRA-FAIL** with: "TSan is unavailable on Windows;
+     run the TSan arm under WSL2 or Linux CI, or use Intel Inspector for native race
+     detection" (see `cpp-sanitizers` → Windows platform notes). ASan+UBSan proceed
+     normally with clang/MinGW; under pure MSVC only ASan is available (UBSan flags
+     will fail at configure — that too is INFRA-FAIL, not CLEAN).
 
 4. **Run, capturing evidence:**
    - Execute the chosen build+test, teeing all output to
