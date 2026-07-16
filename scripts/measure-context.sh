@@ -12,6 +12,30 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Interpreter discovery (v0.13.0): python3 → python → py -3 via the shared chain.
+# SCRIPT_DIR is already absolute (no cd follows), so the lib path is stable.
+HA_LIB_DIR="$SCRIPT_DIR/lib"
+# shellcheck disable=SC1091
+. "${HA_LIB_DIR}/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
+if [ -z "$PYBIN" ]; then
+    echo "NOTE: no python interpreter (python3/python/py) found — this tool needs Python to decode the hook JSON; install it or rely on CI." >&2
+fi
+
+# Char count, not bytes: bash ${#} counts BYTES under a C/POSIX locale (Git Bash's
+# default), so multibyte chars (—, box-drawing) inflate it — the very thing this tool
+# measures against a CHAR cap. Count through the engine so the number matches the cap's
+# unit on every platform (binary stdin read avoids Windows text-mode CRLF folding). (v0.13.0)
+_charlen() {
+    if [ -n "$PYBIN" ]; then
+        # shellcheck disable=SC2086
+        printf '%s' "$1" | $PYBIN -c 'import sys; print(len(sys.stdin.buffer.read().decode("utf-8","replace")))'
+    else
+        printf '%s' "$1" | wc -m | tr -d '[:space:]'
+    fi
+}
+
 echo "=== measure-context ==="
 echo ""
 
@@ -35,7 +59,8 @@ if [ -z "$OUTPUT" ]; then
 fi
 
 # ---- 3. Decode the additionalContext field ----
-CONTEXT=$(printf '%s' "$OUTPUT" | python3 -c "
+# shellcheck disable=SC2086
+CONTEXT=$(printf '%s' "$OUTPUT" | $PYBIN -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -51,22 +76,24 @@ if [ -z "$CONTEXT" ]; then
     exit 1
 fi
 
-# ---- 4. Measure per-section byte counts ----
-TOTAL=${#CONTEXT}
+# ---- 4. Measure per-section CHAR counts (via _charlen — ${#} would be bytes) ----
+TOTAL=$(_charlen "$CONTEXT")
 CAP=12000
 WARN=$((CAP * 90 / 100))  # 10800
 
 # Extract sections by marker tags
 STATE_SECTION=$(printf '%s' "$CONTEXT" | awk '/<harness-anchor-state>/,/<\/harness-anchor-state>/' || true)
 TOC_SECTION=$(printf '%s' "$CONTEXT" | awk '/<project-toc>/,/<\/project-toc>/' || true)
+STATE_LEN=$(_charlen "$STATE_SECTION")
+TOC_LEN=$(_charlen "$TOC_SECTION")
 # Skill body = everything after the last closing tag
-SKILL_LEN=$((TOTAL - ${#STATE_SECTION} - ${#TOC_SECTION}))
+SKILL_LEN=$((TOTAL - STATE_LEN - TOC_LEN))
 [ "$SKILL_LEN" -lt 0 ] && SKILL_LEN=0
 
 echo ""
 echo "Section breakdown:"
-echo "  <harness-anchor-state>:  ${#STATE_SECTION} chars"
-echo "  <project-toc>:           ${#TOC_SECTION} chars"
+echo "  <harness-anchor-state>:  ${STATE_LEN} chars"
+echo "  <project-toc>:           ${TOC_LEN} chars"
 echo "  Skill body (remainder):  ${SKILL_LEN} chars"
 echo "  ─────────────────────────────────"
 echo "  Total:                   ${TOTAL} chars"
@@ -93,14 +120,15 @@ git -C "$GEN_DIR" init -q 2>/dev/null
 printf '# scratch\n' > "$GEN_DIR/README.md"
 OUTPUT2=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$GEN_DIR" \
     bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
-CONTEXT2=$(printf '%s' "$OUTPUT2" | python3 -c "
+# shellcheck disable=SC2086
+CONTEXT2=$(printf '%s' "$OUTPUT2" | $PYBIN -c "
 import json, sys
 try:
     print(json.load(sys.stdin).get('hookSpecificOutput', {}).get('additionalContext', ''))
 except Exception:
     pass
 " 2>/dev/null)
-TOTAL2=${#CONTEXT2}
+TOTAL2=$(_charlen "$CONTEXT2")
 echo ""
 echo "Generic fixture (no TOC/handoff, cpp-only regions dropped):"
 echo "  Total:                   ${TOTAL2} chars"

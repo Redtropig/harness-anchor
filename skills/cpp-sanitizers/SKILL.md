@@ -9,9 +9,9 @@ Sanitizers are compiler-instrumented runtime checks. They catch what static anal
 
 | Sanitizer | What it catches | Slowdown |
 |---|---|---|
-| **ASan** (Address) | Use-after-free, heap/stack overflow, leaks (leaks: Linux) | 2-3x |
-| **UBSan** (UB) | Signed overflow, null deref, misaligned, OOB shift, ... | ~1.1x |
-| **TSan** (Thread) | Data races, deadlocks | 5-10x |
+| **ASan** (Address) | Use-after-free, heap/stack overflow, leaks (leaks: Linux only) | 2-3x |
+| **UBSan** (UB) | Signed overflow, null deref, misaligned, OOB shift, ... (MSVC: unavailable — see Windows notes) | ~1.1x |
+| **TSan** (Thread) | Data races, deadlocks (not available on Windows — see Windows notes) | 5-10x |
 | **MSan** (Memory) | Use of uninitialized memory | 3x (Linux only, Clang only) |
 
 Note: ASan + UBSan are combinable. TSan is **mutually exclusive** with ASan/MSan.
@@ -61,8 +61,14 @@ ASan's "leaks" row above **is** LeakSanitizer. Platform truth:
 - **macOS / Apple toolchains**: LeakSanitizer is **not supported** — setting
   `ASAN_OPTIONS=detect_leaks=1` makes every ASan binary **abort at startup** with
   `detect_leaks is not supported on this platform` (it is NOT a silent no-op). The
-  generated `scripts/sanitizer-build.sh` selects per-OS (Darwin → 0, else → 1). For leak
-  hunting on macOS use `leaks`(1) / Instruments, or run the ASan+LSan suite on Linux CI.
+  generated `scripts/sanitizer-build.sh` selects per-OS (Darwin/MinGW/MSYS/Cygwin → 0,
+  else → 1). For leak hunting on macOS use `leaks`(1) / Instruments, or run the ASan+LSan
+  suite on Linux CI.
+- **Windows (MSVC or clang)**: LeakSanitizer is likewise **not supported** — same
+  startup abort if forced. The generated `scripts/sanitizer-build.sh` turns it off on
+  MINGW*/MSYS*/CYGWIN* too. For leak hunting on Windows use the **MSVC CRT debug heap**
+  (`_CrtSetDbgFlag(_CRTDBG_LEAK_CHECK_DF)` / `_CrtDumpMemoryLeaks` — ships with MSVC),
+  **Dr. Memory**, or **UMDH** (Windows SDK) — or run the LSan suite on Linux CI/WSL2.
 
 On Linux, when you want leaks *without* ASan's memory-error overhead, link the **standalone** detector:
 
@@ -95,6 +101,23 @@ valgrind --tool=memcheck --leak-check=full ./your_test_binary
 ```
 
 slower than ASan (10-50x) but works without recompiling.
+
+## Windows platform notes (substitute tools)
+
+Sanitizer availability on Windows toolchains, with viable substitutes when a
+sanitizer is missing (a refusal should always name a substitute):
+
+| Unavailable on Windows | Use instead (preference order) |
+|---|---|
+| TSan (data races) | ① Run the TSan arm under **WSL2** or Linux CI (closest fidelity); ② **Intel Inspector** (oneAPI) for native data-race/deadlock detection |
+| LSan (leaks) | ① **MSVC CRT debug heap** (`_CrtDumpMemoryLeaks`); ② **Dr. Memory**; ③ **UMDH** (Windows SDK); ④ WSL2/Linux-CI LSan |
+| UBSan under MSVC `cl.exe` | ① **clang-on-Windows** `-fsanitize=undefined` (partial set; MinGW or clang-cl); ② **MSVC `/RTC1`** runtime checks (narrower: uninit locals, stack corruption) |
+| Valgrind | ① **Dr. Memory**; ② **Application Verifier + PageHeap** (`gflags /p`) for heap/handle misuse |
+
+What DOES work natively on Windows: **ASan** — MSVC (`cl /fsanitize=address`, VS 2019 16.9+)
+and clang-on-Windows both support it; the generated ASan+UBSan script works under Git
+Bash with a clang/MinGW toolchain. Substitute tools are recommendations to run yourself —
+`/sanitize` never auto-runs them; a sanitizer that did not run is never reported CLEAN.
 
 ## Reading sanitizer output
 

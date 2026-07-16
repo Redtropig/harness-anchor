@@ -163,3 +163,13 @@ Typical entry query: `clang-tidy <check-name>` or `cppcheck <id>`.
 - `.clang-tidy` baseline config: `templates/cpp/.clang-tidy.tpl` (copied by `/cpp-init`)
 - `scripts/lint.sh` sysroot-aware clang-tidy wrapper: `templates/cpp/lint.sh.tpl` (copied by `/cpp-init`)
 - See `tool-comparison.md` for clang-tidy vs cppcheck vs IWYU side-by-side decisions.
+
+## Windows notes
+
+- clang-tidy needs a `compile_commands.json`; **CMake + Ninja** (`-DCMAKE_EXPORT_COMPILE_COMMANDS=ON -G Ninja`)
+  produces one on Windows — MSBuild generators do NOT. No sysroot injection is needed
+  (that is a macOS-only concern); the PostToolUse hook already skips `xcrun` off-Darwin.
+- With an MSVC-flavored database (`cl.exe` commands), clang-tidy auto-detects driver
+  mode in most setups; if the TU fails to parse, the diagnostics-are-garbage rule
+  applies unchanged — verify via the build or `scripts/lint.sh`, don't act on them.
+- GCC `-fanalyzer` guidance is unchanged (MinGW GCC works; still C-only).

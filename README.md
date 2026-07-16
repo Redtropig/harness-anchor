@@ -108,7 +108,7 @@ bash init.sh     # health-check the environment
 | SessionStart | Injects state banner: active feature, project type, TOC freshness, golden-rules count, state-file budget sentinel, handoff head, slimmed meta-skill body — frontmatter stripped, cpp-only sections injected only in C/C++ projects (≤ 3000 token budget); compact-source caution line (post-compaction recall is unreliable — rebuild from on-disk evidence) |
 | PostToolUse | After Edit/Write: regression-warn on pass-feature files; duplicate feature-`id` warn when `feature_list.json` is written; **new-code-module scope-creep warn** when a new module is written while a feature is in-progress (action-side companion to the prompt-side scope-jump check); clang-tidy on C/C++ files when `compile_commands.json` present (sysroot-aware on macOS; failed-parse diagnostics suppressed with one honest notice); one-line `/sanitize` nudge on C/C++ edits (never runs sanitizers inline); **context-fill flush reminder** (transcript-size threshold, once per session) — flush chat-only durable memory before compaction takes it |
 | Stop | Nudges progress.md update, session-handoff refresh, and flushing chat-only durable memory; never blocks |
-| UserPromptSubmit | Detects scope-jump phrases ("顺便", "also", "by the way"); surfaces active feature for confirmation |
+| UserPromptSubmit | Detects scope-jump phrases ("also", "by the way"); surfaces active feature for confirmation |
 
 ---
 
@@ -142,9 +142,28 @@ bash init.sh     # health-check the environment
 | [`superpowers`](https://github.com/obra/superpowers) | Process methodology | Recommended |
 | `context7` / first-party docs MCP (e.g. Microsoft Learn) | Library & ecosystem docs lookup | Optional (`docs-lookup` prefers first-party when relevant, else WebSearch) |
 
-`harness-anchor` is **zero-dependency at runtime** (bash + git; Node.js for the `scripts/*.mjs` index/state tools; python3 used inline by the hooks, with graceful fallback).
+`harness-anchor` is **zero-dependency at runtime** (bash + git; Node.js for the `scripts/*.mjs` index/state tools). Hooks parse JSON through an engine chain — python3 → python → py -3 → node → a narrow pure-bash tier — so any ONE of those (or none, with honest degradation) is enough.
 
 ---
+
+## Windows
+
+Supported under the **Git-Bash baseline**: Git for Windows (which Claude Code on
+Windows already requires) provides the bash + GNU coreutils the hooks run on;
+`hooks/run-hook.cmd` dispatches hook events to it automatically (WSL bash is
+deliberately excluded — hooks must see Windows paths).
+
+| You have | Hook fidelity |
+|---|---|
+| python3 / python / py, or node | Full — all checks incl. feature-ledger parsing |
+| none of the above | Degraded but honest: banner + project typing + version still real (plugin-controlled formats parse in pure bash); ledger-derived checks skip and the banner shows `(needs python3 or node)` |
+
+Windows-specific behaviors handled for you: LF checkout is forced for all bash
+files via `.gitattributes`; `System32`'s incompatible `find`/`sort`/`timeout` are
+shielded by a PATH prepend inside each hook; `C:\` paths are normalized at hook
+entry. C/C++ notes: TSan/LSan don't exist on Windows — see the `cpp-sanitizers`
+skill's *Windows platform notes* for the substitute-tool table (WSL2, Intel
+Inspector, Dr. Memory, CRT debug heap, `/RTC1`).
 
 ## Verifying installation
 

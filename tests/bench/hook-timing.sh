@@ -13,7 +13,8 @@
 #   WARN at ≥ 2000 ms   early regression signal — does NOT fail CI
 #   FAIL at ≥ 5000 ms   a hook this slow is hitting its own watchdog (invariant #7)
 #
-# Timing uses python3 epoch-ms (portable; `date +%s%N` is GNU-only, absent on macOS).
+# Timing uses epoch-ms via the shared engine chain ($PYBIN→node→date; `date +%s%N`
+# is GNU-only, absent on macOS/BSD).
 # Each measurement includes one python-startup (~tens of ms) of constant overhead,
 # which is negligible against the second-scale thresholds and errs conservative.
 #
@@ -24,6 +25,10 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
 
 WARN_MS=2000
 FAIL_MS=5000
@@ -32,7 +37,16 @@ PASS=0
 WARN=0
 FAIL=0
 
-now_ms() { python3 -c "import time; print(int(time.time()*1000))"; }
+now_ms() {  # portable epoch-ms: $PYBIN (python3→python→py) → node → 1s date fallback
+    if [ -n "$PYBIN" ]; then
+        # shellcheck disable=SC2086
+        $PYBIN -c "import time; print(int(time.time()*1000))"
+    elif command -v node >/dev/null 2>&1; then
+        node -e 'console.log(Date.now())'
+    else
+        echo $(( $(date +%s) * 1000 ))
+    fi
+}
 
 report() {
     local label="$1" ms="$2"

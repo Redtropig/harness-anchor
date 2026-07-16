@@ -3,21 +3,35 @@
 # Run inside the plugin root, or pass the plugin root as the first positional
 # argument (validate-anchor.sh [plugin-root]); it defaults to the repo root.
 #
-# Checks (labelled [1/10]..[9/10] in the output):
-#   [1/10]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
-#   [2/10]   JSON files parse; scripts/*.mjs pass node --check
-#   [3-4/10] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
-#   [5/10]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
-#   [6/10]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
-#   [7/10]   SessionStart hook is executable and produces valid JSON when run; meta-skill cpp-only regions well-formed + flat (sequenced, non-nested)
-#   [8/10]   Commands directory consistency (each commands/*.md is a usable /command)
-#   [9/10]   Every template referenced from commands/anchor.md + cpp-init.md AND from scaffold.sh's template map exists
-#   [10/10]  Command↔script wiring: the four mechanism scripts exist + executable + bash -n; every ${CLAUDE_PLUGIN_ROOT}/scripts/* referenced by a command/agent md resolves
+# Checks (labelled [1/11]..[11/11] in the output):
+#   [1/11]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
+#   [2/11]   JSON files parse; scripts/*.mjs pass node --check
+#   [3-4/11] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
+#   [5/11]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
+#   [6/11]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
+#   [7/11]   SessionStart hook is executable and produces valid JSON when run; meta-skill cpp-only regions well-formed + flat (sequenced, non-nested)
+#   [8/11]   Commands directory consistency (each commands/*.md is a usable /command)
+#   [9/11]   Every template referenced from commands/anchor.md + cpp-init.md AND from scaffold.sh's template map exists
+#   [10/11]  Command↔script wiring: the four mechanism scripts exist + executable + bash -n; every ${CLAUDE_PLUGIN_ROOT}/scripts/* referenced by a command/agent md resolves
+#   [11/11]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; every hook sources it AND calls ha_platform_init (the Windows python3→python→py→node engine-chain wiring)
 
 set -uo pipefail   # no -e so we report all failures, not abort on first
 
 PLUGIN_ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$PLUGIN_ROOT" || { echo "FATAL: cannot cd to $PLUGIN_ROOT"; exit 2; }
+
+# Interpreter discovery (v0.13.0): python3 → python → py -3 via the shared lib.
+# cwd is $PLUGIN_ROOT here (stable), so the relative lib path resolves. Dev-surface
+# scripts REQUIRE an engine; a python-less machine gets a loud NOTE and the
+# python-backed checks below fail visibly (intended — CI always has an engine).
+HA_LIB_DIR="scripts/lib"
+# shellcheck disable=SC1091
+. "${HA_LIB_DIR}/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
+if [ -z "$PYBIN" ]; then
+    echo "NOTE: no python interpreter (python3/python/py) found — python-backed checks will fail; install Python or rely on CI." >&2
+fi
 
 FAIL=0
 PASS_COUNT=0
@@ -32,7 +46,7 @@ echo "Root: $PLUGIN_ROOT"
 echo ""
 
 # ---- 1. Required files ----
-echo "[1/10] Required files..."
+echo "[1/11] Required files..."
 for f in \
     .claude-plugin/plugin.json \
     .claude-plugin/marketplace.json \
@@ -50,14 +64,30 @@ done
 echo ""
 
 # ---- 2. JSON validity ----
-echo "[2/10] JSON parse + scripts/*.mjs syntax..."
+echo "[2/11] JSON parse + scripts/*.mjs syntax..."
 while IFS= read -r f; do
-    if python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
+    # shellcheck disable=SC2086
+    if [ -n "$PYBIN" ] && $PYBIN -c "import json; json.load(open('$f'))" 2>/dev/null; then
         ok "parse $f"
     else
         fail "invalid JSON: $f"
     fi
 done < <(find . -name '*.json' -not -path './node_modules/*' -not -path './.harness-anchor/*' -not -path './tests/manifest-fixtures/*' 2>/dev/null)
+# 2c: the skill-local feature-list schema must stay byte-identical to the template.
+# It was a git symlink until v0.13.0; symlinks materialize as broken text stubs on
+# Windows (core.symlinks=false), so it is now a real copy guarded by this parity
+# check instead of the filesystem link (mechanical guarantee replaces the symlink).
+SCHEMA_TPL="templates/feature_list.schema.json"
+SCHEMA_SKILL="skills/feature-state-keeper/feature-list.schema.json"
+if [ -f "$SCHEMA_TPL" ] && [ -f "$SCHEMA_SKILL" ]; then
+    if cmp -s "$SCHEMA_TPL" "$SCHEMA_SKILL"; then
+        ok "schema parity: $SCHEMA_SKILL == $SCHEMA_TPL"
+    else
+        fail "schema drift: $SCHEMA_SKILL differs from $SCHEMA_TPL (re-copy the template)"
+    fi
+else
+    fail "schema parity: one of $SCHEMA_TPL / $SCHEMA_SKILL missing"
+fi
 # 2b: Node tools must at least parse (glob, not an enumerated list — enumeration rots).
 if command -v node >/dev/null 2>&1; then
     while IFS= read -r mjs; do
@@ -73,7 +103,7 @@ fi
 echo ""
 
 # ---- 3 & 4. SKILL.md frontmatter ----
-echo "[3-4/10] SKILL.md frontmatter (name + description, ≤500 chars desc)..."
+echo "[3-4/11] SKILL.md frontmatter (name + description, ≤500 chars desc)..."
 while IFS= read -r skill; do
     if ! head -1 "$skill" | grep -q '^---$'; then
         fail "$skill: missing frontmatter opener"
@@ -97,7 +127,7 @@ done < <(find skills -name SKILL.md 2>/dev/null)
 echo ""
 
 # ---- 5. Agent frontmatter (name + description) ----
-echo "[5/10] Agent frontmatter + single-level constraint (invariant #3) + fresh-dir evidence contract (invariant #4)..."
+echo "[5/11] Agent frontmatter + single-level constraint (invariant #3) + fresh-dir evidence contract (invariant #4)..."
 if [ -d agents ]; then
     while IFS= read -r agent; do
         [ -e "$agent" ] || continue
@@ -142,7 +172,7 @@ fi
 echo ""
 
 # ---- 6. Command frontmatter (description, no name required) ----
-echo "[6/10] Command frontmatter (description ≤500 chars + allowed-tools shape)..."
+echo "[6/11] Command frontmatter (description ≤500 chars + allowed-tools shape)..."
 if [ -d commands ]; then
     while IFS= read -r cmd; do
         [ -e "$cmd" ] || continue
@@ -174,10 +204,11 @@ fi
 echo ""
 
 # ---- 7. SessionStart hook smoke test ----
-echo "[7/10] SessionStart hook smoke test..."
+echo "[7/11] SessionStart hook smoke test..."
 if [ -x hooks/session-start ]; then
-    if out=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash hooks/session-start 2>/dev/null) && \
-       echo "$out" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'hookSpecificOutput' in d, 'missing hookSpecificOutput'; assert d['hookSpecificOutput'].get('hookEventName')=='SessionStart'" 2>/dev/null; then
+    # shellcheck disable=SC2086
+    if out=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash hooks/session-start 2>/dev/null) && [ -n "$PYBIN" ] && \
+       echo "$out" | $PYBIN -c "import sys,json; d=json.load(sys.stdin); assert 'hookSpecificOutput' in d, 'missing hookSpecificOutput'; assert d['hookSpecificOutput'].get('hookEventName')=='SessionStart'" 2>/dev/null; then
         ok "session-start produces valid SessionStart JSON"
     else
         fail "session-start invalid output: $(echo "$out" | head -c 200)"
@@ -217,7 +248,7 @@ fi
 echo ""
 
 # ---- 8. Commands referenced ----
-echo "[8/10] Commands directory consistency..."
+echo "[8/11] Commands directory consistency..."
 if [ -d commands ]; then
     for cmd in commands/*.md; do
         [ -e "$cmd" ] || continue
@@ -230,7 +261,7 @@ fi
 echo ""
 
 # ---- 9. Templates referenced in /anchor + /cpp-init exist ----
-echo "[9/10] Templates referenced by /anchor + /cpp-init..."
+echo "[9/11] Templates referenced by /anchor + /cpp-init..."
 found_any_cmd=0
 for src in commands/anchor.md commands/cpp-init.md; do
     [ -f "$src" ] || continue
@@ -276,7 +307,7 @@ fi
 echo ""
 
 # ---- 10. Command↔script wiring (thin-wrapper single point) ----
-echo "[10/10] Command↔script wiring..."
+echo "[10/11] Command↔script wiring..."
 for s in \
     scripts/golden-rules-check.sh \
     scripts/status-report.sh \
@@ -292,6 +323,31 @@ while IFS= read -r ref; do
     [ -n "$ref" ] || continue
     if [ -f "$ref" ]; then ok "referenced $ref"; else fail "dangling script reference: $ref (from commands/ or agents/)"; fi
 done < <(grep -rhoE '\{CLAUDE_PLUGIN_ROOT\}/scripts/[A-Za-z0-9._-]+' commands/ agents/ 2>/dev/null | sed 's|.*{CLAUDE_PLUGIN_ROOT}/||' | sort -u)
+echo ""
+
+# ---- 11. Platform layer wiring (v0.13.0 Windows compatibility) ----
+echo "[11/11] Platform layer (scripts/lib/portable.sh) wiring..."
+LIB="scripts/lib/portable.sh"
+if [ -f "$LIB" ]; then
+    ok "$LIB present"
+    if bash -n "$LIB" 2>/dev/null; then ok "$LIB bash -n"; else fail "$LIB fails bash -n"; fi
+    # portable.sh is the SINGLE source of the engine chain (python3→python→py→node)
+    # + platform init. Every automatic hook must route through it — source the lib
+    # AND call ha_platform_init — or the Windows engine-agnostic path is not wired
+    # and the hook silently reverts to bare `python3`, which fails where only
+    # `python`/`py`/`node` exist. Static presence is the invariant; the runtime
+    # source is graceful (|| true), but the wiring must be in the file.
+    for h in hooks/session-start hooks/post-tool-use hooks/stop hooks/user-prompt-submit; do
+        if [ ! -f "$h" ]; then
+            fail "missing hook: $h"
+            continue
+        fi
+        if grep -q 'scripts/lib/portable\.sh' "$h"; then ok "$h sources portable.sh"; else fail "$h does not source portable.sh (engine chain unwired)"; fi
+        if grep -q 'ha_platform_init' "$h"; then ok "$h calls ha_platform_init"; else fail "$h missing ha_platform_init call"; fi
+    done
+else
+    fail "$LIB missing — the v0.13.0 platform layer is not installed"
+fi
 echo ""
 
 # ---- Summary ----

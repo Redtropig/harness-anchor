@@ -8,18 +8,23 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Shared engine chain: JSON validity (rc=2 → SKIP), ha_json_field for the
+# additionalContext extraction, $PYBIN for the locale-independent char count. (v0.13.0)
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
 
 PASS=0
 FAIL=0
 
 assert_json_valid() {
-    if printf '%s' "$1" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
-        echo "  OK   valid JSON"
-        PASS=$((PASS+1))
-    else
-        echo "  FAIL invalid JSON output: $(printf '%s' "$1" | head -c 200)"
-        FAIL=$((FAIL+1))
-    fi
+    printf '%s' "$1" | ha_json_valid
+    case $? in
+        0) echo "  OK   valid JSON"; PASS=$((PASS+1)) ;;
+        2) echo "  SKIP json-validity (no JSON engine on this machine)" ;;
+        *) echo "  FAIL invalid JSON output: $(printf '%s' "$1" | head -c 200)"; FAIL=$((FAIL+1)) ;;
+    esac
 }
 
 assert_contains() {
@@ -186,18 +191,26 @@ anchor4=$(git rev-parse HEAD 2>/dev/null | cut -c1-12)
 echo ""
 echo "=== session-start (deep repo → directory-map injected, budget held) ==="
 output5=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR4" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
-ctx5=$(printf '%s' "$output5" | python3 -c "import json,sys; print(json.load(sys.stdin).get('hookSpecificOutput',{}).get('additionalContext',''))" 2>/dev/null || true)
+ctx5=$(printf '%s' "$output5" | ha_json_field hookSpecificOutput.additionalContext)
 if [ -z "$output5" ]; then
     echo "  FAIL no output emitted"; FAIL=$((FAIL+1))
 else
     assert_json_valid "$output5"
     assert_contains "(root)" "$ctx5"        # the "(root)" line is map-only — proves map injection
     assert_contains "for the full" "$ctx5"  # a "see ... for the full ..." pointer (degraded view)
-    len5=${#ctx5}
-    if [ "$len5" -le 12000 ]; then
-        echo "  OK   budget held at scale: ${len5} <= 12000"; PASS=$((PASS+1))
+    # CHARACTER count, not bash ${#}: under a C/POSIX locale (Git Bash's default)
+    # ${#} counts BYTES, so multibyte chars (—, etc.) inflate it past the 12000-CHAR
+    # cap the budget targets (macOS/Linux CI run UTF-8, where ${#} already = chars).
+    if [ -n "$PYBIN" ]; then
+        # shellcheck disable=SC2086
+        len5=$(printf '%s' "$output5" | $PYBIN -c "import json,sys; print(len(json.load(sys.stdin).get('hookSpecificOutput',{}).get('additionalContext','')))" 2>/dev/null || echo 999999)
+        if [ "$len5" -le 12000 ]; then
+            echo "  OK   budget held at scale: ${len5} <= 12000"; PASS=$((PASS+1))
+        else
+            echo "  FAIL budget blown at scale: ${len5} > 12000"; FAIL=$((FAIL+1))
+        fi
     else
-        echo "  FAIL budget blown at scale: ${len5} > 12000"; FAIL=$((FAIL+1))
+        echo "  SKIP budget char-count (needs python for a locale-independent len)"
     fi
 fi
 
@@ -224,18 +237,24 @@ git commit -qm init >/dev/null 2>&1 || true
 echo ""
 echo "=== session-start (old TOC, no dir-map → legacy truncation, budget held) ==="
 output6=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR5" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
-ctx6=$(printf '%s' "$output6" | python3 -c "import json,sys; print(json.load(sys.stdin).get('hookSpecificOutput',{}).get('additionalContext',''))" 2>/dev/null || true)
+ctx6=$(printf '%s' "$output6" | ha_json_field hookSpecificOutput.additionalContext)
 if [ -z "$output6" ]; then
     echo "  FAIL no output emitted"; FAIL=$((FAIL+1))
 else
     assert_json_valid "$output6"
     assert_contains "file000.cpp" "$ctx6"                        # head of the list present
     assert_contains "see PROJECT-TOC.md for full index" "$ctx6"  # legacy pointer
-    len6=${#ctx6}
-    if [ "$len6" -le 12000 ]; then
-        echo "  OK   legacy budget held: ${len6} <= 12000"; PASS=$((PASS+1))
+    # CHARACTER count (see the len5 note above — C-locale ${#} counts bytes).
+    if [ -n "$PYBIN" ]; then
+        # shellcheck disable=SC2086
+        len6=$(printf '%s' "$output6" | $PYBIN -c "import json,sys; print(len(json.load(sys.stdin).get('hookSpecificOutput',{}).get('additionalContext','')))" 2>/dev/null || echo 999999)
+        if [ "$len6" -le 12000 ]; then
+            echo "  OK   legacy budget held: ${len6} <= 12000"; PASS=$((PASS+1))
+        else
+            echo "  FAIL legacy budget blown: ${len6} > 12000"; FAIL=$((FAIL+1))
+        fi
     else
-        echo "  FAIL legacy budget blown: ${len6} > 12000"; FAIL=$((FAIL+1))
+        echo "  SKIP legacy budget char-count (needs python for a locale-independent len)"
     fi
 fi
 

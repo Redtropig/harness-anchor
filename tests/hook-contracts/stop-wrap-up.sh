@@ -8,6 +8,11 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Shared engine chain: JSON validity (rc=2 → SKIP) + $PYBIN for python payloads. (v0.13.0)
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
 
 PASS=0
 FAIL=0
@@ -16,13 +21,12 @@ ok()   { echo "  OK   $*"; PASS=$((PASS+1)); }
 fail() { echo "  FAIL $*"; FAIL=$((FAIL+1)); }
 
 assert_json_valid() {
-    if printf '%s' "$1" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
-        echo "  OK   valid JSON"
-        PASS=$((PASS+1))
-    else
-        echo "  FAIL invalid JSON output: $(printf '%s' "$1" | head -c 200)"
-        FAIL=$((FAIL+1))
-    fi
+    printf '%s' "$1" | ha_json_valid
+    case $? in
+        0) echo "  OK   valid JSON"; PASS=$((PASS+1)) ;;
+        2) echo "  SKIP json-validity (no JSON engine on this machine)" ;;
+        *) echo "  FAIL invalid JSON output: $(printf '%s' "$1" | head -c 200)"; FAIL=$((FAIL+1)) ;;
+    esac
 }
 
 assert_contains() {
@@ -40,7 +44,9 @@ assert_contains() {
 # is warn-only, so no blocking fields (stopReason / decision:block / permissionDecision:deny).
 # This is the assertion that would have caught the hookSpecificOutput regression.
 assert_valid_stop_schema() {
-    if python3 -c '
+    if [ -z "$PYBIN" ]; then echo "  SKIP warn-only Stop schema (needs python)"; return 0; fi
+    # shellcheck disable=SC2086
+    if $PYBIN -c '
 import json, sys
 d = json.loads(sys.argv[1])
 allowed = {"continue", "suppressOutput", "stopReason", "decision", "reason",
@@ -88,11 +94,14 @@ cat > progress.md <<'EOF'
 - Started feat-active
 EOF
 # Set mtime to 1 hour ago (requires touch -t, portable on macOS/Linux).
-STALE_TIME=$(python3 -c "
-import datetime, sys
-t = datetime.datetime.now() - datetime.timedelta(hours=1)
-print(t.strftime('%Y%m%d%H%M'))
-")
+if [ -n "$PYBIN" ]; then
+    # shellcheck disable=SC2086
+    STALE_TIME=$($PYBIN -c "import datetime; print((datetime.datetime.now()-datetime.timedelta(hours=1)).strftime('%Y%m%d%H%M'))")
+else
+    # Portable fallback (GNU then BSD date) — keeps the staleness scenario meaningful
+    # without python. (v0.13.0)
+    STALE_TIME=$(date -d '1 hour ago' +%Y%m%d%H%M 2>/dev/null || date -v-1H +%Y%m%d%H%M 2>/dev/null || echo "")
+fi
 touch -t "$STALE_TIME" progress.md 2>/dev/null || true
 
 echo "=== stop hook (in-progress feature + stale progress) ==="

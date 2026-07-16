@@ -14,6 +14,22 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Shared engine chain: JSON validity (rc=2 → SKIP) + a portable ms clock. (v0.13.0)
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
+# Millisecond clock (portable): $PYBIN → node → 1s-resolution date fallback.
+_now_ms() {
+    if [ -n "$PYBIN" ]; then
+        # shellcheck disable=SC2086
+        $PYBIN -c 'import time; print(int(time.time()*1000))'
+    elif command -v node >/dev/null 2>&1; then
+        node -e 'console.log(Date.now())'
+    else
+        echo $(( $(date +%s) * 1000 ))
+    fi
+}
 
 PASS=0
 FAIL=0
@@ -88,9 +104,9 @@ git add -A && git commit -qm "init" 2>/dev/null || true
 echo "=== session-start self-timeout test ==="
 echo "  (cpp-detect stub will sleep 10s; total watchdog must cap at ~5s)"
 
-start_ms=$(python3 -c "import time; print(int(time.time()*1000))")
+start_ms=$(_now_ms)
 output=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
-end_ms=$(python3 -c "import time; print(int(time.time()*1000))")
+end_ms=$(_now_ms)
 
 elapsed_ms=$(( end_ms - start_ms ))
 elapsed_s=$(( elapsed_ms / 1000 ))
@@ -109,11 +125,12 @@ if [ -z "$output" ]; then
     ok "no output on timeout (correct — avoids truncated JSON)"
 else
     # If there IS output, it must be valid JSON (not truncated).
-    if printf '%s' "$output" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
-        ok "output is valid JSON even under timeout"
-    else
-        fail "output is truncated/invalid JSON — this is the partial-JSON pitfall"
-    fi
+    printf '%s' "$output" | ha_json_valid
+    case $? in
+        0) ok "output is valid JSON even under timeout" ;;
+        2) echo "  SKIP json-validity (no JSON engine on this machine)" ;;
+        *) fail "output is truncated/invalid JSON — this is the partial-JSON pitfall" ;;
+    esac
 fi
 
 echo ""

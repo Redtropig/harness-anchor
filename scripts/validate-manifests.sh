@@ -18,6 +18,19 @@
 
 set -uo pipefail
 
+# Interpreter discovery (v0.13.0): resolve the lib path from $0 BEFORE any cd
+# (a $0-relative path breaks once the script changes directory). python3 → python
+# → py -3 via the shared chain; a python-less machine gets a loud NOTE and the
+# manifest checks below fail visibly (intended dev-surface behavior — CI has python).
+HA_LIB_DIR="$(cd "$(dirname "$0")" && pwd)/lib"
+# shellcheck disable=SC1091
+. "${HA_LIB_DIR}/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
+if [ -z "$PYBIN" ]; then
+    echo "NOTE: no python interpreter (python3/python/py) found — manifest checks need Python; install it or rely on CI." >&2
+fi
+
 FAIL=0
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -29,7 +42,10 @@ fail() { echo "  FAIL  $*"; FAIL_COUNT=$((FAIL_COUNT+1)); FAIL=1; }
 # Used by BOTH fixture mode and normal mode so the rules can never drift.
 # Prints "PASS" or one-or-more "FAIL: <reason>" lines; returns 0 pass / 1 fail.
 validate_plugin_json() {
-    python3 - "$1" <<'PY' 2>&1
+    # argv-passed path ("$1"): MSYS converts it to a Windows path, so native
+    # Windows python opens it regardless of cwd. shellcheck: $PYBIN may be "py -3".
+    # shellcheck disable=SC2086
+    $PYBIN - "$1" <<'PY' 2>&1
 import json, sys, re
 
 path = sys.argv[1]
@@ -116,8 +132,14 @@ if [ -n "$FIXTURE_DIR" ]; then
         mj="$subdir/marketplace.json"
         if [ -f "$pj" ] && [ -f "$mj" ]; then
             dir_label=$(basename "$subdir")
-            pv=$(python3 -c "import json; print(json.load(open('$pj')).get('version',''))" 2>/dev/null || echo "")
-            mv=$(python3 -c "import json; print(json.load(open('$mj')).get('plugins',[{}])[0].get('version',''))" 2>/dev/null || echo "")
+            # Read the path from argv (sys.argv[1]), never embedded in the -c text:
+            # $pj/$mj come from --fixtures and may be ABSOLUTE (e.g. a mktemp dir).
+            # Native Windows python can't open an MSYS abs path spliced into source,
+            # but MSYS converts argv path args, so argv-passing works either way. (v0.13.0)
+            # shellcheck disable=SC2086
+            pv=$($PYBIN -c "import json,sys; print(json.load(open(sys.argv[1])).get('version',''))" "$pj" 2>/dev/null || echo "")
+            # shellcheck disable=SC2086
+            mv=$($PYBIN -c "import json,sys; print(json.load(open(sys.argv[1])).get('plugins',[{}])[0].get('version',''))" "$mj" 2>/dev/null || echo "")
             if [ "$pv" != "$mv" ]; then
                 ok "$dir_label: version mismatch correctly detected ($pv vs $mv)"
             else
@@ -160,7 +182,8 @@ echo ""
 # ---- 2. marketplace.json ----
 echo "[2/3] marketplace.json..."
 if [ -f "$MARKETPLACE_JSON" ]; then
-    result=$(python3 - "$MARKETPLACE_JSON" <<'PY' 2>&1
+    # shellcheck disable=SC2086
+    result=$($PYBIN - "$MARKETPLACE_JSON" <<'PY' 2>&1
 import json, sys, re
 
 path = sys.argv[1]
@@ -207,8 +230,11 @@ echo ""
 
 # ---- 3. Version sync ----
 echo "[3/3] Version sync..."
-pv=$(python3 -c "import json; print(json.load(open('$PLUGIN_JSON')).get('version',''))" 2>/dev/null || echo "")
-mv=$(python3 -c "import json; print(json.load(open('$MARKETPLACE_JSON')).get('plugins',[{}])[0].get('version',''))" 2>/dev/null || echo "")
+# Same argv-passed form as the fixture-mode reader above — uniform + Windows-safe.
+# shellcheck disable=SC2086
+pv=$($PYBIN -c "import json,sys; print(json.load(open(sys.argv[1])).get('version',''))" "$PLUGIN_JSON" 2>/dev/null || echo "")
+# shellcheck disable=SC2086
+mv=$($PYBIN -c "import json,sys; print(json.load(open(sys.argv[1])).get('plugins',[{}])[0].get('version',''))" "$MARKETPLACE_JSON" 2>/dev/null || echo "")
 
 if [ -z "$pv" ] || [ -z "$mv" ]; then
     fail "could not read version from one or both manifests"

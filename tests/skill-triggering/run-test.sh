@@ -30,6 +30,10 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck disable=SC1091
+. "$PLUGIN_DIR/scripts/lib/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
 
 TIMESTAMP=$(date +%s)
 OUTPUT_DIR="/tmp/harness-anchor-tests/${TIMESTAMP}/skill-triggering/${SKILL_NAME}"
@@ -72,7 +76,8 @@ grep -o '"skill":"[^"]*"' "$LOG_FILE" 2>/dev/null | sort -u || echo "  (none det
 
 echo ""
 echo "First assistant response (truncated):"
-grep '"type":"assistant"' "$LOG_FILE" 2>/dev/null | head -1 | python3 -c "
+# shellcheck disable=SC2086
+grep '"type":"assistant"' "$LOG_FILE" 2>/dev/null | head -1 | $PYBIN -c "
 import json, sys
 try:
     d = json.loads(sys.stdin.readline())

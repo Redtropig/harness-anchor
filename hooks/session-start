@@ -16,6 +16,9 @@
 #   - Defensive: every sub-check fails silently, never aborts the hook.
 #   - sub-commands wall-clocked to 3s where possible.
 #   - Total watchdog: 5s cap (R1). On timeout, emit nothing, exit 0 (warn-only).
+#   - Engine chain (v0.13.0): JSON parsing via scripts/lib/portable.sh
+#     (python3→python→py→node→narrow bash). Residual blind spot: with zero
+#     engines the active-feature line degrades to "(needs python3 or node)".
 
 set -uo pipefail
 
@@ -33,11 +36,22 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SKILL_FILE="${PLUGIN_ROOT}/skills/using-harness-anchor/SKILL.md"
 
+# Platform layer (v0.13.0): JSON engine chain + Windows PATH shield + path
+# normalization. Missing lib = broken install → silent no-op (warn-only).
+# shellcheck disable=SC1091
+. "${PLUGIN_ROOT}/scripts/lib/portable.sh" 2>/dev/null || exit 0
+ha_platform_init
+# Pre-warm engine detection ONCE in the parent shell so the exported
+# HA_JSON_ENGINE is inherited by every $(...) command-substitution below —
+# otherwise each ha_json_* call re-probes the engine in its own subshell,
+# doubling subprocess spawns (costly on Windows). (v0.13.0)
+ha_json_engine_init
+
 # ---- Resolve project root (3-level fallback) ----
 # 1) CLAUDE_PROJECT_DIR (set by Claude Code for plugin hooks)
 # 2) git toplevel from CWD
 # 3) CWD itself
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
+PROJECT_DIR="$(ha_normalize_path "${CLAUDE_PROJECT_DIR:-}")"
 if [ -z "$PROJECT_DIR" ] || [ ! -d "$PROJECT_DIR" ]; then
     if git_top=$(git rev-parse --show-toplevel 2>/dev/null); then
         PROJECT_DIR="$git_top"
@@ -57,35 +71,20 @@ main() {
     # ---- 0. Hook event source from stdin JSON ("startup"|"clear"|"compact"; empty if absent) ----
     hook_source=""
     if [ -n "$HOOK_STDIN" ]; then
-        hook_source=$(printf '%s' "$HOOK_STDIN" | python3 -c "
-import json, sys
-try:
-    print(json.load(sys.stdin).get('source', ''))
-except Exception:
-    pass
-" 2>/dev/null || echo "")
+        hook_source=$(printf '%s' "$HOOK_STDIN" | ha_json_field source)
     fi
 
     # ---- 1. Active feature from feature_list.json ----
     active_feature="none (run /anchor to scaffold)"
     flist="$PROJECT_DIR/feature_list.json"
     if [ -f "$flist" ]; then
-        af=$(python3 - "$flist" <<'PY' 2>/dev/null || true
-import json, sys
-try:
-    with open(sys.argv[1]) as f:
-        d = json.load(f)
-    for feat in d.get('features', []):
-        if feat.get('status') == 'in-progress':
-            print(f"{feat.get('id','?')}: {feat.get('name','')}")
-            break
-    else:
-        print("(no in-progress feature)")
-except Exception:
-    pass
-PY
-)
-        [ -n "$af" ] && active_feature="$af"
+        # Engine-parsed; with no JSON engine this is honestly "(needs ...)" —
+        # residual blind spot: the ledger may hold an active feature we cannot name.
+        # ha_flist_active prints "(no in-progress feature)" itself when the file
+        # parses clean with no in-progress entry — identical wording to the old python.
+        af=$(ha_flist_active "$flist")
+        [ -n "$af" ] || af="(needs python3 or node)"
+        active_feature="$af"
     fi
 
     # ---- 2. Project type via cpp-detect.sh ----
@@ -94,20 +93,25 @@ PY
     if [ -x "$detect_script" ]; then
         cpp_json=$($to_cmd bash "$detect_script" --target "$PROJECT_DIR" 2>/dev/null || true)
         if [ -n "$cpp_json" ]; then
-            parsed=$(printf '%s' "$cpp_json" | python3 -c "
-import json, sys
-try:
-    d = json.load(sys.stdin)
-    if d.get('is_cpp_project'):
-        bs = d.get('build_system', '?')
-        std = d.get('standard', '')
-        print(f'cpp ({bs}' + (f', {std}' if std and std != 'unknown' else '') + ')')
-    else:
-        print('generic')
-except Exception:
-    print('generic')
-" 2>/dev/null || echo "generic")
-            [ -n "$parsed" ] && project_type="$parsed"
+            # cpp-detect.sh output is our own controlled format — extractable by
+            # every engine tier including narrow bash (booleans → true/false).
+            # ONE ha_json_fields call, not three ha_json_field: each engine call
+            # spawns a subprocess, and on Windows those spawns dominate the hook's
+            # wall time (they can push it past the held-open-stdin budget).
+            cpp_fields=$(printf '%s' "$cpp_json" | ha_json_fields is_cpp_project build_system standard)
+            is_cpp=$(printf '%s\n' "$cpp_fields" | sed -n 1p)
+            if [ "$is_cpp" = "true" ]; then
+                bs=$(printf '%s\n' "$cpp_fields" | sed -n 2p)
+                std=$(printf '%s\n' "$cpp_fields" | sed -n 3p)
+                [ -n "$bs" ] || bs="?"
+                if [ -n "$std" ] && [ "$std" != "unknown" ]; then
+                    project_type="cpp (${bs}, ${std})"
+                else
+                    project_type="cpp (${bs})"
+                fi
+            else
+                project_type="generic"
+            fi
         fi
     fi
 
@@ -208,14 +212,11 @@ except Exception:
     # Read version from plugin.json at runtime (DD1 — de-hardcode version).
     plugin_version="unknown"
     if [ -f "${PLUGIN_ROOT}/.claude-plugin/plugin.json" ]; then
-        pv=$(python3 -c "
-import json, sys
-try:
-    with open('${PLUGIN_ROOT}/.claude-plugin/plugin.json') as f:
-        print(json.load(f).get('version', 'unknown'))
-except Exception:
-    pass
-" 2>/dev/null || true)
+        # plugin.json is our own format — the bash tier greps it fine, so the
+        # version is real even on an engine-less machine (fixes "vunknown").
+        # Feeding the file via stdin redirection avoids passing an MSYS-style
+        # path into a native-Windows engine (which cannot open /c/... paths).
+        pv=$(ha_json_field version < "${PLUGIN_ROOT}/.claude-plugin/plugin.json")
         [ -n "$pv" ] && plugin_version="$pv"
     fi
 
@@ -365,6 +366,12 @@ ${truncated_files}
 
     combined="${banner}${toc_block}${skill_content}"
 
+    # Normalize to LF: SKILL.md / PROJECT-TOC.md may check out CRLF on Windows
+    # (they are not eol=lf-pinned), and each stray \r both wastes injection budget
+    # (invariant #2 — the at-scale count blew past 12000 on Windows purely on \r)
+    # and is noise to the model. Strip so count + payload are platform-independent.
+    combined="${combined//$'\r'/}"
+
     # Final safety: if skill body itself is enormous, truncate it.
     if [ "${#combined}" -gt "$MAX_CHARS" ]; then
         marker="
@@ -380,27 +387,10 @@ ${truncated_files}
         fi
     fi
 
-    # ---- 9. JSON-escape (python3 O(n) fast path; pure-bash fallback, no jq) ----
-    # The bash ${var//} escaper is quadratic in matches×length: a ~12KB, ~700-line
-    # payload (deep-repo TOC) costs seconds on slow CPUs — pessimal macOS CI
-    # runners burned the entire 5s watchdog in this step alone (locally ~0.15s).
-    # json.dumps is O(n) and escapes control chars the bash path misses; [1:-1]
-    # strips its outer quotes to fit the printf template below.
-    escape_for_json() {
-        local s="$1"
-        s="${s//\\/\\\\}"
-        s="${s//\"/\\\"}"
-        s="${s//$'\n'/\\n}"
-        s="${s//$'\r'/\\r}"
-        s="${s//$'\t'/\\t}"
-        printf '%s' "$s"
-    }
-
-    context=""
-    if command -v python3 >/dev/null 2>&1; then
-        context=$(printf '%s' "$combined" | python3 -c 'import json,sys; sys.stdout.write(json.dumps(sys.stdin.read())[1:-1])' 2>/dev/null || true)
-    fi
-    [ -n "$context" ] || context="$(escape_for_json "$combined")"
+    # ---- 9. JSON-escape via the shared engine chain (scripts/lib/portable.sh) ----
+    # ha_json_escape uses python/node json.dumps (O(n)); its pure-bash last resort
+    # is the same quadratic ${var//} escaper as before (engines cover the common case).
+    context=$(printf '%s' "$combined" | ha_json_escape)
 
     # ---- 10. Emit to stdout (parent captures via redirect for R1) ----
     printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$context"

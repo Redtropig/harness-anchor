@@ -10,6 +10,9 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# JSON validity via the shared engine chain (rc=2 = no engine → honest SKIP). (v0.13.0)
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
 
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
@@ -47,11 +50,12 @@ assert_not_contains() {
     fi
 }
 assert_json_valid() {
-    if printf '%s' "$1" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
-        echo "  OK   valid JSON"; PASS=$((PASS+1))
-    else
-        echo "  FAIL invalid JSON: $(printf '%s' "$1" | head -c 200)"; FAIL=$((FAIL+1))
-    fi
+    printf '%s' "$1" | ha_json_valid
+    case $? in
+        0) echo "  OK   valid JSON"; PASS=$((PASS+1)) ;;
+        2) echo "  SKIP json-validity (no JSON engine on this machine)" ;;
+        *) echo "  FAIL invalid JSON: $(printf '%s' "$1" | head -c 200)"; FAIL=$((FAIL+1)) ;;
+    esac
 }
 
 run_hook() { printf '%s' "$input_json" | bash "$PLUGIN_ROOT/hooks/post-tool-use" 2>/dev/null || true; }

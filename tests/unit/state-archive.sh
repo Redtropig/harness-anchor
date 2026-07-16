@@ -11,17 +11,23 @@
 #   7. same id in archive with DIFFERENT content -> abort, no writes
 #   8. crash residue (identical content already archived) -> converges (hot shrinks)
 #   9. repeat archival prepends newer block above older archive content
+# shellcheck disable=SC2086  # every $PYBIN call site word-splits intentionally ("py -3")
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ARCHIVE="$PLUGIN_ROOT/scripts/state-archive.mjs"
+# Python oracles via the shared chain (python3→python→py); all paths argv-passed. (v0.13.0)
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
 
 PASS=0; FAIL=0
 ok()  { echo "  OK   $*"; PASS=$((PASS+1)); }
 bad() { echo "  FAIL $*"; FAIL=$((FAIL+1)); }
 
 command -v node >/dev/null 2>&1 || { echo "SKIP: node not found"; exit 0; }
-command -v python3 >/dev/null 2>&1 || { echo "SKIP: python3 not found"; exit 0; }
+[ -n "$PYBIN" ] || { echo "SKIP: needs python (python3/python/py)"; exit 0; }
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -46,7 +52,7 @@ make_progress() {
 # make_features <dir> <n-pass>  — plus 1 in-progress + 1 planned; pass completedAt ascending by index
 make_features() {
     local dir="$1" npass="$2"
-    N="$npass" python3 - "$dir/feature_list.json" <<'PY'
+    N="$npass" $PYBIN - "$dir/feature_list.json" <<'PY'
 import json, os, sys
 n = int(os.environ['N'])
 feats = [
@@ -91,7 +97,7 @@ grep -q '## .*Session 5$' "$D/progress-archive.md" && ok "archive has Session 5"
 grep -q '## .*Session 1$' "$D/progress-archive.md" && ok "archive has Session 1" || bad "archive missing Session 1"
 grep -q 'work item 3' "$D/progress-archive.md" && ok "section bodies moved verbatim" || bad "section body lost"
 grep -q 'progress-archive.md' "$D/progress.md" && ok "hot header gained pointer line" || bad "no pointer line"
-python3 - "$D/feature_list.json" "$D/feature_archive.json" <<'PY' && ok "feature split correct" || bad "feature split wrong"
+$PYBIN - "$D/feature_list.json" "$D/feature_archive.json" <<'PY' && ok "feature split correct" || bad "feature split wrong"
 import json, sys
 hot = json.load(open(sys.argv[1])); arch = json.load(open(sys.argv[2]))
 hot_ids = [f["id"] for f in hot["features"]]
@@ -113,7 +119,7 @@ if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q 'nothing to archive'; then ok
 
 echo "=== 9. repeat archival prepends newer block above older ==="
 # grow hot again: prepend 6 newer sections (Sessions 26..31) after the header
-python3 - "$D/progress.md" <<'PY'
+$PYBIN - "$D/progress.md" <<'PY'
 import sys
 p = sys.argv[1]
 text = open(p).read().split('\n')
@@ -171,7 +177,7 @@ node "$ARCHIVE" --target "$D" >/dev/null 2>&1          # normal archival
 make_features "$D" 15
 out=$(node "$ARCHIVE" --target "$D" 2>&1); rc=$?
 [ "$rc" -eq 0 ] && ok "recovery run exits 0" || bad "recovery exit $rc: $out"
-python3 - "$D/feature_list.json" "$D/feature_archive.json" <<'PY' && ok "converged: hot shrunk, archive single-copy" || bad "recovery did not converge"
+$PYBIN - "$D/feature_list.json" "$D/feature_archive.json" <<'PY' && ok "converged: hot shrunk, archive single-copy" || bad "recovery did not converge"
 import json, sys
 hot = json.load(open(sys.argv[1])); arch = json.load(open(sys.argv[2]))
 assert sum(1 for f in hot["features"] if f["status"] == "pass") == 10
@@ -183,7 +189,7 @@ echo "=== 10. duplicate-id ledger -> refuse (never operate on corrupt input) ===
 # Both copies of 'dup-x' are the oldest pass entries (=> both would move); unguarded
 # archival would write a duplicate id into the archive. The tool must refuse instead.
 D="$TMP/dup"; mkdir -p "$D"
-python3 - "$D/feature_list.json" <<'PY'
+$PYBIN - "$D/feature_list.json" <<'PY'
 import json, sys
 feats = []
 for i in range(1, 13):

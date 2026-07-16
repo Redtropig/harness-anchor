@@ -136,3 +136,40 @@ diagnostics would be garbage and are withheld. Fix the toolchain, not the code: 
 **Fix:**
 - Upgrade to **v0.3.2+**: `hooks/stop` now emits a non-blocking `systemMessage` (warn-only — never `decision: "block"` or `stopReason`, per design invariant #1).
 - Verify your copy: `bash tests/hook-contracts/stop-wrap-up.sh` should report `STATUS: PASSED`. As of v0.3.2 that test asserts the full Stop output schema, not just JSON validity — so it catches this class of regression.
+
+## 9. Windows: banner shows `harness-anchor vunknown` (pre-0.13.0) or ledger lines degraded
+
+**Symptom:** SessionStart banner reports `vunknown`, `Project type: generic` on a C++
+project, or `Active feature: (needs python3 or node)`.
+
+**Diagnosis:** No working JSON engine. Windows Python installs `python.exe`/`py.exe`
+(no `python3`); the Store's `python.exe` stub exists but cannot run. From 0.13.0 the
+engine chain tries python3 → python → py -3 → node, and plugin-controlled formats
+(version, cpp-detect) parse even with zero engines — only feature-ledger parsing
+still needs a real engine.
+
+**Fix:** Install Python (any launcher name) or Node.js. Verify: `python -c "print(1)"`
+or `node -e "console.log(1)"` in Git Bash.
+
+## 10. Windows: `$'\r': command not found` when running scripts manually
+
+**Symptom:** Running a repo script by hand fails with `\r` errors.
+
+**Diagnosis:** The checkout predates the 0.13.0 `.gitattributes` eol rules (CRLF
+working tree), or the file lost its attribute coverage.
+
+**Fix:** One-time re-smudge: delete the affected files, then `git checkout -- .`.
+Verify: `git ls-files --eol -- hooks/session-start` shows `w/lf`. `tests/windows-compat.sh`
+guards the attribute coverage.
+
+## 11. Windows: `timeout`/`find`/`sort` behave bizarrely in your own scripts
+
+**Symptom:** `timeout 5 cmd` complains about arguments; `find -mmin` errors; sort
+order is wrong — but the plugin's hooks are fine.
+
+**Diagnosis:** `C:\Windows\System32` ships incompatible same-name binaries. Hooks
+shield themselves (`ha_platform_init` prepends `/usr/bin`), but scripts you run
+outside the hooks inherit your own PATH.
+
+**Fix:** In your scripts, source `${CLAUDE_PLUGIN_ROOT}/scripts/lib/portable.sh` and
+call `ha_platform_init`, or put Git's `/usr/bin` first on PATH yourself.
