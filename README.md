@@ -108,7 +108,7 @@ bash init.sh     # health-check the environment
 | SessionStart | Injects state banner: active feature, project type, TOC freshness, golden-rules count, state-file budget sentinel, handoff head, slimmed meta-skill body — frontmatter stripped, cpp-only sections injected only in C/C++ projects (≤ 3000 token budget); compact-source caution line (post-compaction recall is unreliable — rebuild from on-disk evidence) |
 | PostToolUse | After Edit/Write: regression-warn on pass-feature files; duplicate feature-`id` warn when `feature_list.json` is written; **new-code-module scope-creep warn** when a new module is written while a feature is in-progress (action-side companion to the prompt-side scope-jump check); clang-tidy on C/C++ files when `compile_commands.json` present (sysroot-aware on macOS; failed-parse diagnostics suppressed with one honest notice); one-line `/sanitize` nudge on C/C++ edits (never runs sanitizers inline); **context-fill flush reminder** (transcript-size threshold, once per session) — flush chat-only durable memory before compaction takes it |
 | Stop | Nudges progress.md update, session-handoff refresh, and flushing chat-only durable memory; never blocks |
-| UserPromptSubmit | Detects scope-jump phrases ("顺便", "also", "by the way"); surfaces active feature for confirmation |
+| UserPromptSubmit | Detects scope-jump phrases ("also", "by the way"); surfaces active feature for confirmation |
 
 ---
 

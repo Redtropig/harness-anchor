@@ -23,6 +23,19 @@ if [ -z "$PYBIN" ]; then
     echo "NOTE: no python interpreter (python3/python/py) found — this tool needs Python to decode the hook JSON; install it or rely on CI." >&2
 fi
 
+# Char count, not bytes: bash ${#} counts BYTES under a C/POSIX locale (Git Bash's
+# default), so multibyte chars (—, box-drawing) inflate it — the very thing this tool
+# measures against a CHAR cap. Count through the engine so the number matches the cap's
+# unit on every platform (binary stdin read avoids Windows text-mode CRLF folding). (v0.13.0)
+_charlen() {
+    if [ -n "$PYBIN" ]; then
+        # shellcheck disable=SC2086
+        printf '%s' "$1" | $PYBIN -c 'import sys; print(len(sys.stdin.buffer.read().decode("utf-8","replace")))'
+    else
+        printf '%s' "$1" | wc -m | tr -d '[:space:]'
+    fi
+}
+
 echo "=== measure-context ==="
 echo ""
 
@@ -63,22 +76,24 @@ if [ -z "$CONTEXT" ]; then
     exit 1
 fi
 
-# ---- 4. Measure per-section byte counts ----
-TOTAL=${#CONTEXT}
+# ---- 4. Measure per-section CHAR counts (via _charlen — ${#} would be bytes) ----
+TOTAL=$(_charlen "$CONTEXT")
 CAP=12000
 WARN=$((CAP * 90 / 100))  # 10800
 
 # Extract sections by marker tags
 STATE_SECTION=$(printf '%s' "$CONTEXT" | awk '/<harness-anchor-state>/,/<\/harness-anchor-state>/' || true)
 TOC_SECTION=$(printf '%s' "$CONTEXT" | awk '/<project-toc>/,/<\/project-toc>/' || true)
+STATE_LEN=$(_charlen "$STATE_SECTION")
+TOC_LEN=$(_charlen "$TOC_SECTION")
 # Skill body = everything after the last closing tag
-SKILL_LEN=$((TOTAL - ${#STATE_SECTION} - ${#TOC_SECTION}))
+SKILL_LEN=$((TOTAL - STATE_LEN - TOC_LEN))
 [ "$SKILL_LEN" -lt 0 ] && SKILL_LEN=0
 
 echo ""
 echo "Section breakdown:"
-echo "  <harness-anchor-state>:  ${#STATE_SECTION} chars"
-echo "  <project-toc>:           ${#TOC_SECTION} chars"
+echo "  <harness-anchor-state>:  ${STATE_LEN} chars"
+echo "  <project-toc>:           ${TOC_LEN} chars"
 echo "  Skill body (remainder):  ${SKILL_LEN} chars"
 echo "  ─────────────────────────────────"
 echo "  Total:                   ${TOTAL} chars"
@@ -113,7 +128,7 @@ try:
 except Exception:
     pass
 " 2>/dev/null)
-TOTAL2=${#CONTEXT2}
+TOTAL2=$(_charlen "$CONTEXT2")
 echo ""
 echo "Generic fixture (no TOC/handoff, cpp-only regions dropped):"
 echo "  Total:                   ${TOTAL2} chars"
