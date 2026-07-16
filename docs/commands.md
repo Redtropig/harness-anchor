@@ -178,7 +178,7 @@ updated) and suggests `git commit -m 'chore: refresh project index'`.
 **Arguments.** None.
 
 **Prerequisites.** A git repository (errors out otherwise). **Note:** this is the one command
-that needs **Node.js** (for `index-builder.mjs`); everything else is bash + git (+ python3).
+that needs **Node.js** (for `index-builder.mjs`); everything else is bash + git (+ a JSON engine: python3/python/py or node).
 
 **Writes / side effects.** Writes `PROJECT-TOC.md`. Bootstraps it from the template if
 missing. Does **not** commit.

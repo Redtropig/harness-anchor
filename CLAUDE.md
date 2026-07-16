@@ -25,6 +25,12 @@ Stop. Read this before doing anything.
 7. **Hooks must time out in ≤ 5 seconds** and fail silent on missing tools.
 8. **Default-FAIL evaluation contracts.** No skill or agent should mark anything "done" without an evidence path. This is the anti-hallucination invariant — do not soften it.
 9. **docs-lookup is the canonical procedure** for unfamiliar tools/APIs/errors/library behavior. New skills MUST reference it rather than inlining Context7 → WebSearch waterfalls — the failure-mode detection and calibrated-uncertainty fallback live in one place by design.
+10. **Windows/Git-Bash is a supported surface.** `tests/windows-compat.sh` must pass:
+    no direct `python3` invocation in hooks (JSON goes through `scripts/lib/portable.sh`'s
+    engine chain: python3 → python → py -3 → node → narrow bash); externally supplied
+    paths are normalized at hook entry (`ha_normalize_path`); walk-up loops terminate
+    by fixed point (`ha_find_project_root`), never by comparing against `"/"`; bash-consumed
+    files carry `eol=lf` gitattributes (`run-hook.cmd` deliberately excluded — polyglot).
 
 ## Authoring a New Skill (when explicitly asked)
 

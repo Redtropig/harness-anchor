@@ -4,6 +4,44 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-16
+
+### Added
+
+- **Windows support (Git-Bash baseline).** `scripts/lib/portable.sh` — shared platform
+  layer sourced by all four hooks and runtime scripts: JSON engine chain
+  (python3 → python → py -3 → node → narrow pure-bash) with run-validated detection
+  (immune to the Windows-Store python stub), `C:\` path normalization at hook entry,
+  fixed-point project-root walk (the old `!= "/"` loop spun the 5s watchdog on
+  drive-letter paths), Windows PATH shield (System32's incompatible
+  `find`/`sort`/`timeout` lose to `/usr/bin`), portable mtime. Plugin-controlled
+  formats (plugin.json version, cpp-detect output) parse even with ZERO engines —
+  fixes the `vunknown` banner and C++-projects-typed-`generic` on Windows.
+- `.gitattributes` eol rules: every bash-consumed file checks out LF on all platforms
+  (`run-hook.cmd` deliberately stays `text=auto` for the cmd/bash polyglot).
+- `hooks/run-hook.cmd`: `%ProgramFiles%`-based + user-scope Git discovery; WSL's
+  `System32\bash.exe` excluded (hooks must see Windows paths).
+- C/C++ Windows counterpart mapping: `sanitizer-build.sh.tpl` turns `detect_leaks`
+  off on MINGW*/MSYS*/CYGWIN* (LSan unsupported — same abort class as the v0.8.0
+  macOS incident); `/sanitize` reports TSan-on-Windows as INFRA-FAIL with substitutes;
+  `cpp-sanitizers` gains *Windows platform notes* with a substitute-tool table
+  (WSL2/Linux-CI TSan, Intel Inspector, Dr. Memory, CRT debug heap, UMDH, `/RTC1`);
+  `cpp-static-analysis` gains Windows compile_commands/driver-mode notes.
+- `tests/windows-compat.sh` — static Windows invariants on every platform; new
+  contract tests: `session-start-engine-degradation.sh`,
+  `post-tool-use-windows-paths.sh` (Windows path bugs are string bugs — Linux CI
+  catches them); windows-latest CI arm (curated core subset).
+
+### Changed
+
+- Hooks and `status-report.sh`/`session-end-precheck.sh` widen `command -v python3`
+  gates to the shared engine chain; the four duplicated `escape_for_json` copies
+  collapse into `ha_json_escape`; `hooks/stop` staleness checks use mtime arithmetic
+  instead of `find -mmin` (BSD/GNU/System32-neutral). Dev-surface scripts
+  (validate-anchor / validate-manifests / measure-context) discover any python via
+  `ha_python`; the test suite SKIPs honestly (visible, never silent) where an assert's
+  engine is missing. CLAUDE.md gains design invariant #10 (Windows surface).
+
 ## [0.12.0] - 2026-07-14
 
 ### Added
@@ -469,7 +507,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/Redtropig/harness-anchor/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Redtropig/harness-anchor/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Redtropig/harness-anchor/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Redtropig/harness-anchor/compare/v0.9.1...v0.10.0
