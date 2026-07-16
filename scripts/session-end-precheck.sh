@@ -12,6 +12,10 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Platform layer (v0.13.0): engine discovery (python3→python→py→node).
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib/portable.sh" 2>/dev/null || true
+command -v ha_platform_init >/dev/null 2>&1 && ha_platform_init
 TARGET="."; SKIP_INIT=0
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -35,8 +39,11 @@ if [ ! -f "$FLIST" ]; then
     echo "(no feature_list.json — un-anchored; suggest /anchor)"
 else
     facts=""
-    if command -v python3 >/dev/null 2>&1; then
-        facts=$(python3 - "$FLIST" <<'PY' 2>/dev/null || true
+    HA_PY="${HA_PY:-}"
+    command -v ha_python >/dev/null 2>&1 && HA_PY=$(ha_python || true)
+    if [ -n "$HA_PY" ] && [ "${HA_JSON_ENGINE:-}" != "node" ]; then
+        # shellcheck disable=SC2086
+        facts=$($HA_PY - "$FLIST" <<'PY' 2>/dev/null || true
 import json, sys
 def clean(s): return str(s).replace("\n", " ").replace("\t", " ")
 try:
@@ -74,6 +81,8 @@ console.log("counts=planned " + (counts["planned"]||0) + " / in-progress " + (co
     + " / pass " + (counts["pass"]||0) + " / blocked " + (counts["blocked"]||0));
 ' "$FLIST" 2>/dev/null || true)
     fi
+    # Windows python/node emit \r\n; strip stray CR from the multi-line facts. (v0.13.0)
+    facts="${facts//$'\r'/}"
     if [ -z "$facts" ]; then
         echo "(needs python3 or node)"
     else

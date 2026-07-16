@@ -123,6 +123,9 @@ if (typeof d === "boolean") process.stdout.write(String(d));
 else if (typeof d === "string" || typeof d === "number") process.stdout.write(String(d));
 ' "$field" 2>/dev/null || true) ;;
     esac
+    # Windows python/node stdout is text-mode: print() emits \r\n. A single-line
+    # value loses the trailing CR via $(...), but strip defensively regardless.
+    out="${out//$'\r'/}"
     [ -n "$out" ] || out=$(ha_json_field_bash "$field" "$data")
     printf '%s' "$out"
 }
@@ -166,6 +169,10 @@ for (const path of process.argv.slice(1)) {
 process.stdout.write(lines.join("\n") + "\n");
 ' "$@" 2>/dev/null || true) ;;
     esac
+    # Windows python/node emit \r\n on EVERY line; $(...) only strips the final
+    # trailing newline, so internal lines keep a stray CR. Strip all of them so
+    # per-field `sed -n Np` extraction is clean without the double-$() dance.
+    out="${out//$'\r'/}"
     if [ -z "$out" ]; then
         for f in "$@"; do
             ha_json_field_bash "$f" "$data"

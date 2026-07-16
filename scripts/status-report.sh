@@ -14,6 +14,10 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Platform layer (v0.13.0): engine discovery (python3→python→py→node) + portable mtime.
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib/portable.sh" 2>/dev/null || true
+command -v ha_platform_init >/dev/null 2>&1 && ha_platform_init
 TARGET="."
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -32,7 +36,7 @@ if [ ! -f "$FLIST" ]; then
     exit 0
 fi
 
-mtime_of() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+mtime_of() { if command -v ha_mtime >/dev/null 2>&1; then ha_mtime "$1"; else stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; fi; }
 fmt_age() { # $1 = seconds
     if   [ "$1" -lt 7200 ];   then echo "$(( $1 / 60 )) minute(s) ago"
     elif [ "$1" -lt 172800 ]; then echo "$(( $1 / 3600 )) hour(s) ago"
@@ -44,8 +48,11 @@ NOW=$(date +%s)
 ARCHIVE="$TARGET/feature_archive.json"
 [ -f "$ARCHIVE" ] || ARCHIVE=""
 facts=""
-if command -v python3 >/dev/null 2>&1; then
-    facts=$(python3 - "$FLIST" "$ARCHIVE" <<'PY' 2>/dev/null || true
+HA_PY="${HA_PY:-}"
+command -v ha_python >/dev/null 2>&1 && HA_PY=$(ha_python || true)
+if [ -n "$HA_PY" ] && [ "${HA_JSON_ENGINE:-}" != "node" ]; then
+    # shellcheck disable=SC2086
+    facts=$($HA_PY - "$FLIST" "$ARCHIVE" <<'PY' 2>/dev/null || true
 import json, sys, time, calendar
 def clean(s): return str(s).replace("\n", " ").replace("\r", " ").replace("\t", " ")
 try:
@@ -113,6 +120,11 @@ if (process.argv[2]) {
 }
 ' "$FLIST" "$ARCHIVE" 2>/dev/null || true)
 fi
+
+# Windows python/node emit \r\n; the multi-line facts keep a stray CR on every
+# internal line, which `while read -r` preserves and contaminates each value
+# (e.g. active_id="f-b\r"). Strip all CR before parsing. (v0.13.0)
+facts="${facts//$'\r'/}"
 
 degraded=0
 [ -n "$facts" ] || degraded=1

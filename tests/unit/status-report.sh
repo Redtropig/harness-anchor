@@ -64,14 +64,32 @@ i=0; while [ $i -lt 700 ]; do printf 'padding line to grow the file well past it
 out=$(bash "$SR" --target "$ROOT/proj")
 expect_contains "over marker" "OVER — /session-end offers archival/trim" "$out"
 
-# ---- degraded: python3 AND node both fail → JSON sections degrade, rest stays ----
+# ---- degraded: ALL engines fail → JSON sections degrade, rest stays ----
+# Shim every engine the v0.13.0 chain tries (python3/python/py/node), not just
+# python3+node — otherwise a real `python`/`py` on PATH keeps the section alive.
 SHIM=$(mktemp -d)
-printf '#!/bin/sh\nexit 3\n' > "$SHIM/python3"; cp "$SHIM/python3" "$SHIM/node"; chmod +x "$SHIM/python3" "$SHIM/node"
+printf '#!/bin/sh\nexit 3\n' > "$SHIM/python3"
+for e in python py node; do cp "$SHIM/python3" "$SHIM/$e"; done
+chmod +x "$SHIM"/python3 "$SHIM"/python "$SHIM"/py "$SHIM"/node
 out=$(PATH="$SHIM:$PATH" bash "$SR" --target "$ROOT/proj")
 expect_contains "degraded active"  "(needs python3 or node)" "$out"
 expect_contains "degraded keeps git section"  "?? wip.txt" "$out"
 expect_contains "degraded keeps gr" "- golden rules: 2 rule(s) (1 mechanical)" "$out"
 rm -rf "$SHIM"
+
+# ---- widened chain: python3 hidden, `python`/`py` present → JSON still parses ----
+SHIM2=$(mktemp -d)
+printf '#!/bin/sh\nexit 3\n' > "$SHIM2/python3"; chmod +x "$SHIM2/python3"
+if command -v python >/dev/null 2>&1 && python -c 'print(1)' >/dev/null 2>&1; then
+    out=$(PATH="$SHIM2:$PATH" bash "$SR" --target "$ROOT/proj")
+    expect_contains "python-tier active" "- **f-b**: Beta" "$out"
+elif command -v node >/dev/null 2>&1; then
+    out=$(PATH="$SHIM2:$PATH" bash "$SR" --target "$ROOT/proj")
+    expect_contains "node-tier active" "- **f-b**: Beta" "$out"
+else
+    echo "  SKIP widened-chain lane (no python/node)"
+fi
+rm -rf "$SHIM2"
 
 echo ""; echo " Pass: $PASS  Fail: $FAIL"
 if [ "$FAIL" -eq 0 ]; then echo " STATUS: PASSED"; exit 0; else echo " STATUS: FAILED"; exit 1; fi
