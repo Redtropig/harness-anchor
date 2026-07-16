@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 5
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Checkout
@@ -45,7 +45,10 @@ jobs:
       - name: Manifest negative fixtures
         run: bash scripts/validate-manifests.sh --fixtures tests/manifest-fixtures
 
+      # Windows arm runs the curated core subset first release (spec §9); expand once
+      # proven stable — a flaky gate is worse than none.
       - name: Command frontmatter negative fixtures
+        if: runner.os != 'Windows'
         run: bash scripts/check-allowed-tools.sh --fixtures tests/command-fixtures
 
       # Glob, not an enumerated list: a hardcoded list silently omits newly added
@@ -61,9 +64,14 @@ jobs:
           done
 
       - name: POSIX compatibility
+        if: runner.os != 'Windows'
         run: bash tests/posix-compat.sh
 
+      - name: Windows compatibility (static invariants, all platforms)
+        run: bash tests/windows-compat.sh
+
       - name: E2E fixture structural checks
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -91,9 +99,11 @@ jobs:
           "
 
       - name: Context budget measurement
+        if: runner.os != 'Windows'
         run: bash scripts/measure-context.sh
 
       - name: Hook timing benchmark
+        if: runner.os != 'Windows'
         run: bash tests/bench/hook-timing.sh
 
       - name: cpp-detect — fixture coverage
@@ -116,6 +126,7 @@ jobs:
           done
 
       - name: index-builder smoke test on temp repo
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -152,6 +163,7 @@ jobs:
           echo "${out}" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['is_cpp_project'] is False, 'non-cpp-fixture wrongly detected as cpp'; print('OK non-cpp-fixture: is_cpp_project=false')"
 
       - name: Skill-triggering coverage (structural, no LLM)
+        if: runner.os != 'Windows'
         run: bash tests/skill-triggering/check-coverage.sh
 
   shellcheck:
