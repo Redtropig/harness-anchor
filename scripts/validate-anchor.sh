@@ -20,6 +20,19 @@ set -uo pipefail   # no -e so we report all failures, not abort on first
 PLUGIN_ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$PLUGIN_ROOT" || { echo "FATAL: cannot cd to $PLUGIN_ROOT"; exit 2; }
 
+# Interpreter discovery (v0.13.0): python3 → python → py -3 via the shared lib.
+# cwd is $PLUGIN_ROOT here (stable), so the relative lib path resolves. Dev-surface
+# scripts REQUIRE an engine; a python-less machine gets a loud NOTE and the
+# python-backed checks below fail visibly (intended — CI always has an engine).
+HA_LIB_DIR="scripts/lib"
+# shellcheck disable=SC1091
+. "${HA_LIB_DIR}/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
+if [ -z "$PYBIN" ]; then
+    echo "NOTE: no python interpreter (python3/python/py) found — python-backed checks will fail; install Python or rely on CI." >&2
+fi
+
 FAIL=0
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -53,7 +66,8 @@ echo ""
 # ---- 2. JSON validity ----
 echo "[2/11] JSON parse + scripts/*.mjs syntax..."
 while IFS= read -r f; do
-    if python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
+    # shellcheck disable=SC2086
+    if [ -n "$PYBIN" ] && $PYBIN -c "import json; json.load(open('$f'))" 2>/dev/null; then
         ok "parse $f"
     else
         fail "invalid JSON: $f"
@@ -192,8 +206,9 @@ echo ""
 # ---- 7. SessionStart hook smoke test ----
 echo "[7/11] SessionStart hook smoke test..."
 if [ -x hooks/session-start ]; then
-    if out=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash hooks/session-start 2>/dev/null) && \
-       echo "$out" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'hookSpecificOutput' in d, 'missing hookSpecificOutput'; assert d['hookSpecificOutput'].get('hookEventName')=='SessionStart'" 2>/dev/null; then
+    # shellcheck disable=SC2086
+    if out=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash hooks/session-start 2>/dev/null) && [ -n "$PYBIN" ] && \
+       echo "$out" | $PYBIN -c "import sys,json; d=json.load(sys.stdin); assert 'hookSpecificOutput' in d, 'missing hookSpecificOutput'; assert d['hookSpecificOutput'].get('hookEventName')=='SessionStart'" 2>/dev/null; then
         ok "session-start produces valid SessionStart JSON"
     else
         fail "session-start invalid output: $(echo "$out" | head -c 200)"

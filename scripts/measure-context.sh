@@ -12,6 +12,17 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Interpreter discovery (v0.13.0): python3 → python → py -3 via the shared chain.
+# SCRIPT_DIR is already absolute (no cd follows), so the lib path is stable.
+HA_LIB_DIR="$SCRIPT_DIR/lib"
+# shellcheck disable=SC1091
+. "${HA_LIB_DIR}/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
+if [ -z "$PYBIN" ]; then
+    echo "NOTE: no python interpreter (python3/python/py) found — this tool needs Python to decode the hook JSON; install it or rely on CI." >&2
+fi
+
 echo "=== measure-context ==="
 echo ""
 
@@ -35,7 +46,8 @@ if [ -z "$OUTPUT" ]; then
 fi
 
 # ---- 3. Decode the additionalContext field ----
-CONTEXT=$(printf '%s' "$OUTPUT" | python3 -c "
+# shellcheck disable=SC2086
+CONTEXT=$(printf '%s' "$OUTPUT" | $PYBIN -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -93,7 +105,8 @@ git -C "$GEN_DIR" init -q 2>/dev/null
 printf '# scratch\n' > "$GEN_DIR/README.md"
 OUTPUT2=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$GEN_DIR" \
     bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
-CONTEXT2=$(printf '%s' "$OUTPUT2" | python3 -c "
+# shellcheck disable=SC2086
+CONTEXT2=$(printf '%s' "$OUTPUT2" | $PYBIN -c "
 import json, sys
 try:
     print(json.load(sys.stdin).get('hookSpecificOutput', {}).get('additionalContext', ''))
