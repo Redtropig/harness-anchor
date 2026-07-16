@@ -8,12 +8,15 @@
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# additionalContext extraction via the shared engine chain (python3→python→py→node). (v0.13.0)
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
 PASS=0; FAIL=0
 ok()  { echo "  OK   $*"; PASS=$((PASS+1)); }
 bad() { echo "  FAIL $*"; FAIL=$((FAIL+1)); }
 
 decode_ctx() {
-    printf '%s' "$1" | python3 -c "import json,sys; print(json.load(sys.stdin).get('hookSpecificOutput',{}).get('additionalContext',''))" 2>/dev/null || true
+    printf '%s' "$1" | ha_json_field hookSpecificOutput.additionalContext
 }
 run_hook() {
     CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$1" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true

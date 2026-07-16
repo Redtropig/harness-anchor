@@ -7,8 +7,17 @@
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Python discovery via the shared chain (python3→python→py); the whole test is a
+# python oracle, so a missing interpreter is an honest whole-file SKIP. argv-passed
+# path is MSYS-safe. (v0.13.0)
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
+[ -n "$PYBIN" ] || { echo "SKIP: feature-list-schema needs python (python3/python/py)"; exit 0; }
 
-python3 - "$PLUGIN_ROOT" <<'PY'
+# shellcheck disable=SC2086
+$PYBIN - "$PLUGIN_ROOT" <<'PY'
 import json, re, sys, os
 root = sys.argv[1]
 schema_path  = os.path.join(root, "templates", "feature_list.schema.json")

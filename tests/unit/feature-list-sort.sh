@@ -6,12 +6,20 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SORT="$PLUGIN_ROOT/scripts/feature-list-sort.mjs"
+# Oracle checks below read the sorted JSON via python; discover it through the
+# shared chain (python3→python→py) and pass paths as argv, never spliced into
+# -c text — $FL is an absolute mktemp path native Windows python can't embed-open. (v0.13.0)
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
 
 PASS=0; FAIL=0
 ok()  { echo "  OK   $*"; PASS=$((PASS+1)); }
 bad() { echo "  FAIL $*"; FAIL=$((FAIL+1)); }
 
 command -v node >/dev/null 2>&1 || { echo "SKIP: node not found"; exit 0; }
+[ -n "$PYBIN" ] || { echo "SKIP: needs python (python3/python/py) for oracle checks"; exit 0; }
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -37,16 +45,19 @@ JSON
 node "$SORT" "$FL" || bad "feature-list-sort exited non-zero"
 
 # 1. actionable-first order: in-progress, blocked, planned(createdAt asc), pass(completedAt desc)
-order=$(python3 -c "import json; print(','.join(f['id'] for f in json.load(open('$FL'))['features']))")
+# shellcheck disable=SC2086
+order=$($PYBIN -c "import json,sys; print(','.join(f['id'] for f in json.load(open(sys.argv[1]))['features']))" "$FL")
 expected="a-inprog,b-blocked,c-planned-early,m-planned,y-pass-new,z-pass-old"
 if [ "$order" = "$expected" ]; then ok "actionable-first order"; else bad "order: got [$order] want [$expected]"; fi
 
 # 2. unknown top-level key preserved (no silent field loss)
-if python3 -c "import json,sys; sys.exit(0 if json.load(open('$FL')).get('customKey')=='must-survive' else 1)"; then
+# shellcheck disable=SC2086
+if $PYBIN -c "import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get('customKey')=='must-survive' else 1)" "$FL"; then
     ok "unknown top-level key preserved"; else bad "customKey lost"; fi
 
 # 3. evidence preserved on pass features
-if python3 -c "import json,sys; d=json.load(open('$FL')); e={f['id']:f.get('evidence') for f in d['features']}; sys.exit(0 if e['y-pass-new'] and e['y-pass-new']['commit']=='new' else 1)"; then
+# shellcheck disable=SC2086
+if $PYBIN -c "import json,sys; d=json.load(open(sys.argv[1])); e={f['id']:f.get('evidence') for f in d['features']}; sys.exit(0 if e['y-pass-new'] and e['y-pass-new']['commit']=='new' else 1)" "$FL"; then
     ok "evidence preserved"; else bad "evidence lost/corrupted"; fi
 
 # 4. idempotent: a second run must not change a single byte
@@ -67,7 +78,8 @@ solo_after=$(shasum "$SOLO" | awk '{print $1}')
 if [ "$solo_before" = "$solo_after" ]; then ok "single-feature file untouched"; else bad "single-feature file rewritten"; fi
 
 # 7. schema-valid: the sorted output still satisfies feature_list.schema.json's core rules
-if python3 - "$FL" <<'PY'
+# shellcheck disable=SC2086
+if $PYBIN - "$FL" <<'PY'
 import json, re, sys
 d = json.load(open(sys.argv[1]))
 assert 'project' in d and isinstance(d.get('features'), list)

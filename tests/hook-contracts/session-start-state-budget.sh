@@ -7,12 +7,21 @@
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Shared engine chain: ha_json_field for additionalContext, $PYBIN for the
+# fixture-writer heredocs (python3→python→py). (v0.13.0)
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
+PYBIN=""
+command -v ha_python >/dev/null 2>&1 && PYBIN=$(ha_python || true)
+# The fixture generators below need python to build the >64KB/>32KB state files;
+# without it there is nothing meaningful to measure — honest whole-file SKIP. (v0.13.0)
+[ -n "$PYBIN" ] || { echo "SKIP: session-start-state-budget needs python (python3/python/py)"; exit 0; }
 PASS=0; FAIL=0
 ok()  { echo "  OK   $*"; PASS=$((PASS+1)); }
 bad() { echo "  FAIL $*"; FAIL=$((FAIL+1)); }
 
 decode_ctx() {
-    printf '%s' "$1" | python3 -c "import json,sys; print(json.load(sys.stdin).get('hookSpecificOutput',{}).get('additionalContext',''))" 2>/dev/null || true
+    printf '%s' "$1" | ha_json_field hookSpecificOutput.additionalContext
 }
 run_hook() {
     CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$1" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true
@@ -33,7 +42,8 @@ fi
 
 echo ""
 echo "=== progress.md > 64KB -> sentinel names it, budget held ==="
-python3 - <<'PY'
+# shellcheck disable=SC2086
+$PYBIN - <<'PY'
 with open('progress.md', 'w') as f:
     f.write('# Progress Log\n\n---\n')
     for i in range(400):
@@ -51,7 +61,8 @@ if [ "$len" -le 12000 ]; then ok "context ${len} <= 12000"; else bad "context ${
 
 echo ""
 echo "=== feature_list.json also > 32KB -> both named on ONE line ==="
-python3 - <<'PY'
+# shellcheck disable=SC2086
+$PYBIN - <<'PY'
 import json
 feats = []
 for i in range(60):
@@ -68,7 +79,8 @@ if [ "$n" -eq 1 ]; then ok "exactly one sentinel line"; else bad "expected 1 sen
 
 echo ""
 echo "=== golden-rules.md > 8KB (non-archivable file) -> also named on the sentinel line ==="
-python3 - <<'PY'
+# shellcheck disable=SC2086
+$PYBIN - <<'PY'
 with open('golden-rules.md', 'w') as f:
     f.write('# Golden Rules\n\n## Rules\n')
     for i in range(1, 60):
@@ -84,7 +96,8 @@ echo ""
 echo "=== barely over cap (65537B) -> size rounds UP: 65KB>64KB, never self-equal 64KB>64KB ==="
 printf '{ "project": "s", "features": [] }\n' > feature_list.json
 rm -f golden-rules.md
-python3 - <<'PY'
+# shellcheck disable=SC2086
+$PYBIN - <<'PY'
 # ASCII-only so char count == byte count: exactly 65537 bytes, one over the cap.
 s = '# Progress Log\n\n---\n\n## 2026-06-02 - Session X\n\n- '
 s += 'x' * (65537 - len(s))
