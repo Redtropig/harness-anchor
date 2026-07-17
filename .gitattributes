@@ -11,6 +11,11 @@ hooks/post-tool-use text eol=lf
 hooks/stop text eol=lf
 hooks/user-prompt-submit text eol=lf
 
+# The meta-skill is awk-consumed by hooks/session-start (conditional-region
+# filter + injection length); pin LF so marker anchors and counts are
+# deterministic on every checkout.
+skills/using-harness-anchor/SKILL.md text eol=lf
+
 # hooks/run-hook.cmd stays under `* text=auto` ON PURPOSE: the cmd/bash
 # polyglot needs platform-native endings on each side (CRLF for cmd.exe on
 # Windows checkouts, LF for POSIX sh on Unix checkouts). Do not force eol.

@@ -15,19 +15,25 @@
 #   ha_json_valid, ha_flist_active, ha_mtime, ha_python.
 
 # ---- platform ----
+# HA_OS taxonomy: windows | darwin | linux. validate-anchor's HA_OS_TAXONOMY
+# mirrors this list — keep both in sync when adding a platform.
+# A pre-set HA_OS is RESPECTED (v0.14.0): tests inject platform states, and a
+# user may override classification (containers / WSL / trying a new platform).
+# The PATH shield keys on the REAL uname regardless — environment fact and
+# taxonomy classification are deliberately decoupled.
 ha_platform_init() {
     case "$(uname -s 2>/dev/null)" in
         MINGW*|MSYS*|CYGWIN*)
-            HA_OS="windows"
             # System32 ships incompatible find.exe / sort.exe / timeout.exe.
             # /usr/bin first makes GNU coreutils win for this process tree.
             case ":$PATH:" in
                 *":/usr/bin:"*) : ;;
                 *) PATH="/usr/bin:$PATH" ;;
             esac
+            : "${HA_OS:=windows}"
             ;;
-        Darwin) HA_OS="darwin" ;;
-        *)      HA_OS="linux" ;;
+        Darwin) : "${HA_OS:=darwin}" ;;
+        *)      : "${HA_OS:=linux}" ;;
     esac
     export HA_OS
 }
