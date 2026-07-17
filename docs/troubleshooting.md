@@ -173,3 +173,18 @@ outside the hooks inherit your own PATH.
 
 **Fix:** In your scripts, source `${CLAUDE_PLUGIN_ROOT}/scripts/lib/portable.sh` and
 call `ha_platform_init`, or put Git's `/usr/bin` first on PATH yourself.
+
+## 12. Platform content not injected / injected on the wrong platform
+
+**Symptom:** An `<!-- os-<name> -->` region of the meta-skill never appears in the
+SessionStart context, or appears on the wrong OS.
+
+**Diagnosis:** A region is kept only when `<name>` equals the runtime `HA_OS`
+(`windows` | `darwin` | `linux`). Everything else — typos, names outside the
+taxonomy, a pre-set `HA_OS` override in the environment — is dropped silently
+(fail-slim: an unknown name never fattens the injection).
+
+**Fix:** Check the runtime value and overrides:
+`bash -c '. scripts/lib/portable.sh; ha_platform_init; echo $HA_OS'` and
+`env | grep '^HA_OS='`. `scripts/validate-anchor.sh` ([7/12]) rejects
+malformed or off-taxonomy markers at authoring time.

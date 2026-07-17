@@ -11,7 +11,7 @@
 | harness-anchor injection (= the three parts below) | this plugin's SessionStart | **generic ≈1160 / C-C++ ≈1580 measured / 3000 cap** | Hard-capped at 12000 chars; re-measure the plugin baselines anytime: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/measure-context.sh` |
 | ├ state banner | `<harness-anchor-state>` block | ~150 | active feature, project type, TOC freshness, golden-rules count, state-budget sentinel, handoff head (first 10 lines) |
 | ├ TOC view | `<project-toc>` adaptive block | leftover-sized (~1700 available on a generic project) | full `## Files` when it fits; directory map (or just its top levels) on large repos |
-| └ meta-skill body | `using-harness-anchor` SKILL.md | ~1050 generic / ~1200 C-C++ | injected slimmed (no frontmatter; cpp-only regions gated by cpp-detect); truncated last if the cap would be exceeded |
+| └ meta-skill body | `using-harness-anchor` SKILL.md | ~1050 generic / ~1200 C-C++ | injected slimmed (no frontmatter; cpp-only regions gated by cpp-detect; os-<name> regions gated by HA_OS); truncated last if the cap would be exceeded |
 
 Measured at v0.10.0 on the reference fixtures; the TOC and handoff parts vary per project.
 Tier-1 headroom is deliberate — it belongs to the TOC block, not to new always-on content.
