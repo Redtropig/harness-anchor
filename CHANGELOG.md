@@ -4,6 +4,37 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-18
+
+### Added
+
+- **Cross-platform content modularization.** Platform-specific agent-facing content
+  now has two dedicated channels: `skills/<skill>/platform/<os>.md` sidecars for
+  operational depth (loaded on demand behind an inline same-skill pointer;
+  decision-shaping facts — availability, verdict rules — stay inline), and
+  `<!-- os-<name>-start/end -->` regions in the injected meta-skill, mechanically
+  dropped by SessionStart unless `<name>` matches the runtime `HA_OS` (fail-slim:
+  unknown names never fatten the injection). First sidecar:
+  `cpp-sanitizers/platform/windows.md` (substitute-tool preference table).
+  Adding a platform = adding content; no mechanism change.
+- SessionStart banner `Platform:` line (HA_OS taxonomy: `windows (Git-Bash)` |
+  `darwin` | `linux`; unknown pre-set values pass through verbatim).
+- `ha_platform_init` respects a pre-set `HA_OS` (tests inject platform states;
+  users may override classification) — the Windows PATH shield stays keyed on
+  the real uname.
+- validate-anchor: joint flat sequencing across both conditional-region families,
+  os-name taxonomy whitelist, inert-marker detection outside the meta-skill, and
+  `[12/12]` platform-sidecar ↔ SKILL.md pointer integrity (bidirectional).
+
+### Changed
+
+- `cpp-sanitizers` Windows substitute detail moved to `platform/windows.md`
+  (SKILL.md keeps the availability matrix and the never-CLEAN verdict rule
+  inline); `/sanitize` pointer updated accordingly. CLAUDE.md invariant #2
+  wording generalized to conditional regions; the skill-authoring rules gain the
+  platform decision-weight split. The meta-skill is pinned `eol=lf` (it is
+  awk-consumed by the injection filter).
+
 ## [0.13.0] - 2026-07-16
 
 ### Added
@@ -507,7 +538,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/Redtropig/harness-anchor/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Redtropig/harness-anchor/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Redtropig/harness-anchor/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Redtropig/harness-anchor/compare/v0.10.0...v0.11.0

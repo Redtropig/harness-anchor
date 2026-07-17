@@ -17,7 +17,7 @@ Stop. Read this before doing anything.
 ## Design Invariants (do not break)
 
 1. **Warn-only hooks.** No PostToolUse / Stop / UserPromptSubmit hook may produce JSON with `"permissionDecision": "deny"` or `"stopReason"`. PostToolUse / UserPromptSubmit / SessionStart surface `additionalContext` for self-correction; the **Stop** event has no `additionalContext` channel, so its reminder uses `systemMessage` (still non-blocking — never `decision: "block"`).
-2. **SessionStart token budget ≤ 3000 tokens.** Roughly 12000 chars of injected content. Hard-truncate with a pointer to the on-disk file. The meta-skill body is injected *slimmed* (frontmatter stripped; `cpp-only` regions dropped in non-C/C++ projects) — headroom belongs to the project-specific TOC/handoff, not to a fatter generic body.
+2. **SessionStart token budget ≤ 3000 tokens.** Roughly 12000 chars of injected content. Hard-truncate with a pointer to the on-disk file. The meta-skill body is injected *slimmed* (frontmatter stripped; conditional regions dropped when their gate doesn't match — `cpp-only` by project type, `os-<name>` by HA_OS platform) — headroom belongs to the project-specific TOC/handoff, not to a fatter generic body.
 3. **Subagents are single-level.** Every subagent prompt must end with: *"Do not invoke other subagents from this one."*
 4. **State files are git-tracked by default.** `.harness-anchor/` (error log dir) is the only gitignored runtime path.
 5. **C/C++ skills are gated by `cpp-detect.sh`.** They must include a frontmatter trigger condition referencing the detected build system; they must not activate in non-C/C++ projects.
@@ -35,7 +35,7 @@ Stop. Read this before doing anything.
 ## Authoring a New Skill (when explicitly asked)
 
 1. Decide if it's generic (language-agnostic) or C/C++ specific. The frontmatter description must make this clear.
-2. SKILL.md keeps the main flow in ≤200 lines. Heavy reference → sibling `.md` files.
+2. SKILL.md keeps the main flow in ≤200 lines. Heavy reference → sibling `.md` files. Platform-specific content splits by decision weight: facts an agent needs to *judge* correctly (availability, verdict rules) stay inline; operational depth (substitute tools, commands, workarounds) goes to `platform/<os>.md` (os ∈ the HA_OS taxonomy) behind an inline "On <OS>, read …" pointer using a same-skill relative path (cross-skill mentions name the skill, never a path). Don't create a platform file for <10 lines of pure decision facts.
 3. Frontmatter description: ≤500 chars, front-load with "Use when X" trigger.
 4. Add at least one adversarial prompt under `tests/skill-triggering/prompts/` proving the skill triggers on a naive user message that *doesn't* mention the skill name.
 5. Update `scripts/validate-anchor.sh` checklist if needed.

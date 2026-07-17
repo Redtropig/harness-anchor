@@ -39,7 +39,7 @@ the ≤5s warn-only hook budget (CLAUDE.md invariants #4 and #7). PostToolUse ma
    - **Windows:** TSan is unavailable on Windows toolchains — if TSan is requested or
      indicated, report Verdict **INFRA-FAIL** with: "TSan is unavailable on Windows;
      run the TSan arm under WSL2 or Linux CI, or use Intel Inspector for native race
-     detection" (see `cpp-sanitizers` → Windows platform notes). ASan+UBSan proceed
+     detection" (see `cpp-sanitizers` → `platform/windows.md`). ASan+UBSan proceed
      normally with clang/MinGW; under pure MSVC only ASan is available (UBSan flags
      will fail at configure — that too is INFRA-FAIL, not CLEAN).
 
