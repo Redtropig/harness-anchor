@@ -162,7 +162,7 @@ Windows-specific behaviors handled for you: LF checkout is forced for all bash
 files via `.gitattributes`; `System32`'s incompatible `find`/`sort`/`timeout` are
 shielded by a PATH prepend inside each hook; `C:\` paths are normalized at hook
 entry. C/C++ notes: TSan/LSan don't exist on Windows — see the `cpp-sanitizers`
-skill's *Windows platform notes* for the substitute-tool table (WSL2, Intel
+skill's `platform/windows.md` sidecar for the substitute-tool table (WSL2, Intel
 Inspector, Dr. Memory, CRT debug heap, `/RTC1`).
 
 ## Verifying installation
