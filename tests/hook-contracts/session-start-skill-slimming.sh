@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Contract test for the SessionStart meta-skill slimming (v0.10.0).
+# Contract test for the SessionStart meta-skill slimming (v0.10.0; os-region + Platform line v0.14.0).
 #
 # The injected body must be the SLIMMED form of using-harness-anchor/SKILL.md:
 # no YAML frontmatter, no cpp-only marker text ever, cpp-only regions present
@@ -19,7 +19,13 @@ decode_ctx() {
     printf '%s' "$1" | ha_json_field hookSpecificOutput.additionalContext
 }
 run_hook() {
-    CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$1" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true
+    # $2 (optional): pre-set HA_OS — exercises the v0.14.0 override semantics
+    # (portable.sh respects a caller-set HA_OS; PATH shield stays uname-keyed).
+    if [ -n "${2:-}" ]; then
+        HA_OS="$2" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$1" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true
+    else
+        CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$1" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true
+    fi
 }
 
 G=""; C=""
@@ -56,6 +62,26 @@ printf '%s' "$ctx" | grep -q '/sanitize' && ok "/sanitize line injected" || bad 
 if printf '%s' "$ctx" | grep -q 'cpp-only'; then bad "marker text leaked (cpp mode)"; else ok "no marker text (cpp mode)"; fi
 len=${#ctx}
 if [ "$len" -le 12000 ]; then ok "context ${len} <= 12000"; else bad "context ${len} > 12000"; fi
+
+echo ""
+echo "=== os-region: HA_OS=windows -> os-windows region + Platform line injected ==="
+ctx=$(decode_ctx "$(run_hook "$G" windows)")
+printf '%s' "$ctx" | grep -q 'Windows session (Git-Bash)' && ok "os-windows region injected" || bad "os-windows region missing under HA_OS=windows"
+printf '%s' "$ctx" | grep -q 'Platform:         windows (Git-Bash)' && ok "banner Platform line (windows)" || bad "banner Platform line missing/wrong (windows)"
+if printf '%s' "$ctx" | grep -q '<!-- os-'; then bad "os marker text leaked"; else ok "no os marker text"; fi
+printf '%s' "$ctx" | grep -q '## Priority Order' && ok "content after os region survives" || bad "post-os-region content missing (skip leak?)"
+
+echo ""
+echo "=== os-region: HA_OS=linux -> os-windows region dropped, Platform line = linux ==="
+ctx=$(decode_ctx "$(run_hook "$G" linux)")
+if printf '%s' "$ctx" | grep -q 'Windows session (Git-Bash)'; then bad "os-windows region injected under HA_OS=linux"; else ok "os-windows region dropped"; fi
+printf '%s' "$ctx" | grep -q 'Platform:         linux' && ok "banner Platform line (linux)" || bad "banner Platform line missing (linux)"
+
+echo ""
+echo "=== cpp project + HA_OS=windows -> cpp-only AND os-windows both injected ==="
+ctx=$(decode_ctx "$(run_hook "$C" windows)")
+printf '%s' "$ctx" | grep -q 'cpp-build-systems' && ok "cpp regions present (combined)" || bad "cpp regions missing (combined)"
+printf '%s' "$ctx" | grep -q 'Windows session (Git-Bash)' && ok "os-windows region present (combined)" || bad "os-windows region missing (combined)"
 
 echo ""
 echo "==================================="

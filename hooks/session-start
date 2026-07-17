@@ -8,8 +8,10 @@
 #   - State-file budget sentinel (only when a budgeted file exceeds its cap; see step 2d)
 #   - Session handoff head (first 10 lines of session-handoff.md)
 #   - Compact notice line (only when the hook fired with stdin source=="compact")
+#   - Platform line (HA_OS taxonomy: windows (Git-Bash) | darwin | linux)
 #   - using-harness-anchor SKILL.md body (the meta-skill, injected slimmed:
-#     frontmatter stripped; cpp-only regions gated by cpp-detect — see step 7)
+#     frontmatter stripped; cpp-only regions gated by cpp-detect; os-<name>
+#     regions gated by HA_OS — see step 7)
 #
 # Hard constraints:
 #   - Token budget ≤ 3000 (~ 12000 chars). Skill body truncated to fit.
@@ -220,11 +222,19 @@ main() {
         [ -n "$pv" ] && plugin_version="$pv"
     fi
 
+    # Platform label: HA_OS is the plugin's own taxonomy (the harness env block
+    # says "win32"; this line carries the Git-Bash-baseline semantics and any
+    # future finer buckets) and closes the loop for skills' platform/<os>.md
+    # pointers. Unknown pre-set values pass through verbatim (override support).
+    platform_label="$HA_OS"
+    [ "$HA_OS" = "windows" ] && platform_label="windows (Git-Bash)"
+
     banner="<harness-anchor-state>
 Plugin:           harness-anchor v${plugin_version}
 Project root:     ${PROJECT_DIR}
 Active feature:   ${active_feature}
 Project type:     ${project_type}
+Platform:         ${platform_label}
 TOC freshness:    ${toc_status}"
 
     # ---- 5b. Compact caution (v0.12.0) — only when this SessionStart fired on a compaction ----
@@ -278,22 +288,26 @@ Last session handoff: (no session-handoff.md — run /anchor or /session-end)"
 
     # ---- 7. Read + slim the meta-skill body ----
     # Injected form = a pure filter of the file: strip the YAML frontmatter
-    # (metadata for the skill lister, not the session) and, in non-C/C++
-    # projects, the <!-- cpp-only-start/end --> regions (invariant #5 —
-    # cpp-detect gates C/C++ content). Marker lines are never injected.
-    # Regions are FLAT by contract — this single-boolean filter cannot parse
-    # nesting; validate-anchor [7/9] rejects nested/misordered markers at
-    # authoring time. The file itself stays intact for the Skill-tool path.
+    # (metadata for the skill lister, not the session), the <!-- cpp-only -->
+    # regions in non-C/C++ projects (invariant #5 — cpp-detect gates C/C++
+    # content), and any <!-- os-<name> --> region whose name is not the current
+    # HA_OS (v0.14.0 — unknown names drop too: fail-slim, never fail-fat).
+    # Marker lines are never injected. BOTH families are FLAT by contract —
+    # this single-boolean filter cannot parse nesting; validate-anchor [7/12]
+    # rejects nested/misordered/mismatched markers at authoring time. The file
+    # itself stays intact for the Skill-tool path.
     skill_content=""
     if [ -f "$SKILL_FILE" ]; then
         is_cpp=0
         case "$project_type" in cpp*) is_cpp=1 ;; esac
-        skill_content="$(awk -v cpp="$is_cpp" '
+        skill_content="$(awk -v cpp="$is_cpp" -v os="$HA_OS" '
             NR==1 && /^---$/          { fm=1; next }
             fm && /^---$/             { fm=0; next }
             fm                        { next }
             /<!-- cpp-only-start -->/ { if (!cpp) skip=1; next }
             /<!-- cpp-only-end -->/   { skip=0; next }
+            /<!-- os-[a-z0-9]+-start -->/ { n=$0; sub(/.*<!-- os-/,"",n); sub(/-start -->.*/,"",n); if (n != os) skip=1; next }
+            /<!-- os-[a-z0-9]+-end -->/   { skip=0; next }
             skip                      { next }
             { print }
         ' "$SKILL_FILE")"

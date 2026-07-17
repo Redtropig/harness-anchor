@@ -7,6 +7,10 @@ description: Use whenever working in a project. Establishes state/scope/verifica
 
 You have the **harness-anchor** runtime layer, companion to `superpowers` (process methodology): it anchors **state persistence, scope boundaries, verification gates, and C/C++ engineering**.
 
+<!-- os-windows-start -->
+**Windows session (Git-Bash):** plugin scripts already handle path and JSON-engine portability — do not hand-"fix" MSYS paths or shell out to PowerShell. C/C++ caveat: TSan/LSan are unavailable on this platform; read the `cpp-sanitizers` skill's Windows platform notes before trusting sanitizer coverage.
+<!-- os-windows-end -->
+
 ## Priority Order
 
 1. **User's explicit instructions** (CLAUDE.md, direct requests) — highest
