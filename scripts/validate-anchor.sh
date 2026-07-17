@@ -3,17 +3,18 @@
 # Run inside the plugin root, or pass the plugin root as the first positional
 # argument (validate-anchor.sh [plugin-root]); it defaults to the repo root.
 #
-# Checks (labelled [1/11]..[11/11] in the output):
-#   [1/11]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
-#   [2/11]   JSON files parse; scripts/*.mjs pass node --check
-#   [3-4/11] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
-#   [5/11]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
-#   [6/11]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
-#   [7/11]   SessionStart hook is executable and produces valid JSON when run; meta-skill cpp-only regions well-formed + flat (sequenced, non-nested)
-#   [8/11]   Commands directory consistency (each commands/*.md is a usable /command)
-#   [9/11]   Every template referenced from commands/anchor.md + cpp-init.md AND from scaffold.sh's template map exists
-#   [10/11]  Command↔script wiring: the four mechanism scripts exist + executable + bash -n; every ${CLAUDE_PLUGIN_ROOT}/scripts/* referenced by a command/agent md resolves
-#   [11/11]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; every hook sources it AND calls ha_platform_init (the Windows python3→python→py→node engine-chain wiring)
+# Checks (labelled [1/12]..[11/12] in the output):
+#   [1/12]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
+#   [2/12]   JSON files parse; scripts/*.mjs pass node --check
+#   [3-4/12] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
+#   [5/12]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
+#   [6/12]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
+#   [7/12]   SessionStart hook is executable and produces valid JSON when run; meta-skill conditional regions (cpp-only + os-<name>) well-formed, jointly flat, taxonomy-whitelisted
+#   [8/12]   Commands directory consistency (each commands/*.md is a usable /command)
+#   [9/12]   Every template referenced from commands/anchor.md + cpp-init.md AND from scaffold.sh's template map exists
+#   [10/12]  Command↔script wiring: the four mechanism scripts exist + executable + bash -n; every ${CLAUDE_PLUGIN_ROOT}/scripts/* referenced by a command/agent md resolves
+#   [11/12]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; every hook sources it AND calls ha_platform_init (the Windows python3→python→py→node engine-chain wiring)
+#   [12/12]  Platform sidecars (v0.14.0): skills/*/platform/<os>.md ↔ SKILL.md pointer integrity (bidirectional, same-skill relative); os names in taxonomy
 
 set -uo pipefail   # no -e so we report all failures, not abort on first
 
@@ -33,6 +34,9 @@ if [ -z "$PYBIN" ]; then
     echo "NOTE: no python interpreter (python3/python/py) found — python-backed checks will fail; install Python or rely on CI." >&2
 fi
 
+# HA_OS taxonomy — MUST mirror scripts/lib/portable.sh ha_platform_init.
+HA_OS_TAXONOMY="windows darwin linux"
+
 FAIL=0
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -46,7 +50,7 @@ echo "Root: $PLUGIN_ROOT"
 echo ""
 
 # ---- 1. Required files ----
-echo "[1/11] Required files..."
+echo "[1/12] Required files..."
 for f in \
     .claude-plugin/plugin.json \
     .claude-plugin/marketplace.json \
@@ -64,7 +68,7 @@ done
 echo ""
 
 # ---- 2. JSON validity ----
-echo "[2/11] JSON parse + scripts/*.mjs syntax..."
+echo "[2/12] JSON parse + scripts/*.mjs syntax..."
 while IFS= read -r f; do
     # shellcheck disable=SC2086
     if [ -n "$PYBIN" ] && $PYBIN -c "import json; json.load(open('$f'))" 2>/dev/null; then
@@ -103,7 +107,7 @@ fi
 echo ""
 
 # ---- 3 & 4. SKILL.md frontmatter ----
-echo "[3-4/11] SKILL.md frontmatter (name + description, ≤500 chars desc)..."
+echo "[3-4/12] SKILL.md frontmatter (name + description, ≤500 chars desc)..."
 while IFS= read -r skill; do
     if ! head -1 "$skill" | grep -q '^---$'; then
         fail "$skill: missing frontmatter opener"
@@ -127,7 +131,7 @@ done < <(find skills -name SKILL.md 2>/dev/null)
 echo ""
 
 # ---- 5. Agent frontmatter (name + description) ----
-echo "[5/11] Agent frontmatter + single-level constraint (invariant #3) + fresh-dir evidence contract (invariant #4)..."
+echo "[5/12] Agent frontmatter + single-level constraint (invariant #3) + fresh-dir evidence contract (invariant #4)..."
 if [ -d agents ]; then
     while IFS= read -r agent; do
         [ -e "$agent" ] || continue
@@ -172,7 +176,7 @@ fi
 echo ""
 
 # ---- 6. Command frontmatter (description, no name required) ----
-echo "[6/11] Command frontmatter (description ≤500 chars + allowed-tools shape)..."
+echo "[6/12] Command frontmatter (description ≤500 chars + allowed-tools shape)..."
 if [ -d commands ]; then
     while IFS= read -r cmd; do
         [ -e "$cmd" ] || continue
@@ -204,7 +208,7 @@ fi
 echo ""
 
 # ---- 7. SessionStart hook smoke test ----
-echo "[7/11] SessionStart hook smoke test..."
+echo "[7/12] SessionStart hook smoke test..."
 if [ -x hooks/session-start ]; then
     # shellcheck disable=SC2086
     if out=$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash hooks/session-start 2>/dev/null) && [ -n "$PYBIN" ] && \
@@ -216,9 +220,10 @@ if [ -x hooks/session-start ]; then
 else
     fail "hooks/session-start not executable"
 fi
-# Injection-source sanity: cpp-only regions in the meta-skill must be FLAT —
-# properly ordered, non-nested, closed. The session-start filter is a single
-# on/off boolean: a nested pair lets the inner 'end' clear the skip early and
+# Injection-source sanity: conditional regions (cpp-only + os-<name>) in the
+# meta-skill must be JOINTLY FLAT — properly ordered, non-nested, non-interleaved,
+# closed, end-name matching. The session-start filter is a single on/off boolean
+# shared by BOTH families: a nested pair lets the inner 'end' clear the skip early and
 # leak the rest of the outer region into generic injections, and a stray 'end'
 # before 'start' swallows the file tail — in both cases raw start/end COUNTS
 # still match, so this scan subsumes a plain count balance (miscounts surface
@@ -226,13 +231,17 @@ fi
 ms="skills/using-harness-anchor/SKILL.md"
 if [ -f "$ms" ]; then
     seq_err=$(awk '
-        /^<!-- cpp-only-start -->$/ { if (inr) { printf "nested start at line %d", NR; bad=1; exit } inr=1; n++; next }
-        /^<!-- cpp-only-end -->$/   { if (!inr) { printf "end without start at line %d", NR; bad=1; exit } inr=0; next }
-        END { if (!bad) { if (inr) printf "unclosed region at EOF"; else printf "OK %d", n } }
+        function open_r(name) { if (inr) { printf "nested start (%s inside %s) at line %d", name, cur, NR; bad=1; exit } inr=1; cur=name; n++ }
+        function close_r(name) { if (!inr) { printf "end without start (%s) at line %d", name, NR; bad=1; exit } if (name != cur) { printf "mismatched end (%s closes %s) at line %d", name, cur, NR; bad=1; exit } inr=0 }
+        /^<!-- cpp-only-start -->$/ { open_r("cpp-only"); next }
+        /^<!-- cpp-only-end -->$/   { close_r("cpp-only"); next }
+        /^<!-- os-[a-z0-9]+-start -->$/ { t=$0; sub(/^<!-- /,"",t); sub(/-start -->$/,"",t); open_r(t); next }
+        /^<!-- os-[a-z0-9]+-end -->$/   { t=$0; sub(/^<!-- /,"",t); sub(/-end -->$/,"",t); close_r(t); next }
+        END { if (!bad) { if (inr) printf "unclosed region (%s) at EOF", cur; else printf "OK %d", n } }
     ' "$ms")
     case "$seq_err" in
-        OK*) ok "meta-skill cpp-only regions properly sequenced (${seq_err#OK } region(s), flat)" ;;
-        *)   fail "meta-skill cpp-only region sequencing: ${seq_err}" ;;
+        OK*) ok "meta-skill conditional regions properly sequenced (${seq_err#OK } region(s), jointly flat)" ;;
+        *)   fail "meta-skill conditional-region sequencing: ${seq_err}" ;;
     esac
     # Well-formedness: any line containing 'cpp-only' must be EXACTLY one of the two
     # markers, alone on its line. A malformed variant (e.g. a bare '<!-- cpp-only -->'
@@ -244,11 +253,36 @@ if [ -f "$ms" ]; then
     else
         fail "meta-skill malformed cpp-only line(s) — would slip past the awk filter: $(printf '%s' "$malformed" | head -1)"
     fi
+    malformed_os=$(grep -n '<!-- os-' "$ms" | grep -vE '^[0-9]+:<!-- os-[a-z0-9]+-(start|end) -->$' || true)
+    if [ -z "$malformed_os" ]; then
+        ok "meta-skill os-region lines are well-formed (exact markers, own line)"
+    else
+        fail "meta-skill malformed os-region line(s) — would slip past the awk filter: $(printf '%s' "$malformed_os" | head -1)"
+    fi
+    # os-<name> whitelist: unknown names are dropped by the filter on EVERY
+    # platform (fail-slim) — content behind a typo'd name silently never ships.
+    bad_os=""
+    for n in $(grep -oE '<!-- os-[a-z0-9]+-(start|end) -->' "$ms" 2>/dev/null | sed -E 's/^<!-- os-([a-z0-9]+)-(start|end) -->$/\1/' | sort -u); do
+        case " $HA_OS_TAXONOMY " in *" $n "*) : ;; *) bad_os="$bad_os $n" ;; esac
+    done
+    if [ -z "$bad_os" ]; then
+        ok "meta-skill os-region names within taxonomy ($HA_OS_TAXONOMY)"
+    else
+        fail "meta-skill os-region name(s) outside taxonomy:$bad_os (allowed: $HA_OS_TAXONOMY)"
+    fi
+    # os markers are only FILTERED in the injected meta-skill; in any other
+    # SKILL.md they ride into context as inert marker text when the skill fires.
+    inert=$(grep -ln '<!-- os-' skills/*/SKILL.md 2>/dev/null | grep -v 'using-harness-anchor' || true)
+    if [ -z "$inert" ]; then
+        ok "no inert os markers outside the injected meta-skill"
+    else
+        fail "os markers in non-injected SKILL.md (inert — use platform/<os>.md instead): $(printf '%s' "$inert" | head -1)"
+    fi
 fi
 echo ""
 
 # ---- 8. Commands referenced ----
-echo "[8/11] Commands directory consistency..."
+echo "[8/12] Commands directory consistency..."
 if [ -d commands ]; then
     for cmd in commands/*.md; do
         [ -e "$cmd" ] || continue
@@ -261,7 +295,7 @@ fi
 echo ""
 
 # ---- 9. Templates referenced in /anchor + /cpp-init exist ----
-echo "[9/11] Templates referenced by /anchor + /cpp-init..."
+echo "[9/12] Templates referenced by /anchor + /cpp-init..."
 found_any_cmd=0
 for src in commands/anchor.md commands/cpp-init.md; do
     [ -f "$src" ] || continue
@@ -307,7 +341,7 @@ fi
 echo ""
 
 # ---- 10. Command↔script wiring (thin-wrapper single point) ----
-echo "[10/11] Command↔script wiring..."
+echo "[10/12] Command↔script wiring..."
 for s in \
     scripts/golden-rules-check.sh \
     scripts/status-report.sh \
@@ -326,7 +360,7 @@ done < <(grep -rhoE '\{CLAUDE_PLUGIN_ROOT\}/scripts/[A-Za-z0-9._-]+' commands/ a
 echo ""
 
 # ---- 11. Platform layer wiring (v0.13.0 Windows compatibility) ----
-echo "[11/11] Platform layer (scripts/lib/portable.sh) wiring..."
+echo "[11/12] Platform layer (scripts/lib/portable.sh) wiring..."
 LIB="scripts/lib/portable.sh"
 if [ -f "$LIB" ]; then
     ok "$LIB present"
@@ -348,6 +382,41 @@ if [ -f "$LIB" ]; then
 else
     fail "$LIB missing — the v0.13.0 platform layer is not installed"
 fi
+echo ""
+
+# ---- 12. Platform sidecars (v0.14.0 cross-platform modularization) ----
+echo "[12/12] Platform sidecars (skills/*/platform/<os>.md <-> SKILL.md pointers)..."
+found_platform=0
+for pdir in skills/*/platform; do
+    [ -d "$pdir" ] || continue
+    found_platform=1
+    sk="${pdir%/platform}/SKILL.md"
+    for pf in "$pdir"/*.md; do
+        [ -e "$pf" ] || continue
+        base=$(basename "$pf" .md)
+        case " $HA_OS_TAXONOMY " in
+            *" $base "*) ok "$pf name in taxonomy" ;;
+            *) fail "$pf: os name '$base' not in taxonomy ($HA_OS_TAXONOMY)" ;;
+        esac
+        # Forward integrity: an unreferenced sidecar is an orphan the agent is
+        # never pointed at — dead weight pretending to be coverage.
+        if [ -f "$sk" ] && grep -q "platform/${base}\.md" "$sk"; then
+            ok "$pf referenced from $sk"
+        else
+            fail "$pf: orphan — no platform/${base}.md pointer in $sk"
+        fi
+    done
+done
+[ "$found_platform" -eq 0 ] && warn "no skills/*/platform directories (fine until a skill grows platform depth)"
+# Reverse integrity: every platform/<os>.md literal in a SKILL.md must resolve
+# in THAT skill's own directory (pointers are same-skill relative by rule;
+# cross-skill mentions name the skill, never a path).
+while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    f="${line%%:*}"; ref="${line#*:}"
+    d=$(dirname "$f")
+    if [ -f "$d/$ref" ]; then ok "$f -> $ref resolves"; else fail "dangling platform pointer: $ref (from $f)"; fi
+done < <(grep -oE 'platform/[a-z0-9]+\.md' skills/*/SKILL.md 2>/dev/null | sort -u)
 echo ""
 
 # ---- Summary ----
