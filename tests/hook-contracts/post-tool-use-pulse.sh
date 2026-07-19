@@ -124,6 +124,7 @@ oa1=$(mkag | run_hook)
 assert_silent "subagent 1st call (fresh window)" "$oa1"
 [ -f "$TMPDIR/.harness-anchor/pulse-s-dup-ag-1.tsv" ] && ok "agent-scoped window file" || bad "agent-scoped window file missing"
 oa2=$(mkag | run_hook)
+assert_silent "subagent 2nd call" "$oa2"
 oa3=$(mkag | run_hook)
 assert_contains "called 3x with identical input" "$oa3"
 

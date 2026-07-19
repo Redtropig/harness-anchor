@@ -70,6 +70,7 @@ main() {
     {
         printf 'ts=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         printf 'epoch=%s\n' "$(date +%s)"
+        printf 'session=%s\n' "$session_id"
         printf 'trigger=%s\n' "$trigger"
         printf 'tbytes=%s\n' "$tbytes"
         printf 'branch=%s\n' "$branch"
