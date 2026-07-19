@@ -88,7 +88,31 @@ assert_silent "unanchored" "$ou"
 [ ! -d "$UNANCH/.harness-anchor" ] && ok "no state dir in unanchored project" || bad "state dir created in unanchored project"
 rm -rf "$UNANCH"
 
-# === TASK2-SCENARIOS ===
+echo ""
+echo "=== watermark T1 fires from a NON-Edit tool (the fixed 1d blind spot) ==="
+T1=$(sed -n 's/^FLUSH_THRESHOLD_BYTES=\([0-9]*\).*/\1/p' "$HOOK"); [ -n "$T1" ] || T1=6291456
+T2=$(sed -n 's/^RESET_THRESHOLD_BYTES=\([0-9]*\).*/\1/p' "$HOOK"); [ -n "$T2" ] || T2=8388608
+# mkev_t <tool> <sid> <transcript> <cmd> — like mkev but with a transcript path.
+mkev_t() {
+    printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s","hook_event_name":"PostToolUse","tool_name":"%s","tool_input":{"command":"%s"},"tool_response":{"stdout":"x"}}' \
+        "$2" "$3" "$TMPDIR" "$1" "$4"
+}
+tr1="$TMPDIR/tr1.jsonl"; head -c "$((T1 + 1024))" /dev/zero | tr '\0' 'x' > "$tr1"
+ow1=$(mkev_t Grep s-wm1 "$tr1" c1 | run_hook)
+assert_contains "Context is filling" "$ow1"
+[ -f "$TMPDIR/.harness-anchor/flush-warned-s-wm1" ] && ok "T1 marker written" || bad "T1 marker missing"
+ow2=$(mkev_t Grep s-wm1 "$tr1" c2 | run_hook)
+assert_silent "T1 one-shot" "$ow2"
+
+echo ""
+echo "=== watermark T2 (reset advice) above RESET_THRESHOLD_BYTES, one-shot ==="
+tr2="$TMPDIR/tr2.jsonl"; head -c "$((T2 + 1024))" /dev/zero | tr '\0' 'x' > "$tr2"
+ow3=$(mkev_t Grep s-wm2 "$tr2" c1 | run_hook)
+assert_contains "Prefer a clean handoff" "$ow3"
+[ -f "$TMPDIR/.harness-anchor/reset-advised-s-wm2" ] && ok "T2 marker written" || bad "T2 marker missing"
+[ -f "$TMPDIR/.harness-anchor/flush-warned-s-wm2" ] && ok "T2 also plants T1 marker (no regressive advice later)" || bad "T2 did not plant T1 marker"
+ow4=$(mkev_t Grep s-wm2 "$tr2" c2 | run_hook)
+assert_silent "T2 one-shot" "$ow4"
 # === TASK3-SCENARIOS ===
 
 echo ""

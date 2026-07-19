@@ -152,7 +152,25 @@ pulse_run() {
         fi
     fi
 
-    # (Task 2 inserts the two-stage watermark here.)
+    # Two-stage context watermark (v0.15.0; Check 1d migrated from the slow lane —
+    # its own "fires only on Edit|Write" blind spot is fixed by living here).
+    # Checked every call: wc -c is a few ms and first-call coverage matters (a
+    # session can resume already over threshold). One-shot markers per stage; T2
+    # also plants the T1 marker so the weaker advice never follows the stronger.
+    # Inherited blind spots (unchanged from 1d): bytes ≠ tokens; the transcript
+    # file may lag the in-memory conversation; subagent transcripts are separate.
+    if [ -z "$PULSE_NUDGE" ] && [ "$tbytes" -gt 0 ]; then
+        if [ "$tbytes" -gt "$RESET_THRESHOLD_BYTES" ] && [ ! -f "$pdir/reset-advised-$session_id" ]; then
+            if : > "$pdir/reset-advised-$session_id" 2>/dev/null; then
+                : > "$pdir/flush-warned-$session_id" 2>/dev/null || true
+                PULSE_NUDGE="Context is heavily filled (transcript ≈$(( tbytes / 1048576 )) MB). Prefer a clean handoff over an automatic compaction: run /session-end (handoff + progress + evidence paths — keep failure-attempt paths too), then continue in a fresh session (context-budget-discipline)."
+            fi
+        elif [ "$tbytes" -gt "$FLUSH_THRESHOLD_BYTES" ] && [ ! -f "$pdir/flush-warned-$session_id" ]; then
+            if : > "$pdir/flush-warned-$session_id" 2>/dev/null; then
+                PULSE_NUDGE="Context is filling (transcript ≈$(( tbytes / 1048576 )) MB). If any durable memory is still chat-only — golden-rule stubs, feature status, progress milestones — flush it to disk now while details are exact (write-at-realization; see capturing-golden-rules)."
+            fi
+        fi
+    fi
     # (Task 3 inserts the periodic selfcheck here.)
     return 0
 }
@@ -412,32 +430,8 @@ if (Object.keys(dups).length) {
         esac
     fi
 
-    # ---- Check 1d: context-fill flush reminder (v0.12.0) ----
-    # Observation point (CLAUDE.md hook rule 5):
-    #   Y (failure surface): durable memory (golden-rule lessons, decisions, milestones)
-    #     lost or distorted because its write was deferred past a context compaction.
-    #   X (observed signal): transcript file size crossing FLUSH_THRESHOLD_BYTES.
-    #   Coverage: X ⊉ Y. Residual blind spots (silence is NOT proof nothing needs flushing):
-    #     - bytes ≠ tokens (tool-result share varies), and the transcript file is written
-    #       asynchronously (docs: may lag the in-memory conversation) → may fire early or late;
-    #     - warn-once per session: the transcript keeps growing after the first compaction,
-    #       so only the FIRST approach is guarded (the highest-value one);
-    #     - subagent transcripts are separate files — their fill is invisible here;
-    #     - fires only on Edit|Write inside an ANCHORED project (the hook's global gate) —
-    #       sessions editing elsewhere fill context unobserved;
-    #     - unwritable .harness-anchor/ → reminder suppressed (fail-silent beats repeat-nagging).
-    if [ -n "$transcript_path" ] && [ -n "$session_id" ] && [ -f "$transcript_path" ]; then
-        flush_marker="$project_root/.harness-anchor/flush-warned-$session_id"
-        if [ ! -f "$flush_marker" ]; then
-            t_size=$(wc -c < "$transcript_path" 2>/dev/null | tr -cd '0-9')
-            if [ -n "$t_size" ] && [ "$t_size" -gt "$FLUSH_THRESHOLD_BYTES" ]; then
-                mkdir -p "$project_root/.harness-anchor" 2>/dev/null || true
-                if : > "$flush_marker" 2>/dev/null; then
-                    warnings+=("Context is filling (transcript ≈$(( t_size / 1048576 )) MB). If any durable memory is still chat-only — golden-rule stubs, feature status, progress milestones — flush it to disk now while details are exact (write-at-realization; see capturing-golden-rules).")
-                fi
-            fi
-        fi
-    fi
+    # (Check 1d — context-fill flush reminder — migrated into the pulse fast
+    # lane as the two-stage watermark in v0.15.0; see pulse_run above.)
 
     # ---- Check 2: C/C++ static analysis (clang-tidy on changed files) ----
     # Phase 4: invoke clang-tidy if file is C/C++ and prerequisites are in place.
