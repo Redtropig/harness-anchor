@@ -41,8 +41,7 @@ When context usage > 70% of model window, mid-session compaction can help. But p
 
 > "Compaction preserves continuity, but doesn't give the agent a clean slate. Context anxiety can still persist."
 
-**Flush before you compress.** Before compaction/reset — or when the PostToolUse context-fill
-sentinel fires — write chat-only durable memory to disk first: golden-rule stubs
+**Flush before you compress.** Before compaction/reset — or when the PostToolUse watermark fires (T1 "Context is filling" = flush now; T2 "Context is heavily filled" = wrap up via /session-end + fresh session) — write chat-only durable memory to disk first: golden-rule stubs
 (`capturing-golden-rules`), feature status, a milestone `progress.md` entry. After a compaction,
 do NOT backfill memory from the summary: reconstruct from on-disk evidence (git diff, test
 output, progress.md) and state uncertainty where evidence is missing.

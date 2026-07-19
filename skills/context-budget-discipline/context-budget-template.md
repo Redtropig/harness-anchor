@@ -21,6 +21,7 @@ Use this format in `context-budget.md` (scaffolded by `/anchor`) to track per-se
 - **A `State budget:` line appears in the banner** → a state file exceeded its cap (progress 64KB · feature_list 32KB · golden-rules 8KB · AGENTS 8KB · handoff 4KB); `/session-end` offers archival/trim.
 - **session-handoff.md grows beyond 10 lines** → its first 10 lines should be the most important. Keep "next action" at the top.
 - **Loaded skills accumulate** → if you've loaded >3 skills this session, consider whether they're all still relevant.
+- **A pulse watermark line appears** (`Context is filling` / `heavily filled`) → T1: flush chat-only durable memory; T2: prefer `/session-end` + a fresh session over auto-compaction.
 
 ## Compaction trigger checklist
 
