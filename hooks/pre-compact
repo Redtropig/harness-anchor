@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# PreCompact hook for harness-anchor (v0.15.0). Warn-only — never blocks compaction.
+#
+# Observation point (CLAUDE.md hook rule 5):
+#   Y (failure surface): post-compaction memory distortion — the next turns
+#     reconstruct state from a lossy summary with nothing anchoring the moment.
+#   X (observed signal): the instant PreCompact fires — transcript bytes, git
+#     branch + dirty count, session-handoff.md staleness.
+#   Coverage: X ⊉ Y, structurally: PreCompact has NO additionalContext channel
+#     and the agent gets NO turn before compaction runs, so no hook can make the
+#     agent write state here. The ACTIONABLE pre-compaction warning is the
+#     PostToolUse watermark (T1 flush / T2 reset). This hook only (a) records
+#     the moment to .harness-anchor/last-compact.meta for the post-compaction
+#     SessionStart notice, and (b) tells the USER via systemMessage when the
+#     handoff is stale. Residual blind spots: unanchored projects get no marker;
+#     a compaction with a fresh handoff emits nothing (by design).
+#
+# Hard constraints: ≤5s total watchdog; silent failure on anything missing;
+# never emits permissionDecision/stopReason/decision.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/../scripts/lib/portable.sh" 2>/dev/null || exit 0
+ha_platform_init
+
+HANDOFF_STALE_MIN=30   # systemMessage only when the handoff is older than this
+
+# ---- Read stdin BEFORE backgrounding (bounded 1s; same hazard class as peers) ----
+HOOK_STDIN=""
+if [ ! -t 0 ]; then
+    IFS= read -r -d '' -t 1 HOOK_STDIN || true
+fi
+
+main() {
+    [ -n "$HOOK_STDIN" ] || return 0
+
+    # PreCompact is rare (once per compaction) — the engine chain is affordable.
+    fields=$(printf '%s' "$HOOK_STDIN" | ha_json_fields session_id transcript_path trigger cwd)
+    session_id=$(printf '%s\n' "$fields" | sed -n '1p' | tr -cd 'A-Za-z0-9._-')
+    transcript_path=$(ha_normalize_path "$(printf '%s\n' "$fields" | sed -n '2p')")
+    trigger=$(printf '%s\n' "$fields" | sed -n '3p' | tr -cd 'a-z')
+    hook_cwd=$(ha_normalize_path "$(printf '%s\n' "$fields" | sed -n '4p')")
+    [ -n "$trigger" ] || trigger="unknown"
+
+    project_root=""
+    [ -n "$hook_cwd" ] && project_root=$(ha_find_project_root "$hook_cwd" || true)
+    [ -n "$project_root" ] || return 0
+
+    mkdir -p "$project_root/.harness-anchor" 2>/dev/null || return 0
+
+    tbytes=0
+    if [ -n "$transcript_path" ] && [ -f "$transcript_path" ]; then
+        tbytes=$(wc -c < "$transcript_path" 2>/dev/null | tr -cd '0-9')
+        [ -n "$tbytes" ] || tbytes=0
+    fi
+    branch=$(git -C "$project_root" branch --show-current 2>/dev/null || true)
+    [ -n "$branch" ] || branch="-"
+    dirty=$(git -C "$project_root" status --porcelain 2>/dev/null | grep -c .)
+
+    handoff_age_min="absent"
+    hf="$project_root/session-handoff.md"
+    if [ -f "$hf" ]; then
+        hm=$(ha_mtime "$hf" | tr -cd '0-9')
+        now_s=$(date +%s)
+        [ -n "$hm" ] && handoff_age_min=$(( (now_s - hm) / 60 ))
+    fi
+
+    {
+        printf 'ts=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf 'epoch=%s\n' "$(date +%s)"
+        printf 'trigger=%s\n' "$trigger"
+        printf 'tbytes=%s\n' "$tbytes"
+        printf 'branch=%s\n' "$branch"
+        printf 'dirty=%s\n' "$dirty"
+        printf 'handoff_age_min=%s\n' "$handoff_age_min"
+    } > "$project_root/.harness-anchor/last-compact.meta" 2>/dev/null || true
+
+    stale=""
+    if [ "$handoff_age_min" = "absent" ]; then
+        stale="absent"
+    elif [ "$handoff_age_min" -gt "$HANDOFF_STALE_MIN" ]; then
+        stale="${handoff_age_min} min stale"
+    fi
+    if [ -n "$stale" ]; then
+        printf '{\n  "systemMessage": "harness-anchor: compaction imminent (%s); session-handoff.md is %s. Post-compaction recall is unreliable — the recovery anchors are on disk."\n}\n' "$trigger" "$stale"
+    fi
+    return 0
+}
+
+# ---- R1: Total watchdog (5s cap, tempfile-guarded; same pattern as peers) ----
+OUTPUT_FILE=$(mktemp)
+main > "$OUTPUT_FILE" 2>/dev/null &
+main_pid=$!
+
+( sleep 5; kill -9 $main_pid 2>/dev/null ) >/dev/null 2>&1 &
+watchdog_pid=$!
+
+wait $main_pid 2>/dev/null
+main_rc=$?
+kill -9 $watchdog_pid 2>/dev/null
+wait $watchdog_pid 2>/dev/null
+
+if [ "$main_rc" -eq 0 ] && [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then
+    cat "$OUTPUT_FILE"
+fi
+rm -f "$OUTPUT_FILE" 2>/dev/null
+
+exit 0
