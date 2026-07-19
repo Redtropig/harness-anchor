@@ -13,6 +13,7 @@
         "Tests pass",
         "Lint clean"
       ],
+      "out_of_scope": ["(optional: explicit exclusions — what this feature will NOT cover; delete if none)"],
       "evidence": null,
       "createdAt": "2026-05-28T00:00:00Z",
       "completedAt": null

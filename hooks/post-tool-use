@@ -51,7 +51,7 @@ RESET_THRESHOLD_BYTES=8388608
 PULSE_DUP_N=3
 PULSE_ERR_N=3
 PULSE_COOLDOWN=10
-PULSE_SELFCHECK_EVERY=25
+PULSE_SELFCHECK_EVERY="${PULSE_SELFCHECK_EVERY:-25}"   # env-overridable (contract tests use 5)
 
 # ---- Read stdin BEFORE backgrounding (bg commands get /dev/null stdin) ----
 # BOUNDED read (1s; same hazard class as session-start): callers holding stdin
@@ -63,6 +63,37 @@ if [ ! -t 0 ]; then
     IFS= read -r -d '' -t 1 HOOK_STDIN || true
 fi
 printf '%s' "$HOOK_STDIN" > "$INPUT_FILE" 2>/dev/null || true
+
+# out_of_scope of the first in-progress feature, "; "-joined. Engine chain only
+# (arbitrary user JSON is beyond the bash tier by design — same stance as
+# ha_flist_active); empty on none/no-engine, caller substitutes "none declared".
+pulse_out_of_scope() {
+    ha_json_engine_init
+    case "$HA_JSON_ENGINE" in
+        python3|python|py)
+            # shellcheck disable=SC2086
+            $HA_PY - "$1" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        d = json.load(fh)
+    for f in d.get('features', []):
+        if f.get('status') == 'in-progress':
+            print('; '.join(str(x) for x in (f.get('out_of_scope') or [])))
+            break
+except Exception:
+    pass
+PY
+            ;;
+        node)
+            node -e '
+let d; try { d = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch (e) { process.exit(0); }
+for (const f of (d.features || [])) {
+    if (f && f.status === "in-progress") { console.log((f.out_of_scope || []).join("; ")); break; }
+}' "$1" 2>/dev/null || true
+            ;;
+    esac
+}
 
 # ---- Pulse fast lane (v0.15.0) ----
 # Observation point (CLAUDE.md hook rule 5):
@@ -171,7 +202,24 @@ pulse_run() {
             fi
         fi
     fi
-    # (Task 3 inserts the periodic selfcheck here.)
+    # Periodic feature checkpoint (issue #6's agent-side drift channel: Check 1c
+    # sees only NEW modules; this covers drift spread across existing files —
+    # between checkpoints drift stays invisible, cadence is the trade-off). The
+    # ONLY fast-lane path allowed to spawn a JSON engine (1-in-N calls).
+    if [ -z "$PULSE_NUDGE" ] && [ $((seq % PULSE_SELFCHECK_EVERY)) -eq 0 ] && [ -f "$pulse_root/feature_list.json" ]; then
+        local af oos af_s oos_s
+        af=$(ha_flist_active "$pulse_root/feature_list.json")
+        case "$af" in
+            ""|"(no in-progress feature)") : ;;
+            *)
+                oos=$(pulse_out_of_scope "$pulse_root/feature_list.json")
+                [ -n "$oos" ] || oos="none declared"
+                af_s=$(printf '%s' "$af" | tr -cd 'A-Za-z0-9 :._-')
+                oos_s=$(printf '%s' "$oos" | tr -cd 'A-Za-z0-9 ;:,()._-')
+                PULSE_NUDGE="Pulse checkpoint: active feature is '$af_s'. Out-of-scope: $oos_s. Confirm your current work still serves this feature; if it has drifted, surface the scope change to the user before continuing (Hard Rule 2)."
+                ;;
+        esac
+    fi
     return 0
 }
 

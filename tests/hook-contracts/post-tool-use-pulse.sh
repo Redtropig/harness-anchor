@@ -113,7 +113,37 @@ assert_contains "Prefer a clean handoff" "$ow3"
 [ -f "$TMPDIR/.harness-anchor/flush-warned-s-wm2" ] && ok "T2 also plants T1 marker (no regressive advice later)" || bad "T2 did not plant T1 marker"
 ow4=$(mkev_t Grep s-wm2 "$tr2" c2 | run_hook)
 assert_silent "T2 one-shot" "$ow4"
-# === TASK3-SCENARIOS ===
+echo ""
+echo "=== selfcheck: cadence call surfaces active feature + out_of_scope ==="
+# Engine-dependent (ha_flist_active): honest SKIP on engine-less machines.
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
+command -v ha_json_engine_init >/dev/null 2>&1 && ha_json_engine_init
+if [ "${HA_JSON_ENGINE:-none}" = "none" ]; then
+    echo "  SKIP selfcheck scenarios (no JSON engine on this machine)"
+else
+    export PULSE_SELFCHECK_EVERY=5   # cadence override — keeps the loop short
+    printf '{ "project": "p", "features": [ {"id":"f-pulse","name":"Pulse Feature","description":"d","status":"in-progress","done_criteria":["x"],"out_of_scope":["UI redesign","perf tuning"],"createdAt":"2026-07-01T00:00:00Z"} ] }\n' > feature_list.json
+    i=1; osc=""
+    while [ "$i" -le 5 ]; do
+        osc=$(mkev Bash s-check "{\"command\":\"cmd-$i\"}" '{"stdout":"x"}' | run_hook)
+        i=$((i + 1))
+    done
+    assert_contains "Pulse checkpoint" "$osc"
+    assert_contains "f-pulse" "$osc"
+    assert_contains "UI redesign" "$osc"
+
+    echo ""
+    echo "=== selfcheck: no in-progress feature -> silent at the cadence point ==="
+    printf '{ "project": "p", "features": [] }\n' > feature_list.json
+    i=1; osn=""
+    while [ "$i" -le 5 ]; do
+        osn=$(mkev Bash s-noact "{\"command\":\"n-$i\"}" '{"stdout":"x"}' | run_hook)
+        i=$((i + 1))
+    done
+    assert_silent "no-active checkpoint" "$osn"
+    unset PULSE_SELFCHECK_EVERY
+fi
 
 echo ""
 echo "==================================="
