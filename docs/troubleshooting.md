@@ -196,7 +196,8 @@ Since v0.15.0 the PostToolUse hook watches every tool call (the "pulse"):
 `Context is filling` / `Context is heavily filled` / `Pulse checkpoint: ...`.
 All warn-only additionalContext — nothing is ever blocked.
 
-State lives in `.harness-anchor/pulse-<session>.tsv` (+ one-shot markers) inside
+State lives in `.harness-anchor/pulse-<session>[-<agent>].tsv` (+ one-shot
+markers; subagent streams get their own window via `agent_id`) inside
 the anchored project — runtime-only, gitignored. Silence is NOT proof of health:
 only exact-input repeats, prefix-detectable errors, transcript byte watermarks,
 and the cadence checkpoint are observed (full blind-spot list in the hook header).

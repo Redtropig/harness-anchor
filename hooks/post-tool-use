@@ -112,13 +112,17 @@ for (const f of (d.features || [])) {
 #       match; distinct inputs sharing the prefix may collide);
 #     - a genuine loop inside the PULSE_COOLDOWN window stays un-nudged (noise
 #       control trade-off);
-#     - subagent attribution: finalized in the v0.15.0 acceptance pass (Task 7).
+#     - subagent tool calls DO flow through this hook (docs: agent_id is present
+#       exactly when firing inside a subagent); windows are keyed per
+#       (session_id, agent_id) so main/subagent streams never interleave — but
+#       churn ALTERNATING between main thread and a subagent spans two windows
+#       and stays invisible.
 pulse_run() {
     [ -n "$session_id" ] && [ -n "$pulse_root" ] || return 0
     local pdir pfile lastf prev_line prev_seq inhash rseg err tbytes w last_nudge dup_n err_n
     pdir="$pulse_root/.harness-anchor"
-    pfile="$pdir/pulse-$session_id.tsv"
-    lastf="$pdir/pulse-$session_id.last"
+    pfile="$pdir/pulse-$pulse_key.tsv"
+    lastf="$pdir/pulse-$pulse_key.last"
     mkdir -p "$pdir" 2>/dev/null || return 0
 
     prev_line=$(tail -n 1 "$pfile" 2>/dev/null || true)
@@ -191,13 +195,13 @@ pulse_run() {
     # Inherited blind spots (unchanged from 1d): bytes ≠ tokens; the transcript
     # file may lag the in-memory conversation; subagent transcripts are separate.
     if [ -z "$PULSE_NUDGE" ] && [ "$tbytes" -gt 0 ]; then
-        if [ "$tbytes" -gt "$RESET_THRESHOLD_BYTES" ] && [ ! -f "$pdir/reset-advised-$session_id" ]; then
-            if : > "$pdir/reset-advised-$session_id" 2>/dev/null; then
-                : > "$pdir/flush-warned-$session_id" 2>/dev/null || true
+        if [ "$tbytes" -gt "$RESET_THRESHOLD_BYTES" ] && [ ! -f "$pdir/reset-advised-$pulse_key" ]; then
+            if : > "$pdir/reset-advised-$pulse_key" 2>/dev/null; then
+                : > "$pdir/flush-warned-$pulse_key" 2>/dev/null || true
                 PULSE_NUDGE="Context is heavily filled (transcript ≈$(( tbytes / 1048576 )) MB). Prefer a clean handoff over an automatic compaction: run /session-end (handoff + progress + evidence paths — keep failure-attempt paths too), then continue in a fresh session (context-budget-discipline)."
             fi
-        elif [ "$tbytes" -gt "$FLUSH_THRESHOLD_BYTES" ] && [ ! -f "$pdir/flush-warned-$session_id" ]; then
-            if : > "$pdir/flush-warned-$session_id" 2>/dev/null; then
+        elif [ "$tbytes" -gt "$FLUSH_THRESHOLD_BYTES" ] && [ ! -f "$pdir/flush-warned-$pulse_key" ]; then
+            if : > "$pdir/flush-warned-$pulse_key" 2>/dev/null; then
                 PULSE_NUDGE="Context is filling (transcript ≈$(( tbytes / 1048576 )) MB). If any durable memory is still chat-only — golden-rule stubs, feature status, progress milestones — flush it to disk now while details are exact (write-at-realization; see capturing-golden-rules)."
             fi
         fi
@@ -243,6 +247,11 @@ main() {
     tool_name="$(fastfield tool_name | tr -cd 'A-Za-z0-9_-')"
     tool_name="${tool_name:0:64}"
     session_id="$(fastfield session_id | tr -cd 'A-Za-z0-9._-')"
+    agent_id="$(fastfield agent_id | tr -cd 'A-Za-z0-9._-')"
+    # Window key: docs guarantee agent_id is present exactly when the hook fires
+    # inside a subagent — keying per (session, agent) keeps main/subagent streams
+    # from interleaving into each other's streak windows.
+    pulse_key="$session_id${agent_id:+-$agent_id}"
     transcript_path="$(fastfield transcript_path)"
     transcript_path="$(ha_normalize_path "${transcript_path//\\\\/\\}")"
     hook_cwd="$(fastfield cwd)"
@@ -268,7 +277,7 @@ main() {
         Edit|Write|"") : ;;
         *)
             if [ -n "$PULSE_NUDGE" ]; then
-                printf '%s' "$seq" > "$pulse_root/.harness-anchor/pulse-$session_id.last" 2>/dev/null || true
+                printf '%s' "$seq" > "$pulse_root/.harness-anchor/pulse-$pulse_key.last" 2>/dev/null || true
                 printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "PostToolUse",\n    "additionalContext": "<harness-anchor PostToolUse>\\n%s\\n</harness-anchor PostToolUse>"\n  }\n}\n' "$PULSE_NUDGE"
             fi
             return 0
@@ -555,7 +564,7 @@ $tidy_out
     # ---- Pulse nudge joins the slow lane's warning batch (v0.15.0) ----
     if [ -n "$PULSE_NUDGE" ]; then
         warnings+=("$PULSE_NUDGE")
-        printf '%s' "$seq" > "$pulse_root/.harness-anchor/pulse-$session_id.last" 2>/dev/null || true
+        printf '%s' "$seq" > "$pulse_root/.harness-anchor/pulse-$pulse_key.last" 2>/dev/null || true
     fi
 
     # ---- Emit output ----

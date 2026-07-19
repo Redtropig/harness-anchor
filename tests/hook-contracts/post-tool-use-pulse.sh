@@ -114,6 +114,20 @@ assert_contains "Prefer a clean handoff" "$ow3"
 ow4=$(mkev_t Grep s-wm2 "$tr2" c2 | run_hook)
 assert_silent "T2 one-shot" "$ow4"
 echo ""
+echo "=== subagent stream: agent_id keys its own window (no interleave) ==="
+# Same session as s-dup (already 4 identical calls deep) — a subagent stream
+# with agent_id must start a FRESH window, not inherit the main-thread streak.
+mkag() { # agent-scoped event, same sid, same input as s-dup's
+    printf '{"session_id":"s-dup","agent_id":"ag-1","transcript_path":"","cwd":"%s","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"ls -la"},"tool_response":{"stdout":"x"}}' "$TMPDIR"
+}
+oa1=$(mkag | run_hook)
+assert_silent "subagent 1st call (fresh window)" "$oa1"
+[ -f "$TMPDIR/.harness-anchor/pulse-s-dup-ag-1.tsv" ] && ok "agent-scoped window file" || bad "agent-scoped window file missing"
+oa2=$(mkag | run_hook)
+oa3=$(mkag | run_hook)
+assert_contains "called 3x with identical input" "$oa3"
+
+echo ""
 echo "=== selfcheck: cadence call surfaces active feature + out_of_scope ==="
 # Engine-dependent (ha_flist_active): honest SKIP on engine-less machines.
 # shellcheck disable=SC1091
