@@ -30,6 +30,7 @@ Adapted from [Anthropic's Code with Claude 2026 reference impl](https://github.c
 | **Tests pass** | Test runner output showing N passed, **0 failed**, **0 errored** |
 | **Coverage obligations** *(non-trivial / risk-bearing features)* | The spec/code obligations are exercised by tests the run actually executes — for features with real logic or risk constructs, a `/test-plan` report (`.harness-anchor/coverage-<ts>.md`) with no open gaps. A green suite that skips the risk path is a false pass. |
 | **Static analysis** | Lint report file, OR explicit "no warnings" line in output |
+| **Test integrity** *(when tests changed in the same diff)* | The claim names why each test change happened (new coverage vs adjusted expectation) — `/verify` reports this as `### Integrity`; a weakened assertion that makes failing behavior "pass" is a red flag |
 | **Deliverable committed & reproducible** *(when claiming "done / shipped / committed")* | Full `git status` reviewed (the whole tree, not just state files) **and** the committed `HEAD` builds — not only the dirty working tree. A feature marked `pass` whose source isn't committed is not delivered: HEAD won't reproduce the evidence. |
 | **Manual smoke** | Concrete steps + observed result (only if the above can't cover) |
 
@@ -95,6 +96,7 @@ Before saying ANY of {"done", "fixed", "ready", "complete", "passing", "working"
 - [ ] I ran the build/compile, observed exit code 0
 - [ ] I ran the test suite, observed N passed / 0 failed
 - [ ] the passing tests exercise the spec's edge cases / risk paths — not just the happy path (run `/test-plan` if unsure)
+- [ ] if tests changed alongside source: I explained each test change (new coverage vs adjusted expectation)
 - [ ] I have a file path for each piece of evidence
 - [ ] feature_list.json is updated with evidence object + timestamp + commit
 - [ ] if I claimed "committed / shipped / delivered": I reviewed the **full** `git status` and confirmed the committed HEAD builds (not just the working tree)

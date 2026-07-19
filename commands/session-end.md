@@ -20,7 +20,8 @@ consumes its facts.
    The block reports: active feature + counts · init.sh result (60s cap;
    `--skip-init` only if the user explicitly asks) · archival backlog
    (state-archive dry-run) · ledger validation · working tree in two columns
-   (state files / source) · TOC structural changes since anchor.
+   (state files / source) · secrets scan over state files · state hygiene
+   (golden-rules count) · TOC structural changes since anchor.
    If the script fails, report its error verbatim and stop — do not
    hand-replay the gathering (writes follow it; only /status may degrade).
 
@@ -56,9 +57,14 @@ consumes its facts.
      consent; never hand-move entries (if the fact line says archival needs
      Node, relay that and move on).
    - Non-archivable overages (golden-rules.md / AGENTS.md over 8KB): archival
-     does not apply — golden-rules wants pruning (step 7's flywheel;
-     `capturing-golden-rules`), AGENTS.md wants thinning back to a map.
-     An oversized handoff self-heals at step 3 if you keep it ≤ 300 words.
+     does not apply — AGENTS.md wants thinning back to a map; an oversized
+     handoff self-heals at step 3 if you keep it ≤ 300 words.
+   - **Golden-rules consolidation (consent-gated).** If step 1's State-hygiene
+     fact suggests it (>30 rules or over 8KB): offer a guided merge — combine
+     near-duplicate rules, prune ones whose origin no longer applies. Rules
+     whose `Why / origin` line contains `[user]` are protected: never merge,
+     reword, or delete them. Show the proposed diff, get consent, then write
+     (this is the concrete form of step 7's pruning flywheel).
 
 7. **Flywheel reflection — safety net, not the capture moment.** Lessons
    should already be on disk (`capturing-golden-rules` writes in the turn a
@@ -72,6 +78,10 @@ consumes its facts.
    *"Project structure changed. Refresh PROJECT-TOC.md now?"* (Yes / Skip)
 
 9. **Surface uncommitted source, then offer the state-file commit.**
+   - If step 1's Secrets-scan fact is not `(clean)`: surface every `SECRET?`
+     line BEFORE offering the commit and recommend redacting (replace the value
+     with `[REDACTED]`). Never auto-edit the user's state files; if the user
+     knowingly opts to commit anyway, proceed (warn-only).
    - The two-column tree fact is the evidence. If source/other is non-clean,
      warn: a feature marked `pass` whose source isn't committed leaves HEAD
      not reflecting the evidence. Do NOT declare any change "old / unrelated"
