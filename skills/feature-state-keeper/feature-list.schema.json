@@ -46,6 +46,11 @@
           "minItems": 1,
           "description": "Concrete, verifiable criteria"
         },
+        "out_of_scope": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional explicit negative scope — what this feature deliberately does NOT cover; quoted by the pulse checkpoint and scope-jump conversations"
+        },
         "evidence": {
           "oneOf": [
             { "type": "null" },
