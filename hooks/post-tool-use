@@ -298,18 +298,12 @@ main() {
         return 0
     fi
 
-    # Extract tool_name (Check 1c) + transcript_path/session_id (Check 1d) in ONE parse
-    # (keeps the per-event python3 process count unchanged).
-    tool_name=""
-    transcript_path=""
-    session_id=""
-    if [ -n "$input" ]; then
-        tn_tp_sid=$(printf '%s' "$input" | ha_json_fields tool_name transcript_path session_id)
-        tool_name=$(printf '%s\n' "$tn_tp_sid" | sed -n '1p')
-        transcript_path=$(ha_normalize_path "$(printf '%s\n' "$tn_tp_sid" | sed -n '2p')")
-        # session_id feeds a marker FILENAME — strip to a safe charset.
-        session_id=$(printf '%s\n' "$tn_tp_sid" | sed -n '3p' | tr -cd 'A-Za-z0-9._-')
-    fi
+    # Re-extract tool_name via the engine (authoritative parse — the fast lane's
+    # 1 KiB-slice value is empty for a legacy payload whose tool_name sits past
+    # the slice). Check 1c reads it to tell Write from Edit. transcript_path and
+    # session_id are NOT re-parsed here: their only slow-lane consumer was the
+    # old Check 1d, now the fast-lane watermark using the fast-extracted values.
+    tool_name=$(printf '%s' "$input" | ha_json_field tool_name)
 
     # Find project root (where feature_list.json lives) — fixed-point walk-up
     # from file_path (terminates on /, C:/, ., UNC roots; ≤64 levels). The old
