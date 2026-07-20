@@ -9,10 +9,24 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HOOK="$PLUGIN_ROOT/hooks/post-tool-use"
+# JSON validity via the shared engine chain (rc=2 = no engine → honest SKIP).
+# The fast lane emits JSON by RAW printf (it deliberately bypasses ha_json_escape
+# for the zero-spawn goal) — so a nudge sneaking in a " or \ would be invalid and
+# silently dropped by the harness. This guards that fragility. (v0.15.0)
+# shellcheck disable=SC1091
+. "$PLUGIN_ROOT/scripts/lib/portable.sh" 2>/dev/null || true
 
 PASS=0; FAIL=0
 ok()  { echo "  OK   $*"; PASS=$((PASS+1)); }
 bad() { echo "  FAIL $*"; FAIL=$((FAIL+1)); }
+assert_json_valid() {
+    printf '%s' "$2" | ha_json_valid
+    case $? in
+        0) ok "$1 valid JSON" ;;
+        2) echo "  SKIP $1 json-validity (no JSON engine)" ;;
+        *) bad "$1 invalid JSON: $(printf '%s' "$2" | head -c 200)" ;;
+    esac
+}
 assert_contains() {
     if printf '%s' "$2" | grep -q "$1"; then ok "contains: $1"
     else bad "missing: $1 (in: $(printf '%s' "$2" | head -c 200))"; fi
@@ -44,6 +58,7 @@ assert_silent "2nd call" "$o2"
 o3=$(mkev Bash s-dup '{"command":"ls -la"}' '{"stdout":"x"}' | run_hook)
 assert_contains "called 3x with identical input" "$o3"
 assert_contains "additionalContext" "$o3"
+assert_json_valid "fast-lane nudge (raw printf)" "$o3"
 [ -f "$TMPDIR/.harness-anchor/pulse-s-dup.tsv" ] && ok "pulse window file written" || bad "pulse tsv missing"
 [ "$(tr -cd '0-9' < "$TMPDIR/.harness-anchor/pulse-s-dup.last" 2>/dev/null)" = "3" ] && ok "cooldown anchor = 3" || bad "cooldown anchor wrong"
 
