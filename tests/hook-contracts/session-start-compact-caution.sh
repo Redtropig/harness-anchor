@@ -107,6 +107,45 @@ else
 fi
 
 echo ""
+echo "=== source=compact + fresh last-compact.meta -> enriched notice (v0.15.0) ==="
+mkdir -p "$TMPDIR/.harness-anchor"
+cat > "$TMPDIR/.harness-anchor/last-compact.meta" <<EOF
+ts=2026-07-19T12:00:00Z
+epoch=$(date +%s)
+trigger=auto
+tbytes=7340032
+branch=feature-x
+dirty=4
+handoff_age_min=42
+EOF
+output5=$(printf '{"source":"compact","session_id":"s1"}' \
+    | CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
+assert_contains "Last compaction: auto" "$output5"
+assert_contains "feature-x" "$output5"
+assert_contains "4 uncommitted" "$output5"
+assert_contains "42 min old" "$output5"
+
+echo ""
+echo "=== stale meta (old epoch) -> plain notice, no enrichment ==="
+cat > "$TMPDIR/.harness-anchor/last-compact.meta" <<EOF
+ts=2026-07-19T00:00:00Z
+epoch=$(( $(date +%s) - 3600 ))
+trigger=auto
+tbytes=1
+branch=feature-x
+dirty=0
+handoff_age_min=absent
+EOF
+output6=$(printf '{"source":"compact","session_id":"s1"}' \
+    | CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CLAUDE_PROJECT_DIR="$TMPDIR" bash "$PLUGIN_ROOT/hooks/session-start" 2>/dev/null || true)
+assert_contains "Compact notice:" "$output6"
+if printf '%s' "$output6" | grep -q "Last compaction:"; then
+    echo "  FAIL enrichment present on stale meta"; FAIL=$((FAIL+1))
+else
+    echo "  OK   stale meta ignored"; PASS=$((PASS+1))
+fi
+
+echo ""
 echo "==================================="
 echo " Pass: $PASS    Fail: $FAIL"
 if [ "$FAIL" -eq 0 ]; then echo " STATUS: PASSED"; exit 0; else echo " STATUS: FAILED"; exit 1; fi

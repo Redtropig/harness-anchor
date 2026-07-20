@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # session-end-precheck.sh — One-call fact gathering for /session-end.
 # Replaces the ritual's scattered mechanical steps (active feature, init.sh
-# run, archival dry-run, ledger validation, whole-tree scan, TOC structural
-# hint) with a single deterministic block. FACTS ONLY — the judgment half of
+# run, archival dry-run, ledger validation, whole-tree scan, secrets scan,
+# state hygiene, TOC structural hint) with a single deterministic block.
+# FACTS ONLY — the judgment half of
 # /session-end (handoff/progress composition, status flips, archival consent,
 # commits) stays with the calling agent.
 #
@@ -175,6 +176,53 @@ EOF
     if [ -n "$source_lines" ]; then printf '%s' "$source_lines"; else echo "    (clean)"; fi
 else
     echo "(not a git repo)"
+fi
+echo ""
+
+# ---- 5b. Secrets scan over state files (v0.15.0) ----
+# The commit offer at /session-end step 9 stages these files; a pasted command
+# output can carry a live credential into git history. Warn-only: labeled
+# file:line pointers, the matched VALUE is never echoed. Patterns are heuristic
+# (blind spot: novel token formats pass; prose containing "token=..." may
+# false-positive — the human adjudicates).
+echo "### Secrets scan (state files)"
+sec_hits=0
+for sf in AGENTS.md feature_list.json feature_archive.json progress.md progress-archive.md session-handoff.md golden-rules.md context-budget.md PROJECT-TOC.md init.sh; do
+    p="$TARGET/$sf"
+    [ -f "$p" ] || continue
+    while IFS= read -r pl; do
+        [ -n "$pl" ] || continue
+        pat="${pl%|*}"; label="${pl##*|}"
+        lines=$(grep -nE "$pat" "$p" 2>/dev/null | head -5 | cut -d: -f1 | tr '\n' ' ')
+        for ln in $lines; do
+            echo "- SECRET? ${sf}:${ln} (${label}) — redact before committing"
+            sec_hits=$((sec_hits + 1))
+        done
+    done <<'PATTERNS'
+AKIA[0-9A-Z]{16}|aws-access-key
+(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}|github-token
+github_pat_[A-Za-z0-9_]{22,}|github-fine-grained-pat
+sk-[A-Za-z0-9_-]{20,}|api-secret-key
+xox[baprs]-[A-Za-z0-9-]{10,}|slack-token
+-----BEGIN [A-Z ]*PRIVATE KEY-----|private-key
+(api[_-]?key|secret|token|password|passwd)["' ]*[:=]["' ]*[^"' ]{12,}|credential-assignment
+PATTERNS
+done
+if [ "$sec_hits" -eq 0 ]; then echo "- (clean)"; fi
+echo ""
+
+# ---- 5c. State hygiene (golden-rules pruning signal, v0.15.0) ----
+echo "### State hygiene"
+grf="$TARGET/golden-rules.md"
+if [ -f "$grf" ]; then
+    grn=$(grep -c '^### GR-' "$grf" 2>/dev/null | tr -cd '0-9'); [ -n "$grn" ] || grn=0
+    grb=$(wc -c < "$grf" 2>/dev/null | tr -cd '0-9'); [ -n "$grb" ] || grb=0
+    echo "- golden-rules: ${grn} rule(s), $(( (grb + 1023) / 1024 ))KB of 8KB budget"
+    if [ "$grn" -gt 30 ] || [ "$grb" -gt 8192 ]; then
+        echo "- consolidation suggested (>30 rules or over budget) — /session-end step 6 offers a guided merge; [user]-tagged rules are never touched"
+    fi
+else
+    echo "- (no golden-rules.md)"
 fi
 echo ""
 

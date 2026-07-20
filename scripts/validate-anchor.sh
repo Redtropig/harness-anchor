@@ -56,6 +56,7 @@ for f in \
     .claude-plugin/marketplace.json \
     hooks/hooks.json \
     hooks/run-hook.cmd \
+    hooks/pre-compact \
     hooks/session-start \
     skills/using-harness-anchor/SKILL.md \
     README.md \
@@ -371,7 +372,7 @@ if [ -f "$LIB" ]; then
     # and the hook silently reverts to bare `python3`, which fails where only
     # `python`/`py`/`node` exist. Static presence is the invariant; the runtime
     # source is graceful (|| true), but the wiring must be in the file.
-    for h in hooks/session-start hooks/post-tool-use hooks/stop hooks/user-prompt-submit; do
+    for h in hooks/session-start hooks/post-tool-use hooks/stop hooks/user-prompt-submit hooks/pre-compact; do
         if [ ! -f "$h" ]; then
             fail "missing hook: $h"
             continue

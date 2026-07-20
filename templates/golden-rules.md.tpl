@@ -30,6 +30,9 @@ line also contains backticks).
 
 Budget: ~30 rules / 8KB — the SessionStart banner warns beyond that. Rules are curated,
 never archived: pruning is the maintenance action (see /gc + capturing-golden-rules).
+
+Mark a rule's "Why / origin" line with [user] to protect it: /session-end's
+consolidation offer never merges, rewords, or prunes [user]-tagged rules.
 -->
 
 ## Rules

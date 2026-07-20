@@ -30,20 +30,28 @@
 set -uo pipefail   # no -e: a single check failure should not abort other checks
 
 # Platform layer (v0.13.0): engine chain + Windows PATH shield + normalization.
-# Missing lib = broken install → silent no-op (warn-only). Pre-warm the engine
-# ONCE here so the exported HA_JSON_ENGINE is inherited by every $(...) below
-# (avoids per-call re-probing — costly subprocess spawns on Windows).
+# Missing lib = broken install → silent no-op (warn-only). The engine pre-warm
+# moved INTO the slow lane (v0.15.0): probing spawns 1-4 subprocesses, and the
+# all-tool fast lane must stay spawn-free on its non-nudge path.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/../scripts/lib/portable.sh" 2>/dev/null || exit 0
 ha_platform_init
-ha_json_engine_init
 
-# Context-fill flush threshold (bytes of transcript JSONL; Check 1d). Transcript bytes are a
-# COARSE proxy for context tokens (tool-result share varies per session) — 6 MiB approximates
-# a long session nearing its first auto-compaction. Warn-only + warn-once: a miscalibration
-# costs at most one extra (or one late) reminder line. Tune here.
+# Context-fill thresholds (bytes of transcript JSONL; pulse watermark — Check 1d
+# migrated into the all-tool fast lane in v0.15.0). Transcript bytes are a COARSE
+# proxy for context tokens (tool-result share varies per session):
+#   T1 FLUSH ≈ a long session nearing its first auto-compaction — flush durable memory;
+#   T2 RESET ≈ deep fill — prefer /session-end + a fresh session over auto-compaction.
+# Warn-only + warn-once per stage: a miscalibration costs at most one extra/late line.
 FLUSH_THRESHOLD_BYTES=6291456
+RESET_THRESHOLD_BYTES=8388608
+# Pulse detector tuning (docs/troubleshooting.md #13). PULSE_ERR_N must stay
+# <= PULSE_DUP_N (both read the same PULSE_DUP_N-line window).
+PULSE_DUP_N=3
+PULSE_ERR_N=3
+PULSE_COOLDOWN=10
+PULSE_SELFCHECK_EVERY="${PULSE_SELFCHECK_EVERY:-25}"   # env-overridable (contract tests use 5)
 
 # ---- Read stdin BEFORE backgrounding (bg commands get /dev/null stdin) ----
 # BOUNDED read (1s; same hazard class as session-start): callers holding stdin
@@ -56,35 +64,246 @@ if [ ! -t 0 ]; then
 fi
 printf '%s' "$HOOK_STDIN" > "$INPUT_FILE" 2>/dev/null || true
 
+# out_of_scope of the first in-progress feature, "; "-joined. Engine chain only
+# (arbitrary user JSON is beyond the bash tier by design — same stance as
+# ha_flist_active); empty on none/no-engine, caller substitutes "none declared".
+pulse_out_of_scope() {
+    ha_json_engine_init
+    case "$HA_JSON_ENGINE" in
+        python3|python|py)
+            # shellcheck disable=SC2086
+            $HA_PY - "$1" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        d = json.load(fh)
+    for f in d.get('features', []):
+        if f.get('status') == 'in-progress':
+            print('; '.join(str(x) for x in (f.get('out_of_scope') or [])))
+            break
+except Exception:
+    pass
+PY
+            ;;
+        node)
+            node -e '
+let d; try { d = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch (e) { process.exit(0); }
+for (const f of (d.features || [])) {
+    if (f && f.status === "in-progress") { console.log((f.out_of_scope || []).join("; ")); break; }
+}' "$1" 2>/dev/null || true
+            ;;
+    esac
+}
+
+# ---- Pulse fast lane (v0.15.0) ----
+# Observation point (CLAUDE.md hook rule 5):
+#   Y (failure surface): agent churn — repeated identical calls, retry storms on
+#     a failing tool, context overfill, silent scope drift — burning tokens/time.
+#   X (observed signal): per-session sliding window of (tool, input-hash, err)
+#     tuples in .harness-anchor/pulse-<sid>.tsv + transcript byte size.
+#   Coverage: X ⊉ Y. Residual blind spots (silence is NOT proof of health):
+#     - near-duplicate loops (input varied slightly each try) hash differently —
+#       only EXACT repeats are caught;
+#     - err is a response-prefix heuristic ("is_error":true / "success":false /
+#       "interrupted":true within the first 400 bytes) — other failure shapes pass;
+#     - unanchored projects (no feature_list.json above cwd/file_path): no pulse;
+#     - the hash segment ends at the first ,"tool_response" byte sequence —
+#       payload containing that literal truncates the hash (identical inputs still
+#       match; distinct inputs sharing the prefix may collide);
+#     - a genuine loop inside the PULSE_COOLDOWN window stays un-nudged (noise
+#       control trade-off);
+#     - subagent tool calls DO flow through this hook (docs: agent_id is present
+#       exactly when firing inside a subagent); windows are keyed per
+#       (session_id, agent_id) so main/subagent streams never interleave — but
+#       churn ALTERNATING between main thread and a subagent spans two windows
+#       and stays invisible.
+pulse_run() {
+    [ -n "$session_id" ] && [ -n "$pulse_root" ] || return 0
+    local pdir pfile lastf prev_line prev_seq inhash rseg err tbytes w last_nudge dup_n err_n
+    pdir="$pulse_root/.harness-anchor"
+    pfile="$pdir/pulse-$pulse_key.tsv"
+    lastf="$pdir/pulse-$pulse_key.last"
+    mkdir -p "$pdir" 2>/dev/null || return 0
+
+    prev_line=$(tail -n 1 "$pfile" 2>/dev/null || true)
+    prev_seq="${prev_line%%$'\t'*}"
+    case "$prev_seq" in ''|*[!0-9]*) prev_seq=0 ;; esac
+    seq=$((prev_seq + 1))
+
+    # Input hash: bytes between "tool_input": and the first ,"tool_response".
+    # The payload is one physical line (JSON escapes newlines); a pretty-printed
+    # payload just yields inhash=0 -> the dup detector goes inert (fail-safe).
+    inhash=$(printf '%s' "$input" | awk '{
+        i = index($0, "\"tool_input\":"); if (i == 0) { print 0; exit }
+        s = substr($0, i + 13)
+        j = index(s, ",\"tool_response\""); if (j > 0) s = substr(s, 1, j - 1)
+        print substr(s, 1, 4096) }' | cksum 2>/dev/null)
+    inhash="${inhash%% *}"
+    case "$inhash" in ''|*[!0-9]*) inhash=0 ;; esac
+
+    rseg=$(printf '%s' "$input" | awk '{
+        i = index($0, "\"tool_response\":"); if (i == 0) exit
+        print substr($0, i + 16, 400) }')
+    err=0
+    case "$rseg" in
+        *'"is_error":true'*|*'"success":false'*|*'"interrupted":true'*) err=1 ;;
+    esac
+
+    tbytes=0
+    if [ -n "$transcript_path" ] && [ -f "$transcript_path" ]; then
+        tbytes=$(wc -c < "$transcript_path" 2>/dev/null | tr -cd '0-9')
+        [ -n "$tbytes" ] || tbytes=0
+    fi
+
+    printf '%s\t%s\t%s\t%s\t%s\n' "$seq" "$tool_name" "$inhash" "$err" "$tbytes" >> "$pfile" 2>/dev/null || return 0
+
+    # Maintenance: trim the window file; opportunistically drop stale sessions.
+    if [ $((seq % 50)) -eq 0 ]; then
+        tail -n 100 "$pfile" > "$pfile.tmp" 2>/dev/null && mv "$pfile.tmp" "$pfile" 2>/dev/null
+        find "$pdir" -maxdepth 1 -name 'pulse-*' -mtime +7 -exec rm -f {} \; 2>/dev/null || true
+    fi
+
+    # Cooldown: after any pulse nudge, hold all detectors for PULSE_COOLDOWN calls.
+    last_nudge=$(tr -cd '0-9' < "$lastf" 2>/dev/null || true)
+    [ -n "$last_nudge" ] || last_nudge=0
+    if [ "$last_nudge" -gt 0 ] && [ $((seq - last_nudge)) -lt "$PULSE_COOLDOWN" ]; then
+        return 0
+    fi
+
+    # Detectors — priority order, at most ONE nudge per invocation.
+    w=$(tail -n "$PULSE_DUP_N" "$pfile" 2>/dev/null || true)
+    if [ "$(printf '%s\n' "$w" | grep -c .)" -eq "$PULSE_DUP_N" ]; then
+        if [ "$inhash" != "0" ]; then
+            dup_n=$(printf '%s\n' "$w" | awk -F'\t' -v t="$tool_name" -v h="$inhash" '$2==t && $3==h {c++} END {print c+0}')
+            if [ "$dup_n" -eq "$PULSE_DUP_N" ]; then
+                PULSE_NUDGE="Pulse: '$tool_name' called ${PULSE_DUP_N}x with identical input. Repeating an unchanged call won't change the outcome — change the input or approach; if the tool/API itself is unclear, follow docs-lookup."
+            fi
+        fi
+        if [ -z "$PULSE_NUDGE" ]; then
+            err_n=$(printf '%s\n' "$w" | awk -F'\t' -v t="$tool_name" '$2==t && $4==1 {c++} END {print c+0}')
+            if [ "$err_n" -eq "$PULSE_ERR_N" ]; then
+                PULSE_NUDGE="Pulse: '$tool_name' failed ${PULSE_ERR_N}x in a row. Stop retrying as-is — diagnose evidence-first (self-correction-loop); for unfamiliar errors follow docs-lookup."
+            fi
+        fi
+    fi
+
+    # Two-stage context watermark (v0.15.0; Check 1d migrated from the slow lane —
+    # its own "fires only on Edit|Write" blind spot is fixed by living here).
+    # Checked every call: wc -c is a few ms and first-call coverage matters (a
+    # session can resume already over threshold). One-shot markers per stage; T2
+    # also plants the T1 marker so the weaker advice never follows the stronger.
+    # Inherited blind spots (unchanged from 1d): bytes ≠ tokens; the transcript
+    # file may lag the in-memory conversation; subagent transcripts are separate.
+    if [ -z "$PULSE_NUDGE" ] && [ "$tbytes" -gt 0 ]; then
+        if [ "$tbytes" -gt "$RESET_THRESHOLD_BYTES" ] && [ ! -f "$pdir/reset-advised-$pulse_key" ]; then
+            if : > "$pdir/reset-advised-$pulse_key" 2>/dev/null; then
+                : > "$pdir/flush-warned-$pulse_key" 2>/dev/null || true
+                PULSE_NUDGE="Context is heavily filled (transcript ≈$(( tbytes / 1048576 )) MB). Prefer a clean handoff over an automatic compaction: run /session-end (handoff + progress + evidence paths — keep failure-attempt paths too), then continue in a fresh session (context-budget-discipline)."
+            fi
+        elif [ "$tbytes" -gt "$FLUSH_THRESHOLD_BYTES" ] && [ ! -f "$pdir/flush-warned-$pulse_key" ]; then
+            if : > "$pdir/flush-warned-$pulse_key" 2>/dev/null; then
+                PULSE_NUDGE="Context is filling (transcript ≈$(( tbytes / 1048576 )) MB). If any durable memory is still chat-only — golden-rule stubs, feature status, progress milestones — flush it to disk now while details are exact (write-at-realization; see capturing-golden-rules)."
+            fi
+        fi
+    fi
+    # Periodic feature checkpoint (issue #6's agent-side drift channel: Check 1c
+    # sees only NEW modules; this covers drift spread across existing files —
+    # between checkpoints drift stays invisible, cadence is the trade-off). The
+    # ONLY fast-lane path allowed to spawn a JSON engine (1-in-N calls).
+    if [ -z "$PULSE_NUDGE" ] && [ $((seq % PULSE_SELFCHECK_EVERY)) -eq 0 ] && [ -f "$pulse_root/feature_list.json" ]; then
+        local af oos af_s oos_s
+        af=$(ha_flist_active "$pulse_root/feature_list.json")
+        case "$af" in
+            ""|"(no in-progress feature)") : ;;
+            *)
+                oos=$(pulse_out_of_scope "$pulse_root/feature_list.json")
+                [ -n "$oos" ] || oos="none declared"
+                af_s=$(printf '%s' "$af" | tr -cd 'A-Za-z0-9 :._-')
+                oos_s=$(printf '%s' "$oos" | tr -cd 'A-Za-z0-9 ;:,()._-')
+                PULSE_NUDGE="Pulse checkpoint: active feature is '$af_s'. Out-of-scope: $oos_s. Confirm your current work still serves this feature; if it has drifted, surface the scope change to the user before continuing (Hard Rule 2)."
+                ;;
+        esac
+    fi
+    return 0
+}
+
 # ---- main() — all logic wrapped for R1 total watchdog ----
 main() {
     # Read pre-captured stdin from tempfile.
     input="$(cat "$INPUT_FILE" 2>/dev/null || true)"
+    [ -n "$input" ] || return 0
+
+    # ---- Fast lane: pure-bash envelope extraction (v0.15.0 — NO engine spawn) ----
+    # Claude Code serializes the envelope (session_id, transcript_path, cwd,
+    # hook_event_name, tool_name) BEFORE tool_input, so a 1 KiB head slice holds
+    # them all and payload content cannot spoof them. Empty extraction -> the
+    # dependent check skips (fail-safe = silence).
+    head_slice="${input:0:1024}"
+    fastfield() { # $1 = key; echoes the string value of "key":"value" from head_slice
+        case "$head_slice" in
+            *"\"$1\":\""*) local v="${head_slice#*\"$1\":\"}"; printf '%s' "${v%%\"*}" ;;
+        esac
+    }
+    tool_name="$(fastfield tool_name | tr -cd 'A-Za-z0-9_-')"
+    tool_name="${tool_name:0:64}"
+    session_id="$(fastfield session_id | tr -cd 'A-Za-z0-9._-')"
+    agent_id="$(fastfield agent_id | tr -cd 'A-Za-z0-9._-')"
+    # Window key: docs guarantee agent_id is present exactly when the hook fires
+    # inside a subagent — keying per (session, agent) keeps main/subagent streams
+    # from interleaving into each other's streak windows.
+    pulse_key="$session_id${agent_id:+-$agent_id}"
+    transcript_path="$(fastfield transcript_path)"
+    transcript_path="$(ha_normalize_path "${transcript_path//\\\\/\\}")"
+    hook_cwd="$(fastfield cwd)"
+    hook_cwd="$(ha_normalize_path "${hook_cwd//\\\\/\\}")"
+
+    # Pulse project root: cwd, else the edited file's directory (legacy payloads
+    # and contract fixtures omit cwd), else no pulse.
+    pulse_root=""
+    [ -n "$hook_cwd" ] && pulse_root=$(ha_find_project_root "$hook_cwd" || true)
+    if [ -z "$pulse_root" ]; then
+        fp_fast="$(fastfield file_path)"
+        fp_fast="$(ha_normalize_path "${fp_fast//\\\\/\\}")"
+        [ -n "$fp_fast" ] && pulse_root=$(ha_find_project_root "$(dirname "$fp_fast")" || true)
+    fi
+
+    PULSE_NUDGE=""
+    seq=0
+    [ -n "$tool_name" ] && pulse_run
+
+    # ---- Lane dispatch: Edit|Write (and legacy empty tool_name) continue into
+    # the slow lane; every other tool is fast-lane only. ----
+    case "$tool_name" in
+        Edit|Write|"") : ;;
+        *)
+            if [ -n "$PULSE_NUDGE" ]; then
+                printf '%s' "$seq" > "$pulse_root/.harness-anchor/pulse-$pulse_key.last" 2>/dev/null || true
+                printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "PostToolUse",\n    "additionalContext": "<harness-anchor PostToolUse>\\n%s\\n</harness-anchor PostToolUse>"\n  }\n}\n' "$PULSE_NUDGE"
+            fi
+            return 0
+            ;;
+    esac
+
+    # ---- Slow lane (Edit|Write) — pre-warm the engine ONCE so the exported
+    # HA_JSON_ENGINE is inherited by every $(...) below (v0.15.0: moved here from
+    # the script top so non-Edit tools never pay the 1-4 probe subprocesses). ----
+    ha_json_engine_init
 
     # Extract file_path field (very narrow JSON parse — avoid jq dependency).
-    file_path=""
-    if [ -n "$input" ]; then
-        file_path=$(printf '%s' "$input" | ha_json_field tool_input.file_path)
-        file_path=$(ha_normalize_path "$file_path")
-    fi
+    file_path=$(printf '%s' "$input" | ha_json_field tool_input.file_path)
+    file_path=$(ha_normalize_path "$file_path")
 
     # No file path → nothing to check.
     if [ -z "$file_path" ]; then
         return 0
     fi
 
-    # Extract tool_name (Check 1c) + transcript_path/session_id (Check 1d) in ONE parse
-    # (keeps the per-event python3 process count unchanged).
-    tool_name=""
-    transcript_path=""
-    session_id=""
-    if [ -n "$input" ]; then
-        tn_tp_sid=$(printf '%s' "$input" | ha_json_fields tool_name transcript_path session_id)
-        tool_name=$(printf '%s\n' "$tn_tp_sid" | sed -n '1p')
-        transcript_path=$(ha_normalize_path "$(printf '%s\n' "$tn_tp_sid" | sed -n '2p')")
-        # session_id feeds a marker FILENAME — strip to a safe charset.
-        session_id=$(printf '%s\n' "$tn_tp_sid" | sed -n '3p' | tr -cd 'A-Za-z0-9._-')
-    fi
+    # Re-extract tool_name via the engine (authoritative parse — the fast lane's
+    # 1 KiB-slice value is empty for a legacy payload whose tool_name sits past
+    # the slice). Check 1c reads it to tell Write from Edit. transcript_path and
+    # session_id are NOT re-parsed here: their only slow-lane consumer was the
+    # old Check 1d, now the fast-lane watermark using the fast-extracted values.
+    tool_name=$(printf '%s' "$input" | ha_json_field tool_name)
 
     # Find project root (where feature_list.json lives) — fixed-point walk-up
     # from file_path (terminates on /, C:/, ., UNC roots; ≤64 levels). The old
@@ -262,32 +481,8 @@ if (Object.keys(dups).length) {
         esac
     fi
 
-    # ---- Check 1d: context-fill flush reminder (v0.12.0) ----
-    # Observation point (CLAUDE.md hook rule 5):
-    #   Y (failure surface): durable memory (golden-rule lessons, decisions, milestones)
-    #     lost or distorted because its write was deferred past a context compaction.
-    #   X (observed signal): transcript file size crossing FLUSH_THRESHOLD_BYTES.
-    #   Coverage: X ⊉ Y. Residual blind spots (silence is NOT proof nothing needs flushing):
-    #     - bytes ≠ tokens (tool-result share varies), and the transcript file is written
-    #       asynchronously (docs: may lag the in-memory conversation) → may fire early or late;
-    #     - warn-once per session: the transcript keeps growing after the first compaction,
-    #       so only the FIRST approach is guarded (the highest-value one);
-    #     - subagent transcripts are separate files — their fill is invisible here;
-    #     - fires only on Edit|Write inside an ANCHORED project (the hook's global gate) —
-    #       sessions editing elsewhere fill context unobserved;
-    #     - unwritable .harness-anchor/ → reminder suppressed (fail-silent beats repeat-nagging).
-    if [ -n "$transcript_path" ] && [ -n "$session_id" ] && [ -f "$transcript_path" ]; then
-        flush_marker="$project_root/.harness-anchor/flush-warned-$session_id"
-        if [ ! -f "$flush_marker" ]; then
-            t_size=$(wc -c < "$transcript_path" 2>/dev/null | tr -cd '0-9')
-            if [ -n "$t_size" ] && [ "$t_size" -gt "$FLUSH_THRESHOLD_BYTES" ]; then
-                mkdir -p "$project_root/.harness-anchor" 2>/dev/null || true
-                if : > "$flush_marker" 2>/dev/null; then
-                    warnings+=("Context is filling (transcript ≈$(( t_size / 1048576 )) MB). If any durable memory is still chat-only — golden-rule stubs, feature status, progress milestones — flush it to disk now while details are exact (write-at-realization; see capturing-golden-rules).")
-                fi
-            fi
-        fi
-    fi
+    # (Check 1d — context-fill flush reminder — migrated into the pulse fast
+    # lane as the two-stage watermark in v0.15.0; see pulse_run above.)
 
     # ---- Check 2: C/C++ static analysis (clang-tidy on changed files) ----
     # Phase 4: invoke clang-tidy if file is C/C++ and prerequisites are in place.
@@ -359,6 +554,12 @@ $tidy_out
             fi
             ;;
     esac
+
+    # ---- Pulse nudge joins the slow lane's warning batch (v0.15.0) ----
+    if [ -n "$PULSE_NUDGE" ]; then
+        warnings+=("$PULSE_NUDGE")
+        printf '%s' "$seq" > "$pulse_root/.harness-anchor/pulse-$pulse_key.last" 2>/dev/null || true
+    fi
 
     # ---- Emit output ----
     if [ "${#warnings[@]}" -eq 0 ]; then

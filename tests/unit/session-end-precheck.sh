@@ -77,5 +77,24 @@ EOF
   expect_contains "dup relay"   "Duplicate feature id(s)" "$out"
 fi
 
+# ---- secrets scan + state hygiene (v0.15.0) ----
+SEC="$ROOT/secproj"; mkproj "$SEC"
+FAKE="ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"   # ghp_ + 36 chars -> github-token
+printf '# handoff\ntoken %s\n' "$FAKE" > "$SEC/session-handoff.md"
+out=$(bash "$PC" --target "$SEC" --skip-init)
+expect_contains "secret flagged (file:line + label)" "SECRET? session-handoff.md:2 (github-token)" "$out"
+case "$out" in
+  *"$FAKE"*) echo "  FAIL secret value echoed in output"; FAIL=$((FAIL+1));;
+  *)         echo "  OK   secret value never echoed"; PASS=$((PASS+1));;
+esac
+expect_contains "hygiene without golden-rules" "(no golden-rules.md)" "$out"
+
+CLN="$ROOT/clnproj"; mkproj "$CLN"
+out=$(bash "$PC" --target "$CLN" --skip-init)
+expect_contains "secrets clean" "- (clean)" "$out"
+printf '# GR\n\n### GR-1 — a\n- **Why / origin:** x\n- **Check:** manual review\n\n### GR-2 — b\n- **Why / origin:** y [user]\n- **Check:** manual review\n' > "$CLN/golden-rules.md"
+out=$(bash "$PC" --target "$CLN" --skip-init)
+expect_contains "golden-rules counted" "2 rule(s)" "$out"
+
 echo ""; echo " Pass: $PASS  Fail: $FAIL"
 if [ "$FAIL" -eq 0 ]; then echo " STATUS: PASSED"; exit 0; else echo " STATUS: FAILED"; exit 1; fi

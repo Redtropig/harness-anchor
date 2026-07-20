@@ -16,7 +16,7 @@ Stop. Read this before doing anything.
 
 ## Design Invariants (do not break)
 
-1. **Warn-only hooks.** No PostToolUse / Stop / UserPromptSubmit hook may produce JSON with `"permissionDecision": "deny"` or `"stopReason"`. PostToolUse / UserPromptSubmit / SessionStart surface `additionalContext` for self-correction; the **Stop** event has no `additionalContext` channel, so its reminder uses `systemMessage` (still non-blocking — never `decision: "block"`).
+1. **Warn-only hooks.** No PostToolUse / Stop / UserPromptSubmit hook may produce JSON with `"permissionDecision": "deny"` or `"stopReason"`. PostToolUse / UserPromptSubmit / SessionStart surface `additionalContext` for self-correction; the **Stop** event has no `additionalContext` channel, so its reminder uses `systemMessage` (still non-blocking — never `decision: "block"`). **PreCompact** likewise reaches only the user (a marker file + `systemMessage`) — the agent gets no turn before compaction runs, so the actionable pre-compaction warning lives in the PostToolUse watermark stages.
 2. **SessionStart token budget ≤ 3000 tokens.** Roughly 12000 chars of injected content. Hard-truncate with a pointer to the on-disk file. The meta-skill body is injected *slimmed* (frontmatter stripped; conditional regions dropped when their gate doesn't match — `cpp-only` by project type, `os-<name>` by HA_OS platform) — headroom belongs to the project-specific TOC/handoff, not to a fatter generic body.
 3. **Subagents are single-level.** Every subagent prompt must end with: *"Do not invoke other subagents from this one."*
 4. **State files are git-tracked by default.** `.harness-anchor/` (error log dir) is the only gitignored runtime path.

@@ -27,6 +27,7 @@ Sibling `.md` files in skill directories. Loaded only when explicitly read.
 ## Compaction Triggers
 
 - Context usage > 80% of model window → trigger context reset (not just compaction) per Anthropic Nov 2025 guidance.
+- The PostToolUse pulse watermark mechanizes this: T1 (≈6 MB transcript) = flush durable memory now; T2 (≈8 MB) = /session-end + fresh session.
 - Use `/session-end` to write rich handoff before reset.
 
 ## Project-specific TODO

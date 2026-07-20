@@ -78,6 +78,9 @@ Append a rule to `golden-rules.md`:
   evidence, empty output = clean. Keep "manual review" in the line to stay human-judged — that takes
   precedence even when the line contains backticked prose.
 - **Keep IDs unique** (`GR-1`, `GR-2`, …) so `/gc` and `/status` can reference and count them.
+- **`[user]` protects a rule.** Put `[user]` in the `Why / origin` line of a rule the human
+  authored or explicitly endorsed — `/session-end`'s consolidation offer must never merge,
+  reword, or prune it.
 
 ## The flywheel
 

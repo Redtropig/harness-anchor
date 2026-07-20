@@ -22,7 +22,7 @@ This is the Anthropic three-agent architecture's "evaluator" role — independen
              report format in your skill instructions. Do not modify code.
    ```
 
-2. **Receive the report**. It will be structured as `### Build`, `### Tests`, `### Verdict`, `### Recommendation` sections.
+2. **Receive the report**. It will be structured as `### Build`, `### Tests`, `### Integrity`, `### Verdict`, `### Recommendation` sections.
 
 3. **Surface the report to the user verbatim** — do not paraphrase. The point of fresh-context evaluation is the user sees the evaluator's actual words.
 

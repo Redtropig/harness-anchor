@@ -188,3 +188,24 @@ taxonomy, a pre-set `HA_OS` override in the environment — is dropped silently
 `bash -c '. scripts/lib/portable.sh; ha_platform_init; echo $HA_OS'` and
 `env | grep '^HA_OS='`. `scripts/validate-anchor.sh` ([7/12]) rejects
 malformed or off-taxonomy markers at authoring time.
+
+## 13. Pulse nudges: what they mean, how to tune or silence them
+
+Since v0.15.0 the PostToolUse hook watches every tool call (the "pulse"):
+`Pulse: '<tool>' called 3x with identical input` / `failed 3x in a row` /
+`Context is filling` / `Context is heavily filled` / `Pulse checkpoint: ...`.
+All warn-only additionalContext — nothing is ever blocked.
+
+State lives in `.harness-anchor/pulse-<session>[-<agent>].tsv` (+ one-shot
+markers; subagent streams get their own window via `agent_id`) inside
+the anchored project — runtime-only, gitignored. Silence is NOT proof of health:
+only exact-input repeats, prefix-detectable errors, transcript byte watermarks,
+and the cadence checkpoint are observed (full blind-spot list in the hook header).
+
+Tuning: constants at the top of `hooks/post-tool-use` — `PULSE_DUP_N`,
+`PULSE_ERR_N`, `PULSE_COOLDOWN`, `PULSE_SELFCHECK_EVERY` (env-overridable),
+`FLUSH_THRESHOLD_BYTES`, `RESET_THRESHOLD_BYTES`. Reset a session's pulse state:
+delete `.harness-anchor/pulse-<session>.*` and the session's
+`flush-warned-*` / `reset-advised-*` markers. A misfire costs one context line;
+a persistently misbehaving detector is a bug — report it rather than hand-patch
+the window file.

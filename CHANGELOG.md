@@ -4,6 +4,33 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-07-19
+
+### Added
+
+- **Session Pulse (PostToolUse fast lane, all tools).** Sliding-window self-supervision:
+  duplicate-call nudge (3× identical input), error-streak nudge (3× same-tool failures),
+  periodic feature checkpoint quoting the new optional `out_of_scope` ledger field —
+  one nudge max per call, 10-call cooldown, pure bash on the hot path (no JSON-engine
+  spawn outside the 1-in-25 checkpoint).
+- **Two-stage context watermark.** The v0.12.0 flush reminder (T1) migrates into the
+  fast lane — observing every tool, not just Edit/Write — and gains a T2 stage advising
+  `/session-end` + a fresh session over automatic compaction.
+- **PreCompact forensics.** New warn-only hook records `.harness-anchor/last-compact.meta`
+  (trigger, transcript size, branch, dirty count, handoff age) and notifies the user when
+  the handoff is stale; the SessionStart compact notice consumes the marker into concrete
+  recovery anchors.
+- **Evidence integrity.** `/verify` gains a `### Integrity` (tests-touched) report section;
+  `/session-end`'s precheck scans state files for credential patterns before the commit
+  offer (labels only — matched values never echoed) and reports golden-rules hygiene with
+  a consent-gated consolidation flow (`[user]`-tagged rules are never touched).
+
+### Changed
+
+- PostToolUse registration drops its `Edit|Write` matcher (fires on all tools); the
+  Edit/Write slow lane is behaviorally unchanged, and the JSON-engine pre-warm moved into
+  it so the fast path stays spawn-free.
+
 ## [0.14.0] - 2026-07-18
 
 ### Added
@@ -538,7 +565,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/Redtropig/harness-anchor/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Redtropig/harness-anchor/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Redtropig/harness-anchor/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Redtropig/harness-anchor/compare/v0.11.0...v0.12.0

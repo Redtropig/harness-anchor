@@ -239,9 +239,26 @@ TOC freshness:    ${toc_status}"
 
     # ---- 5b. Compact caution (v0.12.0) — only when this SessionStart fired on a compaction ----
     # Post-compaction, memory-from-recall is the distortion vector; point at disk evidence.
+    # v0.15.0: when hooks/pre-compact left a FRESH forensics marker (<15 min by its
+    # own epoch field — no stat portability games), upgrade the generic caution to
+    # concrete anchors: when/what-trigger, branch, dirty count, handoff staleness.
     if [ "$hook_source" = "compact" ]; then
+        compact_line="context was just compacted — memory written from recall is unreliable; reconstruct from on-disk evidence (git diff, test output, progress.md) and state uncertainty rather than guess."
+        lc_meta="$PROJECT_DIR/.harness-anchor/last-compact.meta"
+        if [ -f "$lc_meta" ]; then
+            lc_epoch=$(sed -n 's/^epoch=//p' "$lc_meta" | head -1 | tr -cd '0-9')
+            if [ -n "$lc_epoch" ] && [ $(( $(date +%s) - lc_epoch )) -lt 900 ]; then
+                lc_ts=$(sed -n 's/^ts=//p' "$lc_meta" | head -1 | tr -cd 'A-Za-z0-9:.TZ-')
+                lc_trigger=$(sed -n 's/^trigger=//p' "$lc_meta" | head -1 | tr -cd 'a-z')
+                lc_branch=$(sed -n 's/^branch=//p' "$lc_meta" | head -1 | tr -cd 'A-Za-z0-9._/-')
+                lc_dirty=$(sed -n 's/^dirty=//p' "$lc_meta" | head -1 | tr -cd '0-9')
+                lc_age=$(sed -n 's/^handoff_age_min=//p' "$lc_meta" | head -1 | tr -cd 'A-Za-z0-9')
+                case "$lc_age" in absent|"") lc_age_disp="absent" ;; *) lc_age_disp="${lc_age} min old" ;; esac
+                compact_line="${compact_line} Last compaction: ${lc_trigger:-?} at ${lc_ts:-?}; at that moment branch ${lc_branch:--}, ${lc_dirty:-0} uncommitted file(s), handoff ${lc_age_disp}. Rebuild from disk: git diff, progress.md, session-handoff.md."
+            fi
+        fi
         banner="${banner}
-Compact notice:   context was just compacted — memory written from recall is unreliable; reconstruct from on-disk evidence (git diff, test output, progress.md) and state uncertainty rather than guess."
+Compact notice:   ${compact_line}"
     fi
 
     if [ -n "$golden_rules_line" ]; then

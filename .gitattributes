@@ -10,6 +10,7 @@ hooks/session-start text eol=lf
 hooks/post-tool-use text eol=lf
 hooks/stop text eol=lf
 hooks/user-prompt-submit text eol=lf
+hooks/pre-compact text eol=lf
 
 # The meta-skill is awk-consumed by hooks/session-start (conditional-region
 # filter + injection length); pin LF so marker anchors and counts are

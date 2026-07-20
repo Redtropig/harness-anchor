@@ -71,6 +71,19 @@ while a feature is in-progress — so "record new scope as `planned` first" is e
 not only when the new work happens to be phrased in a prompt. Warn-only: it surfaces the new module
 for you to either confirm in-scope or record as planned; it never blocks.
 
+### Negative scope — `out_of_scope` (optional)
+
+A feature may declare what it deliberately does NOT cover:
+
+```json
+"out_of_scope": ["UI redesign", "performance tuning"]
+```
+
+Set it at feature creation when the user draws the boundary. Consumers: the
+PostToolUse **pulse checkpoint** quotes it periodically, so agent-initiated
+drift is checked against an explicit list instead of a guess, and scope-jump
+conversations can cite it. Omit the field when no exclusion is worth naming.
+
 ## Feature id uniqueness
 
 `id` is the **lookup/mutation key** — `/verify` flips *the* feature to `pass` and attaches evidence
