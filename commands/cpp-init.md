@@ -18,9 +18,10 @@ as `/anchor`, C/C++ template map (init.sh per build system, `.clang-format`,
    bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-tool-discovery.sh clang-format clang-tidy
    ```
 
-   Record each `FOUND` absolute path — step 5 writes them into the generated
-   `scripts/lint.sh` and the `AGENTS.md` "Lint:" line, so later sessions invoke
-   the tool by path instead of rediscovering (and mis-concluding) it.
+   Record each `FOUND` line's **`<how>` column as well as its path** — step 5
+   branches on `<how>`, so the path alone is not enough. The point is that a
+   later session never has to rediscover (and mis-conclude) the tool; whether
+   that is best served by a bare name or a recorded path depends on `<how>`.
    A `NOT_FOUND` tool is still worth scaffolding config for (the config is
    version-controlled; the tool may arrive later) — but say so as
    **"searched PATH + \<listed locations\>, not found"**, never "not installed" / "on this machine".

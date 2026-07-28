@@ -142,12 +142,14 @@ system via `cpp-detect.sh`, and places the C/C++ map:
 
 Same conflict protocol as `/anchor`: existing non-empty files (a customized `init.sh`,
 `.clang-format`, `.clang-tidy`) land in `conflicts (need decision)` — resolved interactively,
-applied via `--cpp --overwrite <list>`. Finally, it writes each resolved tool's absolute path
-into the generated `scripts/lint.sh` and into `AGENTS.md`'s `# Lint:` line (an in-place edit of
-the file `/anchor` created), so later sessions invoke the tool by path instead of
-re-discovering — and mis-concluding — it; if every tool was `NOT_FOUND`, it writes an honest
-"searched PATH + listed locations, not found" placeholder instead of asserting the tool isn't
-installed.
+applied via `--cpp --overwrite <list>`. Finally, it records the resolved tools in the generated
+`scripts/lint.sh` and in `AGENTS.md`'s `# Lint:` line (an in-place edit of the file `/anchor`
+created) so later sessions never re-discover — and mis-conclude — them. What it records depends
+on how the tool was found: a tool already on `PATH` keeps its **bare name** (both files are
+git-tracked, so hardcoding a machine-local path there would break the next machine and CI),
+while a tool found off `PATH` gets a `PATH`-first lookup with the resolved path as fallback.
+If every tool was `NOT_FOUND`, it writes an honest "searched PATH + listed locations, not found"
+placeholder instead of asserting the tool isn't installed.
 
 **Arguments.** None.
 
@@ -156,7 +158,9 @@ installed.
 
 **Writes / side effects.** Creates the config files above; existing non-empty ones trigger
 the overwrite prompt. Also **edits `AGENTS.md`** in place — its `# Lint:` line is rewritten
-with the resolved tool path(s) from step 1. Does **not** commit.
+with the lint command implied by step 1's discovery result (bare tool name when it is already
+on `PATH`; a `PATH`-first lookup with the resolved path as fallback when it is not). Does
+**not** commit.
 
 **How it surfaces.** The SessionStart banner shows
 `C/C++ setup: not initialized (no .clang-format/.clang-tidy) — run /cpp-init` when the

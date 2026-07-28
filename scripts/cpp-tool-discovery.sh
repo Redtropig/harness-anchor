@@ -83,7 +83,7 @@ candidate_dirs() {
 }
 
 search_one() {
-    local tool="$1" scope="PATH" p how dir line
+    local tool="$1" scope="PATH" p how dir
 
     # 1. PATH
     p=$(command -v "$tool" 2>/dev/null || true)
