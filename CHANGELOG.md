@@ -29,6 +29,25 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
   attempt at the same build failure, not only on "anything cryptic".
 - `/anchor` closes by recommending `/cpp-init` when the project is C/C++ and
   `.clang-format`/`.clang-tidy` are absent.
+- `/cpp-init` records resolved tools portably: a tool already on PATH keeps its
+  bare name, and one found off PATH is written as a PATH-first lookup with the
+  resolved path as fallback. `scripts/lint.sh` and `AGENTS.md` are git-tracked,
+  so a bare absolute path would have broken the next machine and CI.
+
+### Fixed
+- `tests/skill-triggering/run-test.sh` passed `-p --output-format stream-json`
+  without `--verbose`, which newer `claude` CLI versions reject at argument-parse
+  time — before any prompt is read. Every triggering case failed identically
+  regardless of content, which made `tests/README.md`'s pre-tag ritual
+  unexecutable and left the "an adversarial prompt must PROVE the skill triggers"
+  authoring rule unsatisfiable.
+- `scripts/doc-drift-scan.sh` reported a silent clean in the two most common
+  `/gc` contexts: on `main` (where `merge-base HEAD main` *is* HEAD, and the
+  `HEAD~1` fallback was guarded on the base being empty rather than useless), and
+  on uncommitted work (a `BASE..HEAD` range excludes the working tree, but `/gc`
+  runs on uncommitted batches by design). Both fixed and covered by regression
+  tests that exercise default base resolution — the path the original suite
+  never touched.
 
 ## [0.15.0] - 2026-07-19
 

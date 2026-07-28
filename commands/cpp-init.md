@@ -47,11 +47,26 @@ as `/anchor`, C/C++ template map (init.sh per build system, `.clang-format`,
    `note:` line (make/bazel/unknown build system — no canned init.sh), relay
    it and point at the `cpp-build-systems` skill.
 
-5. **Write the resolved tool paths into the generated files.** For each `FOUND`
-   line from step 1, replace the bare tool name in `scripts/lint.sh` with its
-   absolute path, and fill `AGENTS.md`'s `# Lint:` line with the real command.
-   If every tool was `NOT_FOUND`, write `# Lint: none resolved — searched PATH +
-   platform install locations; re-run /cpp-init after installing.` — never
+5. **Record the resolved tools in the generated files — portably.**
+   `scripts/lint.sh` and `AGENTS.md` are git-tracked and shared, so a bare
+   absolute path from step 1 breaks the next machine and CI. Branch on step 1's
+   `<how>` column:
+
+   - **`how=path`** — leave the bare tool name as-is. It is already portable;
+     substituting `/usr/bin/clang-tidy` would replace something that works
+     everywhere with something that works only here, and then commit it.
+   - **any other `how`** (`vs-llvm`, `vs-cmake`, `brew`, `llvm-dir`, `versioned`)
+     — PATH cannot see the tool on this machine, which is precisely what the
+     absolute path is for. Write a PATH-first lookup with the resolved path as
+     the fallback, so this machine and a PATH-having one both work:
+
+     ```bash
+     CLANG_TIDY="${CLANG_TIDY:-$(command -v clang-tidy || echo '<resolved path from step 1>')}"
+     ```
+
+   Fill `AGENTS.md`'s `# Lint:` line with the command a reader should actually
+   run. If every tool was `NOT_FOUND`, write `# Lint: none resolved — searched
+   PATH + platform install locations; re-run /cpp-init after installing.` — never
    "not installed" / "on this machine" (e.g. not "none configured — not on this machine").
 
 ## Related
