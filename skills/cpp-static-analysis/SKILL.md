@@ -18,8 +18,22 @@ Three core tools cover most needs:
 ## Prerequisites (hard)
 
 - `compile_commands.json` exists at project root or symlinked
-- The tools are installed (`clang-tidy --version`, `cppcheck --version`, `include-what-you-use --version`)
 - A `.clang-tidy` config exists at project root (use template if not)
+- The tool is actually reachable — **resolve this with the discovery script, not with `command -v`**:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-tool-discovery.sh clang-tidy cppcheck include-what-you-use
+```
+
+`FOUND` lines carry the absolute path — use it directly (the tool need not be on
+PATH to be usable). Only a `NOT_FOUND` line licenses you to call a tool unavailable.
+
+**An empty `command -v` / `where` proves nothing.** On Windows the VS-bundled LLVM
+only joins PATH after `vcvars64.bat`; on macOS Homebrew's llvm is keg-only. Report
+absence as **"searched PATH + \<listed locations\>, not found"** —
+never "not installed" / "on this machine". The first is a falsifiable claim about
+your search; the second is an unfalsifiable claim about the world, and it tends to
+get written into AGENTS.md where it silently disables this skill for every later session.
 
 If any prerequisite is missing, **say so explicitly** instead of pretending to analyze:
 

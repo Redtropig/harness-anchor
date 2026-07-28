@@ -92,7 +92,10 @@ reports the rest as `kept (skip-by-default)` (feature_list.json, golden-rules.md
 value) or `conflicts (need decision)`. The agent's job is the interaction: AskUserQuestion per
 conflict (`Show diff` uses `--render <file>`), then ONE `--overwrite <f1,f2>` call for the
 approved set. If the script fails, the error is reported verbatim — templates are never
-hand-copied as a substitute.
+hand-copied as a substitute. Finally, it runs `scripts/cpp-detect.sh` and, if the project is
+C/C++ with `.clang-format`/`.clang-tidy` still absent, closes the reply with a concrete
+`/cpp-init` recommendation — at the moment of maximum relevance, rather than relying on the
+agent to recall it later from the SessionStart command list.
 
 **Arguments.** None.
 
@@ -122,9 +125,12 @@ step instead of archiving during scaffolding).
 **When to use.** Right **after `/anchor`** in a C/C++ project — especially when the project
 has no `.clang-format` / `.clang-tidy` yet.
 
-**What it does.** Runs `scripts/scaffold.sh --target "$(pwd)" --cpp`, which confirms the
-prerequisites itself (exit 4 = not anchored → run `/anchor` first; exit 3 = not a C/C++
-project), detects the build system via `cpp-detect.sh`, and places the C/C++ map:
+**What it does.** First resolves the C/C++ toolchain via
+`scripts/cpp-tool-discovery.sh clang-format clang-tidy` (PATH *and* the platform's known
+install locations — VS-bundled LLVM on Windows, keg-only Homebrew llvm on macOS, ...). Then
+runs `scripts/scaffold.sh --target "$(pwd)" --cpp`, which confirms the prerequisites itself
+(exit 4 = not anchored → run `/anchor` first; exit 3 = not a C/C++ project), detects the build
+system via `cpp-detect.sh`, and places the C/C++ map:
 
 - `init.sh` from the build-system template (`cmake` / `meson`; `make`/`bazel` keep the
   generic one — the report carries a `note:` line).
@@ -136,7 +142,14 @@ project), detects the build system via `cpp-detect.sh`, and places the C/C++ map
 
 Same conflict protocol as `/anchor`: existing non-empty files (a customized `init.sh`,
 `.clang-format`, `.clang-tidy`) land in `conflicts (need decision)` — resolved interactively,
-applied via `--cpp --overwrite <list>`.
+applied via `--cpp --overwrite <list>`. Finally, it records the resolved tools in the generated
+`scripts/lint.sh` and in `AGENTS.md`'s `# Lint:` line (an in-place edit of the file `/anchor`
+created) so later sessions never re-discover — and mis-conclude — them. What it records depends
+on how the tool was found: a tool already on `PATH` keeps its **bare name** (both files are
+git-tracked, so hardcoding a machine-local path there would break the next machine and CI),
+while a tool found off `PATH` gets a `PATH`-first lookup with the resolved path as fallback.
+If every tool was `NOT_FOUND`, it writes an honest "searched PATH + listed locations, not found"
+placeholder instead of asserting the tool isn't installed.
 
 **Arguments.** None.
 
@@ -144,7 +157,10 @@ applied via `--cpp --overwrite <list>`.
 (`cpp-detect.sh` → `is_cpp_project: true`). Refuses otherwise.
 
 **Writes / side effects.** Creates the config files above; existing non-empty ones trigger
-the overwrite prompt. Does **not** commit.
+the overwrite prompt. Also **edits `AGENTS.md`** in place — its `# Lint:` line is rewritten
+with the lint command implied by step 1's discovery result (bare tool name when it is already
+on `PATH`; a `PATH`-first lookup with the resolved path as fallback when it is not). Does
+**not** commit.
 
 **How it surfaces.** The SessionStart banner shows
 `C/C++ setup: not initialized (no .clang-format/.clang-tidy) — run /cpp-init` when the
@@ -297,7 +313,9 @@ harness-engineering's Concept ⑥ — **not** `git gc`.
 
 **What it does.** Dispatches the `drift-analyst` subagent (read-only, fresh-context), which loads
 `golden-rules.md`, bounds the scope to **changed files** (`git diff` vs `HEAD`) or the active
-feature, runs the rules' **mechanical tier via `golden-rules-check.sh`** (three-state:
+feature — with one deliberate exception: an unchanged `*.md` file still enters scope when it
+mentions a symbol the change touched, so a stale doc claim about code that changed elsewhere
+stays reachable — runs the rules' **mechanical tier via `golden-rules-check.sh`** (three-state:
 CLEAN / FINDINGS / CHECK-ERROR — a broken or timed-out Check is surfaced, never counted clean;
 FINDINGS lines are candidates the analyst adjudicates) and hand-reviews the `[MANUAL]` tier,
 applies generic drift heuristics (duplication, dead code, oversized

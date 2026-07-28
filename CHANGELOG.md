@@ -4,6 +4,51 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-07-28
+
+### Added
+- `scripts/cpp-tool-discovery.sh` — resolves a C/C++ tool through PATH *and* the
+  platform's known install locations (VS-bundled LLVM/Ninja on Windows, keg-only
+  Homebrew llvm on macOS, versioned `/usr/lib/llvm-*` on Linux). An empty
+  `command -v` is no longer treated as proof a tool is absent.
+- `scripts/doc-drift-scan.sh` — reverse-associates symbols touched by a change to
+  `*.md` lines that mention them, surfacing documentation claims that should have
+  changed and didn't. Attributes body-only changes to the enclosing symbol.
+- Adversarial trigger prompt for `cpp-static-analysis` covering the
+  "tool looks missing, let's skip the check" failure shape.
+
+### Changed
+- `cpp-static-analysis` / `cpp-formatting` / `/cpp-init` now resolve tool
+  availability via the discovery script, and are required to report absence as
+  "searched PATH + <locations>, not found" rather than "not installed on this machine".
+- `drift-analyst` doc-drift now covers *stale claims* (symbol still exists, its
+  contract changed) in addition to *dangling references*, and pulls unchanged
+  `*.md` into scope when they mention a touched symbol. Its symbol-keyed blind
+  spot is stated in the agent header.
+- `cpp-build-systems` escalates to `cpp-build-doctor` after a second failed
+  attempt at the same build failure, not only on "anything cryptic".
+- `/anchor` closes by recommending `/cpp-init` when the project is C/C++ and
+  `.clang-format`/`.clang-tidy` are absent.
+- `/cpp-init` records resolved tools portably: a tool already on PATH keeps its
+  bare name, and one found off PATH is written as a PATH-first lookup with the
+  resolved path as fallback. `scripts/lint.sh` and `AGENTS.md` are git-tracked,
+  so a bare absolute path would have broken the next machine and CI.
+
+### Fixed
+- `tests/skill-triggering/run-test.sh` passed `-p --output-format stream-json`
+  without `--verbose`, which newer `claude` CLI versions reject at argument-parse
+  time — before any prompt is read. Every triggering case failed identically
+  regardless of content, which made `tests/README.md`'s pre-tag ritual
+  unexecutable and left the "an adversarial prompt must PROVE the skill triggers"
+  authoring rule unsatisfiable.
+- `scripts/doc-drift-scan.sh` reported a silent clean in the two most common
+  `/gc` contexts: on `main` (where `merge-base HEAD main` *is* HEAD, and the
+  `HEAD~1` fallback was guarded on the base being empty rather than useless), and
+  on uncommitted work (a `BASE..HEAD` range excludes the working tree, but `/gc`
+  runs on uncommitted batches by design). Both fixed and covered by regression
+  tests that exercise default base resolution — the path the original suite
+  never touched.
+
 ## [0.15.0] - 2026-07-19
 
 ### Added
@@ -565,7 +610,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/Redtropig/harness-anchor/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Redtropig/harness-anchor/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Redtropig/harness-anchor/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Redtropig/harness-anchor/compare/v0.12.0...v0.13.0

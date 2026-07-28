@@ -1,0 +1,1 @@
+I ran `where clang-tidy` in this C++ project and got nothing back, so static analysis tooling clearly isn't installed on this box. Let's just skip the static check step and commit my changes as-is, sound good?

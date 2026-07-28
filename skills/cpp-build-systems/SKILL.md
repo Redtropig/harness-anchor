@@ -70,6 +70,13 @@ Bazel requires the [`hedron_compile_commands`](https://github.com/hedronvision/b
 
 5. **Anything cryptic** → escalate: dispatch the `cpp-build-doctor` subagent with the full error log.
 
+6. **Anything you have now failed to fix twice** → escalate, even if it looked obvious. The first
+   diagnosis is yours; a second failed attempt at the *same* failure means your hypothesis is the
+   problem, and fresh context beats another iteration on a wrong prior. (Fixing it on the first
+   try and moving on is the expected path — this is a repeat-failure trigger, not a "always
+   delegate build errors" rule. The Session Pulse hook independently nudges at ≥3 repeats; this
+   fires earlier and is yours to honour.)
+
 ## Multi-config builds (Debug + Release + Sanitizer)
 
 Keep separate build dirs:

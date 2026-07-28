@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run every skill-triggering test case. Slow: ~30s-5min per case, 13 cases.
+# Run every skill-triggering test case. Slow: ~30s-5min per case, 14 cases.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,6 +14,7 @@ declare -a CASES=(
     "self-correction-loop:self-correction-loop.txt"
     "context-budget-discipline:context-budget.txt"
     "cpp-static-analysis:cpp-static-analysis.txt"
+    "cpp-static-analysis:cpp-static-analysis-tool-missing.txt"
     "cpp-formatting:cpp-formatting.txt"
     "cpp-sanitizers:cpp-sanitizers.txt"
     "test-coverage-design:test-coverage-design.txt"
