@@ -65,6 +65,16 @@ as `/anchor`, C/C++ template map (init.sh per build system, `.clang-format`,
      CLANG_TIDY="${CLANG_TIDY:-$(command -v clang-tidy || echo '<resolved path from step 1>')}"
      ```
 
+     **Adding that line is only half the edit.** `scripts/lint.sh` ends in a bare
+     `exec clang-tidy -p "$CC_DIR" …`; you must also change that invocation to
+     `exec "$CLANG_TIDY" -p "$CC_DIR" …`. A `CLANG_TIDY=` assignment nothing
+     reads leaves a file that *looks* fixed and still fails on the very machine
+     that needed the fix — check the `exec` line before you call this done.
+
+   `scripts/lint.sh` drives clang-tidy only, so a resolved `clang-format` has no
+   landing site there — record it in `AGENTS.md`'s `# Lint:` line instead (same
+   `<how>` branching), or omit it if it was `NOT_FOUND`.
+
    Fill `AGENTS.md`'s `# Lint:` line with the command a reader should actually
    run. If every tool was `NOT_FOUND`, write `# Lint: none resolved — searched
    PATH + platform install locations; re-run /cpp-init after installing.` — never
