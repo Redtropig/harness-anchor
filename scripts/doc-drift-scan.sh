@@ -5,7 +5,9 @@
 # Usage:
 #   bash doc-drift-scan.sh [--base <ref>] [--target <dir>]
 #     --base    git ref to diff against (default: merge-base with the default
-#               branch if resolvable, else HEAD~1, else empty tree)
+#               branch if resolvable, else HEAD~1, else the empty-tree hash,
+#               so a repo with only one commit still diffs against "nothing"
+#               instead of silently skipping the scan)
 #     --target  project root (default: cwd)
 #
 # Output (stdout, one candidate per line, TAB-separated):
@@ -19,18 +21,51 @@
 # is safe to call at any time" survived a change that made cancel() reject
 # terminal-state jobs, and /gc reported clean.
 #
-# RESIDUAL BLIND SPOT: a stale claim that names no symbol ("the pool is fast")
-# is NOT detectable this way. Documented in agents/drift-analyst.md and frozen
-# as a negative assertion in tests/unit/doc-drift-scan.sh — a silent pass here
-# must never be read as "the docs were checked".
+# RESIDUAL BLIND SPOT: symbol extraction only recognizes CALL/DEFINITION-SHAPED
+# tokens — an identifier immediately followed by `(`. Two consequences, both
+# undetectable by this script: (a) a stale claim that names no symbol at all
+# ("the pool is fast") has nothing to key on; (b) a changed global variable,
+# macro, enum constant, struct field, or typedef produces NO symbol either —
+# so a doc claim naming that exact symbol (e.g. "max_retries defaults to 3"
+# after `max_retries` is edited) is just as invisible, for a different reason
+# than (a). Documented in agents/drift-analyst.md and frozen as negative
+# assertions in tests/unit/doc-drift-scan.sh — a silent pass here must never
+# be read as "the docs were checked".
+#
+# NOISE: symbol extraction takes any call-shaped token on any added line —
+# including ordinary call sites, not just new/renamed symbols — and doc
+# matching is deliberately prefix-based (needed to match "Cancellation" from
+# `cancel`; see the comment at the grep site below). For a common-word
+# identifier (read, write, get, set, run, check, test, ...) this floods: one
+# body-only edit inside a `read(...)` call can surface "please read this",
+# "README", "readable", and similar unrelated prose as candidates. This is an
+# accepted trade-off, not a bug — see agents/drift-analyst.md's doc-drift step
+# for triage guidance when a candidate list is dominated by a common-word
+# symbol.
 
 set -uo pipefail
 
 BASE=""; TARGET=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --base)   BASE="${2:-}"; shift 2;;
-        --target) TARGET="${2:-}"; shift 2;;
+        --base)
+            # A value-less --base (end of args) must not re-enter the loop with
+            # $1/$# unchanged (that's the infinite-loop bug: `shift 2` fails and
+            # is a no-op when only one positional remains). A value that itself
+            # looks like a flag (starts with `-') must be rejected rather than
+            # swallowed as BASE — otherwise the real next flag silently vanishes
+            # and the run goes quiet, indistinguishable from "no drift".
+            case "${2-}" in
+                ""|-*) echo "doc-drift-scan.sh: --base requires a value" >&2; shift;;
+                *)     BASE="$2"; shift 2;;
+            esac
+            ;;
+        --target)
+            case "${2-}" in
+                ""|-*) echo "doc-drift-scan.sh: --target requires a value" >&2; shift;;
+                *)     TARGET="$2"; shift 2;;
+            esac
+            ;;
         *) shift;;
     esac
 done
@@ -47,6 +82,7 @@ if [ -z "$BASE" ]; then
     done
 fi
 [ -n "$BASE" ] || BASE=$(git rev-parse --verify -q HEAD~1 2>/dev/null || true)
+[ -n "$BASE" ] || BASE=$(git hash-object -t tree /dev/null 2>/dev/null || true)
 [ -n "$BASE" ] || exit 0
 
 # ---- 1. changed symbol names --------------------------------------------------
