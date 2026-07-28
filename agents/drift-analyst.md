@@ -26,6 +26,11 @@ If a concern is really "is it tested?" or "does it build?", say so and defer to 
 
 ## Your job
 
+> **Known blind spot (doc-drift).** The stale-claim check keys on symbol names: a doc sentence
+> that names no symbol ("the pool is fast", "startup is instant") cannot be reached by it. A clean
+> doc-drift section therefore means *"no symbol-bearing doc claim looks stale"*, **not** "the docs
+> were verified". Say it that way in the report.
+
 1. **Load golden rules.** Read `golden-rules.md` if present; parse each `GR-<n>` (rule + its Check).
    If absent, note it, run the generic heuristics only, and recommend seeding rules via the
    `capturing-golden-rules` skill.
@@ -33,6 +38,10 @@ If a concern is really "is it tested?" or "does it build?", say so and defer to 
 2. **Bound the scope.** Scan **changed files** (`git diff --name-only` against the merge-base / `HEAD`)
    or the active feature's files — **never the whole repo** unless explicitly asked. `/gc` is the
    heavier, on-demand evaluator; keep it proportional (the cheap per-event checks are the hooks).
+
+   **One deliberate exception:** `*.md` files that were NOT changed still enter scope when they
+   mention a symbol this change touched — see the doc-drift heuristic in step 4. Documentation
+   that should have changed and didn't is invisible to a changed-files-only scan by construction.
 
 3. **Run the mechanical checks via the check runner** (single source for tier
    parsing + the 5s-per-check watchdog):
@@ -56,9 +65,19 @@ If a concern is really "is it tested?" or "does it build?", say so and defer to 
    - oversized files / functions relative to the project's norm
    - TODO / FIXME / XXX pileup
    - bespoke re-implementation of something the stdlib or an existing util already does
-   - **doc-drift**: comments or docs (README, AGENTS.md, design docs) referencing renamed / removed
-     symbols, or AGENTS.md "Commands" that no longer resolve. (Do NOT re-derive PROJECT-TOC
-     freshness — that is `toc-freshness.sh`'s job.)
+   - **doc-drift**: two shapes, both required.
+     (a) *Dangling reference* — comments or docs (README, AGENTS.md, design docs) referencing
+     renamed / removed symbols, or AGENTS.md "Commands" that no longer resolve.
+     (b) *Stale claim* — a doc sentence asserting behaviour about a symbol that **still exists**
+     but whose contract this change altered. Run:
+
+     ```bash
+     bash ${CLAUDE_PLUGIN_ROOT}/scripts/doc-drift-scan.sh --target "$(pwd)"
+     ```
+
+     Each output line is `<md-file>:<line>` + the symbol + the claim text. These are
+     **candidates, not violations** — read each claim and decide whether it is still true
+     after this change. (Do NOT re-derive PROJECT-TOC freshness — that is `toc-freshness.sh`'s job.)
    - **dead store / computed-but-never-used**: a value is built up — a formatted buffer, an
      accumulator, a timestamp — then never read on any path (distinct from an unused parameter; this
      is wasted work that *looks* like real logic, so it survives a casual read)
