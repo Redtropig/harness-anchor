@@ -347,7 +347,9 @@ for s in \
     scripts/golden-rules-check.sh \
     scripts/status-report.sh \
     scripts/scaffold.sh \
-    scripts/session-end-precheck.sh
+    scripts/session-end-precheck.sh \
+    scripts/cpp-tool-discovery.sh \
+    scripts/doc-drift-scan.sh
 do
     if [ -x "$s" ]; then ok "$s executable"; else fail "$s missing or not executable"; fi
     if [ -f "$s" ] && bash -n "$s" 2>/dev/null; then ok "$s bash -n"; else fail "$s fails bash -n"; fi

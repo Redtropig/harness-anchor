@@ -4,6 +4,32 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-07-28
+
+### Added
+- `scripts/cpp-tool-discovery.sh` — resolves a C/C++ tool through PATH *and* the
+  platform's known install locations (VS-bundled LLVM/Ninja on Windows, keg-only
+  Homebrew llvm on macOS, versioned `/usr/lib/llvm-*` on Linux). An empty
+  `command -v` is no longer treated as proof a tool is absent.
+- `scripts/doc-drift-scan.sh` — reverse-associates symbols touched by a change to
+  `*.md` lines that mention them, surfacing documentation claims that should have
+  changed and didn't. Attributes body-only changes to the enclosing symbol.
+- Adversarial trigger prompt for `cpp-static-analysis` covering the
+  "tool looks missing, let's skip the check" failure shape.
+
+### Changed
+- `cpp-static-analysis` / `cpp-formatting` / `/cpp-init` now resolve tool
+  availability via the discovery script, and are required to report absence as
+  "searched PATH + <locations>, not found" rather than "not installed on this machine".
+- `drift-analyst` doc-drift now covers *stale claims* (symbol still exists, its
+  contract changed) in addition to *dangling references*, and pulls unchanged
+  `*.md` into scope when they mention a touched symbol. Its symbol-keyed blind
+  spot is stated in the agent header.
+- `cpp-build-systems` escalates to `cpp-build-doctor` after a second failed
+  attempt at the same build failure, not only on "anything cryptic".
+- `/anchor` closes by recommending `/cpp-init` when the project is C/C++ and
+  `.clang-format`/`.clang-tidy` are absent.
+
 ## [0.15.0] - 2026-07-19
 
 ### Added
