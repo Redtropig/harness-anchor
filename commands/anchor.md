@@ -41,6 +41,27 @@ decisions the script refuses to make.
 
 5. **Do NOT auto-commit.** Let the user review the diff first.
 
+6. **Hand off to `/cpp-init` if this is a C/C++ project missing its config.**
+
+   ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-detect.sh --target "$(pwd)"
+   ```
+
+   If `is_cpp_project` is `true` and either `has_clang_format` or `has_clang_tidy`
+   is `false`, make **the last line of your reply** a concrete recommendation:
+
+   > Next: run `/cpp-init` — this is a `<build_system>` project with no
+   > `.clang-format`/`.clang-tidy` yet, and `/cpp-init` drops those plus a
+   > per-build-system `init.sh`, `scripts/lint.sh`, and the sanitizer build.
+
+   Recommend it *here*, at the moment of maximum relevance, rather than relying on
+   the agent to recall it from the SessionStart command list — a real run read that
+   list, ran `/anchor`, and still never reached `/cpp-init`.
+
+   Note the field names mean *config file present*, not *tool installed* — tool
+   availability is `scripts/cpp-tool-discovery.sh`'s question, and `/cpp-init`
+   asks it in its own step 1.
+
 ## Refusal / edge cases
 
 - Existing state files over their hot-window budgets (the report's facts or
