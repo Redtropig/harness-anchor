@@ -18,6 +18,20 @@ description: Use in C/C++ projects for clang-format. Changed-lines-only; never r
 git diff -U0 --no-color HEAD | clang-format-diff -p1 -i
 ```
 
+## Is clang-format actually here?
+
+Before concluding clang-format is unavailable, resolve it properly:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-tool-discovery.sh clang-format
+```
+
+A `FOUND` line gives you an absolute path — invoke it directly; the binary does
+not need to be on PATH. Only `NOT_FOUND` licenses "unavailable", and then the
+honest phrasing is **"searched PATH + \<listed locations\>, not found"**, never
+"not installed on this machine" (an empty `command -v` only tells you about PATH —
+the VS-bundled LLVM on Windows and keg-only Homebrew llvm on macOS both sit off it).
+
 Or, for staged changes:
 
 ```bash
