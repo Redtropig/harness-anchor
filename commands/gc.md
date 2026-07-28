@@ -20,8 +20,10 @@ agent that wrote the code. It is **report-only** — it never refactors in bulk.
    Task tool with:
      subagent_type: drift-analyst
      prompt: Scan the changed/active code for drift against golden-rules.md plus the generic drift
-             heuristics. Bound the scope to changed files (git diff vs HEAD) or the active feature.
-             Follow the fixed report format. Read-only — recommend, do not refactor.
+             heuristics. Bound the scope to changed files (git diff vs HEAD) or the active feature —
+             plus the one deliberate doc-drift exception: an unchanged *.md file still enters scope
+             when it mentions a symbol this change touched. Follow the fixed report format.
+             Read-only — recommend, do not refactor.
    ```
    If the user passed a path or feature id as an argument, name it in the prompt.
 

@@ -30,9 +30,14 @@ If a concern is really "is it tested?" or "does it build?", say so and defer to 
 > symbols — an identifier immediately followed by `(`. Two things fall outside it: a doc sentence
 > that names no symbol at all ("the pool is fast", "startup is instant"), AND a doc claim naming a
 > changed global variable, macro, enum constant, struct field, or typedef — none of those produce an
-> extracted symbol either, so they're just as invisible. A clean doc-drift section therefore means
-> *"no doc claim about a changed function-shaped symbol looks stale"*, **not** "the docs were
-> verified". Say it that way in the report.
+> extracted symbol either, so they're just as invisible. **The scan is also C/C++-only** —
+> `doc-drift-scan.sh` diffs only `*.c`/`*.cc`/`*.cpp`/`*.cxx`/`*.h`/`*.hpp`, so a changed Python, JS,
+> or any other non-C/C++ symbol produces nothing, *even when it IS call/definition-shaped* (a Python
+> `def cancel(job_id):` is exactly as call-shaped as a C++ `bool cancel(JobId id)`) — this is a
+> language-scope gap, not a symbol-shape gap, and it means the check is silently inert on a non-C/C++
+> project. A clean doc-drift section therefore means *"no doc claim about a changed function-shaped
+> symbol in a C/C++ file looks stale"*, **not** "the docs were verified". Say it that way in the
+> report.
 
 1. **Load golden rules.** Read `golden-rules.md` if present; parse each `GR-<n>` (rule + its Check).
    If absent, note it, run the generic heuristics only, and recommend seeding rules via the
@@ -82,8 +87,11 @@ If a concern is really "is it tested?" or "does it build?", say so and defer to 
      **candidates, not violations** — read each claim and decide whether it is still true
      after this change. If the candidate list is large and dominated by one common-word symbol
      (`read`, `write`, `get`, `set`, `run`, `check`, `test`, ...), that's expected prefix-match
-     noise, not a signal to chase — skim that symbol's block as one unit instead of reading every
-     line. (Do NOT re-derive PROJECT-TOC freshness — that is `toc-freshness.sh`'s job.)
+     noise, not a signal to chase — mentally discount every row for that symbol as a unit rather
+     than reading each one on its own merits. Note the output is `sort -u`'d by `<md-file>:<line>`,
+     so a symbol's rows are interleaved with other symbols' and are NOT adjacent — scan down the
+     symbol column for the name rather than expecting its hits to cluster together. (Do NOT
+     re-derive PROJECT-TOC freshness — that is `toc-freshness.sh`'s job.)
    - **dead store / computed-but-never-used**: a value is built up — a formatted buffer, an
      accumulator, a timestamp — then never read on any path (distinct from an unused parameter; this
      is wasted work that *looks* like real logic, so it survives a casual read)

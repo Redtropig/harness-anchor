@@ -9,7 +9,8 @@ description: Use in C/C++ projects for clang-format. Changed-lines-only; never r
 
 ## Prerequisites
 
-- `clang-format` installed (`brew install clang-format` / `apt install clang-format`)
+- `clang-format` reachable — see "Is clang-format actually here?" below before concluding
+  it's missing; only then `brew install clang-format` / `apt install clang-format`.
 - `.clang-format` config at project root (use `templates/cpp/.clang-format.tpl` if not present — `/cpp-init` drops it for you)
 
 ## Format changed lines only (preferred)
@@ -17,6 +18,14 @@ description: Use in C/C++ projects for clang-format. Changed-lines-only; never r
 ```bash
 git diff -U0 --no-color HEAD | clang-format-diff -p1 -i
 ```
+
+Or, for staged changes:
+
+```bash
+git clang-format
+```
+
+This formats **only changed lines** — does not touch unrelated code. Critical for keeping diffs clean.
 
 ## Is clang-format actually here?
 
@@ -29,16 +38,8 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-tool-discovery.sh clang-format
 A `FOUND` line gives you an absolute path — invoke it directly; the binary does
 not need to be on PATH. Only `NOT_FOUND` licenses "unavailable", and then the
 honest phrasing is **"searched PATH + \<listed locations\>, not found"**, never
-"not installed on this machine" (an empty `command -v` only tells you about PATH —
+"not installed" / "on this machine" (an empty `command -v` only tells you about PATH —
 the VS-bundled LLVM on Windows and keg-only Homebrew llvm on macOS both sit off it).
-
-Or, for staged changes:
-
-```bash
-git clang-format
-```
-
-This formats **only changed lines** — does not touch unrelated code. Critical for keeping diffs clean.
 
 ## Format a whole file
 

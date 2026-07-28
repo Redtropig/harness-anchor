@@ -30,8 +30,8 @@ PATH to be usable). Only a `NOT_FOUND` line licenses you to call a tool unavaila
 
 **An empty `command -v` / `where` proves nothing.** On Windows the VS-bundled LLVM
 only joins PATH after `vcvars64.bat`; on macOS Homebrew's llvm is keg-only. Report
-absence as **"searched PATH + \<the locations the script lists\>, not found"** —
-never as "not installed on this machine". The first is a falsifiable claim about
+absence as **"searched PATH + \<listed locations\>, not found"** —
+never "not installed" / "on this machine". The first is a falsifiable claim about
 your search; the second is an unfalsifiable claim about the world, and it tends to
 get written into AGENTS.md where it silently disables this skill for every later session.
 

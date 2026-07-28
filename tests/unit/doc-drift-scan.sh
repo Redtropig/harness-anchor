@@ -93,6 +93,101 @@ if grep -qE '(^|[^a-zA-Z_-])python3([^a-zA-Z_-]|$)' "$SCAN"; then
   echo "  FAIL script invokes python3 directly"; FAIL=$((FAIL+1))
 else echo "  OK   no direct python3"; PASS=$((PASS+1)); fi
 
+# ---- 7. REGRESSION (C1): default (no --base) resolution must include the
+#         working tree, both AWAY FROM and directly ON the default branch.
+#         Every assertion above always passes --base HEAD~1 explicitly and so
+#         never exercises the resolution path at all — that is exactly the
+#         blind spot that let two independent bugs ship silently: (a)
+#         merge-base(HEAD, main) resolves to HEAD itself when we ARE main, and
+#         the HEAD~1 fallback was guarded on BASE being *empty*, not
+#         *useless*; (b) the diff used "$BASE"..HEAD (commit-to-commit),
+#         invisible to uncommitted changes — but /gc runs precisely on
+#         uncommitted work (commands/gc.md: "after a batch of generated code,
+#         before /session-end").
+
+# ---- 7a. feature branch, one real commit ahead of main, PLUS an uncommitted
+#          change on top — isolates bug (b): BASE != HEAD here (merge-base is
+#          the branch point, not HEAD), so only the one-ref (not ..HEAD) diff
+#          form catches the still-uncommitted drift. ----
+ROOT2=$(mktemp -d); trap 'rm -rf "$ROOT" "$ROOT2"' EXIT
+cd "$ROOT2" || exit 1
+git init -q . && git config user.email t@t && git config user.name t
+git symbolic-ref HEAD refs/heads/main >/dev/null 2>&1 || true
+mkdir -p src
+cat > src/scheduler.cpp <<'EOF'
+bool Scheduler::cancel(JobId id) {
+    mark_cancelled(id);
+    return true;
+}
+EOF
+cat > README.md <<'EOF'
+# Notes
+
+- Cancellation is safe to call at any time.
+EOF
+git add -A && git commit -qm base
+git checkout -q -b feature/uncommitted
+echo "// unrelated" >> src/scheduler.cpp
+git add -A && git commit -qm "unrelated feature-branch commit"
+cat > src/scheduler.cpp <<'EOF'
+bool Scheduler::cancel(JobId id) {
+    if (is_terminal(id)) return false;
+    mark_cancelled(id);
+    return true;
+}
+// unrelated
+EOF
+# (deliberately left UNCOMMITTED — this is the drift under test)
+
+out2=$(bash "$SCAN" --target "$ROOT2" 2>/dev/null); rc2=$?
+if [ "$rc2" -eq 0 ]; then echo "  OK   [default-base/feature-branch] exit 0"; PASS=$((PASS+1))
+else echo "  FAIL [default-base/feature-branch] exit $rc2"; FAIL=$((FAIL+1)); fi
+expect_contains "[default-base/feature-branch] uncommitted body-only change found with NO --base" \
+  "${TAB}cancel${TAB}" "$out2"
+
+# ---- 7b. directly ON main (no feature branch at all), an uncommitted change
+#          — isolates bug (a): merge-base(HEAD, main) == HEAD here, so the
+#          HEAD~1 fallback must actually fire (and then combine with fix (b)
+#          to still see the working tree on top of it). ----
+ROOT3=$(mktemp -d); trap 'rm -rf "$ROOT" "$ROOT2" "$ROOT3"' EXIT
+cd "$ROOT3" || exit 1
+git init -q . && git config user.email t@t && git config user.name t
+git symbolic-ref HEAD refs/heads/main >/dev/null 2>&1 || true
+echo "init" > NOTES.md
+git add -A && git commit -qm init
+mkdir -p src
+cat > src/scheduler.cpp <<'EOF'
+bool Scheduler::cancel(JobId id) {
+    mark_cancelled(id);
+    return true;
+}
+EOF
+cat > README.md <<'EOF'
+# Notes
+
+- Cancellation is safe to call at any time.
+EOF
+git add -A && git commit -qm base
+# still ON main (HEAD == main, no branch divergence); now an uncommitted
+# body-only edit — the drift under test:
+cat > src/scheduler.cpp <<'EOF'
+bool Scheduler::cancel(JobId id) {
+    if (is_terminal(id)) return false;
+    mark_cancelled(id);
+    return true;
+}
+EOF
+
+branch3=$(git rev-parse --abbrev-ref HEAD)
+out3=$(bash "$SCAN" --target "$ROOT3" 2>/dev/null); rc3=$?
+if [ "$rc3" -eq 0 ]; then echo "  OK   [default-base/on-main, branch=$branch3] exit 0"; PASS=$((PASS+1))
+else echo "  FAIL [default-base/on-main] exit $rc3"; FAIL=$((FAIL+1)); fi
+if [ "$branch3" != "main" ]; then
+  echo "  FAIL [default-base/on-main] fixture branch is '$branch3', not 'main' — test invalid"; FAIL=$((FAIL+1))
+fi
+expect_contains "[default-base/on-main] uncommitted body-only change found with NO --base" \
+  "${TAB}cancel${TAB}" "$out3"
+
 echo ""
 echo "doc-drift-scan: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

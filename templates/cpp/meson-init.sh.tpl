@@ -25,7 +25,7 @@ for tool in clang-tidy clang-format; do
     if command -v "$tool" >/dev/null 2>&1; then
         echo "  OK:      $tool (optional)"
     else
-        echo "  WARN:    $tool not installed (optional)"
+        echo "  WARN:    $tool not on PATH (optional; PATH-only check — see cpp-tool-discovery.sh)"
     fi
 done
 echo ""

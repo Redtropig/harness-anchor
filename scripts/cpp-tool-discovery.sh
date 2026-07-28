@@ -8,7 +8,7 @@
 # Output (stdout, one line per tool, TAB-separated):
 #   FOUND<TAB><tool><TAB><abs-path><TAB><how>
 #   NOT_FOUND<TAB><tool><TAB>searched:<comma-list>
-# <how> is a closed set: path|vs-llvm|vs-cmake|vsinstalldir|xcrun|brew|llvm-dir|versioned
+# <how> is a closed set: path|vs-llvm|vs-cmake|xcrun|brew|llvm-dir|versioned
 # Exit code: ALWAYS 0 — discovery results live in stdout, never in $?. Callers
 # must not need `|| true`, and `set -e` callers must not abort on a missing tool.
 #

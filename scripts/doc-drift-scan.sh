@@ -5,10 +5,20 @@
 # Usage:
 #   bash doc-drift-scan.sh [--base <ref>] [--target <dir>]
 #     --base    git ref to diff against (default: merge-base with the default
-#               branch if resolvable, else HEAD~1, else the empty-tree hash,
-#               so a repo with only one commit still diffs against "nothing"
-#               instead of silently skipping the scan)
+#               branch if resolvable AND not HEAD itself, else HEAD~1, else the
+#               empty-tree hash, so a repo with only one commit still diffs
+#               against "nothing" instead of silently skipping the scan). A
+#               merge-base that resolves to HEAD itself (we ARE the default
+#               branch — the solo-dev / this-repo case) is treated the same as
+#               "unresolved" and falls through to HEAD~1: diffing HEAD against
+#               HEAD is always empty, so it is not a useful base.
 #     --target  project root (default: cwd)
+#
+# The diff is always BASE..working-tree (`git diff -U0 "$BASE"`, the one-ref
+# form) — NEVER "$BASE"..HEAD. /gc is documented (commands/gc.md) as running
+# "after a batch of generated code, before /session-end" — i.e. precisely on
+# UNCOMMITTED work — so a commit-to-commit range would be blind to exactly the
+# case this script exists for.
 #
 # Output (stdout, one candidate per line, TAB-separated):
 #   <md-file>:<line><TAB><symbol><TAB><the claim text>
@@ -32,6 +42,16 @@
 # assertions in tests/unit/doc-drift-scan.sh — a silent pass here must never
 # be read as "the docs were checked".
 #
+# LANGUAGE SCOPE (a separate, orthogonal blind spot): the diff below is
+# pathspec-limited to C/C++ sources ('*.c' '*.cc' '*.cpp' '*.cxx' '*.h'
+# '*.hpp'). A change in any OTHER language extracts ZERO symbols even when it
+# IS call/definition-shaped — a Python `def cancel(job_id):` is exactly as
+# call-shaped as the C++ `bool cancel(JobId id)` this script is built around,
+# but a `.py` file never enters the diff pathspec, so it is invisible for a
+# reason that has nothing to do with symbol shape. "Only call/definition-shaped
+# symbols are covered" is true only *within* C/C++ files — a non-C/C++ project
+# sees this scan find nothing, ever, not "a floor with gaps".
+#
 # NOISE: symbol extraction takes any call-shaped token on any added line —
 # including ordinary call sites, not just new/renamed symbols — and doc
 # matching is deliberately prefix-based (needed to match "Cancellation" from
@@ -44,6 +64,17 @@
 # symbol.
 
 set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib/portable.sh" 2>/dev/null || true
+if command -v ha_platform_init >/dev/null 2>&1; then ha_platform_init; fi
+: "${HA_OS:=linux}"
+
+# Fallback if portable.sh was unavailable — keep the script self-sufficient.
+if ! command -v ha_normalize_path >/dev/null 2>&1; then
+    ha_normalize_path() { printf '%s' "${1//\\//}"; }
+fi
 
 BASE=""; TARGET=""
 while [ "$#" -gt 0 ]; do
@@ -70,6 +101,7 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 [ -n "$TARGET" ] || TARGET="$(pwd)"
+TARGET="$(ha_normalize_path "$TARGET")"
 cd "$TARGET" 2>/dev/null || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
@@ -80,6 +112,17 @@ if [ -z "$BASE" ]; then
             [ -n "$BASE" ] && break
         fi
     done
+fi
+# A merge-base that resolves to HEAD itself means we ARE the default branch
+# (the solo-dev default, and this repo's own state) — that is not a useful
+# base (BASE..HEAD is always empty, and even the working-tree diff below would
+# only ever be "HEAD vs HEAD"'s own uncommitted edits with no committed
+# history behind it). Discard it so the HEAD~1 fallback on the next line
+# actually gets a turn — previously that fallback was guarded on BASE being
+# *empty*, not on it being *useless*, so it never fired here.
+if [ -n "$BASE" ]; then
+    HEAD_SHA=$(git rev-parse --verify -q HEAD 2>/dev/null || true)
+    [ -n "$HEAD_SHA" ] && [ "$BASE" = "$HEAD_SHA" ] && BASE=""
 fi
 [ -n "$BASE" ] || BASE=$(git rev-parse --verify -q HEAD~1 2>/dev/null || true)
 [ -n "$BASE" ] || BASE=$(git hash-object -t tree /dev/null 2>/dev/null || true)
@@ -92,13 +135,16 @@ fi
 #       MiniSched case (cancel()'s signature never moved) and is why (a) alone
 #       is not enough. `git diff -U0` hunk headers carry that context after the
 #       `@@ ... @@` marker, which is exactly git's "enclosing function" hint.
+#
+# BASE..working-tree, not BASE..HEAD (one-ref `git diff -U0 "$BASE"`, not
+# `"$BASE"..HEAD`) — see the file header: uncommitted changes must be visible.
 SYMS=$(
   {
-    git diff -U0 "$BASE"..HEAD -- '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp' 2>/dev/null |
+    git diff -U0 "$BASE" -- '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp' 2>/dev/null |
       grep -E '^\+' | grep -vE '^\+\+\+' |
       grep -oE '\b[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(' |
       sed 's/[[:space:]]*($//; s/[[:space:]]*(//'
-    git diff -U0 "$BASE"..HEAD -- '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp' 2>/dev/null |
+    git diff -U0 "$BASE" -- '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp' 2>/dev/null |
       grep -E '^@@' |
       sed 's/^@@[^@]*@@//' |
       grep -oE '\b[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(' |

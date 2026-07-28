@@ -1,6 +1,6 @@
 ---
 description: Initialize C/C++ project-specific harness files (.clang-format, .clang-tidy, sanitizer build, init.sh tuned per build system). Run AFTER /anchor.
-allowed-tools: Read, Write, Bash, AskUserQuestion
+allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
 ---
 
 # /cpp-init
@@ -23,7 +23,7 @@ as `/anchor`, C/C++ template map (init.sh per build system, `.clang-format`,
    the tool by path instead of rediscovering (and mis-concluding) it.
    A `NOT_FOUND` tool is still worth scaffolding config for (the config is
    version-controlled; the tool may arrive later) — but say so as
-   **"searched PATH + \<listed locations\>, not found"**, never "not installed".
+   **"searched PATH + \<listed locations\>, not found"**, never "not installed" / "on this machine".
 
 2. **Run the C/C++ scaffold:**
 
@@ -52,7 +52,7 @@ as `/anchor`, C/C++ template map (init.sh per build system, `.clang-format`,
    absolute path, and fill `AGENTS.md`'s `# Lint:` line with the real command.
    If every tool was `NOT_FOUND`, write `# Lint: none resolved — searched PATH +
    platform install locations; re-run /cpp-init after installing.` — never
-   "none configured (not on this machine)".
+   "not installed" / "on this machine" (e.g. not "none configured — not on this machine").
 
 ## Related
 
