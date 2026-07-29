@@ -12,6 +12,8 @@
 # Build:
 # Test:
 # Lint:
+#   ^ if no linter resolved, record it as a dated observation, not a fact:
+#     "none resolved — searched PATH + platform install locations, not found (as of 2026-07-29)"
 # Type-check:
 # Run:
 ```
