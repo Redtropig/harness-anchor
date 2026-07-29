@@ -32,6 +32,32 @@ Stop. Read this before doing anything.
     by fixed point (`ha_find_project_root`), never by comparing against `"/"`; bash-consumed
     files carry `eol=lf` gitattributes (`run-hook.cmd` deliberately excluded — polyglot).
 
+## Shell hazards no tool in this repo catches
+
+These are conventions, deliberately **not** invariants: the list above is mechanically
+enforced by a test, and these cannot be. Putting an unenforceable rule in that list
+would imply a check that does not exist.
+
+1. **Under `set -u`, a bare `local x` is UNSET, not empty.** Reading it —
+   `[ -n "$x" ]`, `"$x"`, `${x}` — aborts the script with `x: unbound variable`.
+   Initialise every `local` you might read before assigning: `local x=""`. The
+   dangerous shape is narrow and easy to miss: a name whose assignments all sit
+   inside a loop or `if`, read after that block. It fires only on the path where
+   the block never runs — the least-exercised branch, which is usually the
+   not-found / empty / error path.
+
+   Shipped instance: `scripts/cpp-tool-discovery.sh`'s versioned-variant search
+   aborted on its true-`NOT_FOUND` path, i.e. the path the script exists to
+   report correctly.
+
+   **Neither grep nor shellcheck finds this** — both were tried against the real
+   instance. Deciding it needs to know whether an assignment happens on *every*
+   path, which line order does not tell you: a line-order scanner reports clean on
+   code that crashes. ShellCheck at `--severity=style` emitted SC2034 and SC2043
+   for that function and nothing about the unbound read. **The only detector is
+   executing the path**, so the real mitigation is a test that covers the
+   not-found / empty case — which is what caught this one.
+
 ## Authoring a New Skill (when explicitly asked)
 
 1. Decide if it's generic (language-agnostic) or C/C++ specific. The frontmatter description must make this clear.
