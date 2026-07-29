@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run every skill-triggering test case. Slow: ~30s-5min per case, 14 cases.
+# Run every skill-triggering test case. Slow: ~30s-5min per case, 15 cases.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,6 +19,7 @@ declare -a CASES=(
     "cpp-sanitizers:cpp-sanitizers.txt"
     "test-coverage-design:test-coverage-design.txt"
     "capturing-golden-rules:capturing-golden-rules.txt"
+    "anti-hallucination-gates:negative-claim-unverified.txt"
 )
 # scope-jump.txt tests the UserPromptSubmit hook rather than skill invocation
 # (it doesn't map cleanly to a single skill).

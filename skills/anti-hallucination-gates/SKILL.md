@@ -1,6 +1,6 @@
 ---
 name: anti-hallucination-gates
-description: Use before claiming "done", "fixed", "complete", "passing". Default-FAIL contract — every criterion needs evidence; express uncertainty if missing.
+description: Use before claiming done/fixed/passing — or before asserting something is absent: not installed, not available, no such function, couldn't find it. Default-FAIL runs both ways — every claim needs an evidence path. A negative claim must carry its search scope and observation date; state calibrated uncertainty when evidence is missing.
 ---
 
 # Anti-Hallucination Gates
@@ -14,6 +14,63 @@ The most common agent failure is **declaring victory too early**. This skill is 
 A claim like *"I fixed the bug"* is incomplete. The proper form:
 
 > "Fixed by commit `abc123`. Test `tests/foo.test.ts::handles-edge-case` now passes (output captured in `.harness-anchor/test-2026-05-28.log`). Build still passes (`.build/last-build.log` exit 0)."
+
+## The Iron Rule runs both ways
+
+The rule above governs claims that something IS. Claims that something IS NOT are
+the same failure with the sign flipped, and until v0.17.0 this skill said nothing
+about them.
+
+> No claim that something is **absent** without stating the scope you actually
+> searched and when you looked.
+
+*"clang-tidy isn't installed on this machine"* is incomplete in exactly the way
+*"I fixed the bug"* is incomplete. The proper form:
+
+> "searched PATH + the VS-bundled LLVM and CMake directories, not found (as of 2026-07-29)"
+
+### Two classes, two probes
+
+| Class | Sounds like | What counts as evidence |
+|---|---|---|
+| **Capability** | "not installed", "not available here", "this platform can't do X" | The search chain's **coverage** plus the **date you looked**. C/C++ tools: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-tool-discovery.sh <tool>` — its `NOT_FOUND` line already enumerates its own scope. Other ecosystems: `command -v` **plus** that platform's known install locations. |
+| **Search** | "there's no such function", "nothing tests this", "that option isn't in the config" | The **command you actually ran** and its **coverage**: which paths, which glob, case-sensitive or not, whether ignored files were included. |
+
+An empty result proves only that *your search* found nothing. That is a different
+proposition from *the thing is absent*, and conflating the two is what this
+section exists to stop.
+
+### The "there is no" detector
+
+The mirror of the "should" detector further down. When you are about to type
+*not installed*, *doesn't exist*, *isn't supported*, *couldn't find*, *there is
+no* — stop. Either:
+
+- **Widen the search**, then state the coverage you reached. Capability → run the
+  discovery chain, not just `command -v` / `where`. Search → loosen the glob, drop
+  case sensitivity, include ignored files.
+- **Or scope-and-date the claim** in the mandated form above.
+
+### Out of scope, deliberately: judgement-shaped negatives
+
+"This is impossible", "that approach won't work", "the library can't do this" are
+NOT covered here. They carry no executable evidence path, and pulling them in
+would turn a verifiable contract into unverifiable moralising — softening the very
+invariant this skill holds (CLAUDE.md #8). State them as the judgements they are,
+with reasoning. Do not dress them up as findings.
+
+### Residual blind spot — read this before trusting the section above
+
+This contract binds only when this skill is **loaded**, and it loads from its
+description. A negative assertion made in a turn where the description didn't
+match is entirely unguarded: no hook, no probe, no test stands behind it.
+Coverage is strictly narrower than the failure. **A session that never triggered
+this skill is not a session in which negative claims were checked.**
+
+The second line of defence is `init-verification`, which re-checks negative
+capability conclusions already written into `AGENTS.md` at the start of the next
+session. It catches what this section missed — one session late, which is not
+never, but is also not here.
 
 ## Default-FAIL Evaluation Contract
 
