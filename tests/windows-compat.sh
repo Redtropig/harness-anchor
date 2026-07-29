@@ -58,8 +58,13 @@ fi
 echo "[4/5] run-hook.cmd hardening..."
 RH="hooks/run-hook.cmd"
 grep -qF '%LOCALAPPDATA%\Programs\Git' "$RH" && ok "user-scope Git path present" || fail "missing %LOCALAPPDATA% Git path"
-# NB: `grep -iF` with a backslash SIGABRTs on some MSYS2 grep builds (exit 134).
-# Use -E with '.' standing in for the literal backslash — same match, no crash.
+# NB: `-i` COMBINED WITH `-F` SIGABRTs (exit 134) on this MSYS2 grep (GNU 3.0)
+# in any non-UTF-8 locale — and an unset LANG, the default here, is the C locale.
+# No backslash needed: it dies at matcher construction, so even empty input or a
+# non-matching pattern aborts. grep writes nothing to stderr, so the crash reads
+# as a legitimate "no matches" — empty string in `$(...)`, false branch in
+# `if`/`&&`. Plain `-F` without `-i` is unaffected (see the -qF lines here).
+# Hence -E below, with '.' standing in for the literal backslash — same match.
 grep -qiE 'System32.bash\.exe' "$RH" && ok "WSL bash exclusion present" || fail "missing System32\\bash.exe (WSL) exclusion"
 if grep -qF 'C:\Program Files' "$RH"; then fail "hard-coded 'C:\\Program Files' literal (use %ProgramFiles%)"; else ok "no hard-coded Program Files literal"; fi
 
