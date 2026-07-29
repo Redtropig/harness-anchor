@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mandated-phrasing.sh — The negative-capability wording rule spans six files
+# mandated-phrasing.sh — The negative-capability wording rule spans seven files
 # and was, through v0.16.0, held together by instruction alone. v0.16.0's own
 # review found it drifted (finding M6: four sites, three wordings), and its
 # release then drifted AGAIN between commands/cpp-init.md and the docs/ page
@@ -31,7 +31,8 @@ for f in commands/cpp-init.md \
          skills/cpp-static-analysis/SKILL.md \
          skills/cpp-formatting/SKILL.md \
          templates/AGENTS.md.tpl \
-         skills/anti-hallucination-gates/SKILL.md
+         skills/anti-hallucination-gates/SKILL.md \
+         skills/using-harness-anchor/SKILL.md
 do
     if [ ! -f "$f" ]; then bad "site missing: $f"; continue; fi
     if grep -qF 'not found (as of ' "$f"; then ok "dated mandated form: $f"

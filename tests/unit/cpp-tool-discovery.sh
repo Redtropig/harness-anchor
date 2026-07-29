@@ -68,7 +68,13 @@ FAKEDIR=$(mktemp -d); trap 'rm -rf "$FAKEDIR"' EXIT
 printf '#!/bin/sh\necho fake\n' > "$FAKEDIR/ha-faketool-99"
 chmod +x "$FAKEDIR/ha-faketool-99"
 out8=$(PATH="$FAKEDIR:$PATH" bash "$DISC" ha-faketool 2>/dev/null)
-expect_contains "[B4] version far above any ladder is found" "FOUND" "$out8"
+# "FOUND" alone is a substring of "NOT_FOUND" — that needle passes either way.
+# Anchor it: a real FOUND line starts with the literal FOUND immediately
+# followed by TAB; a NOT_FOUND line never does (it starts with NOT_FOUND+TAB).
+case "$out8" in
+    "FOUND${TAB}"*) echo "  OK   [B4] version far above any ladder is found"; PASS=$((PASS+1));;
+    *) echo "  FAIL [B4] version far above any ladder is found → got: $out8"; FAIL=$((FAIL+1));;
+esac
 expect_contains "[B4] found via the versioned label" "${TAB}versioned" "$out8"
 
 # ---- 9. §B4: a non-numeric suffix is not a version and must not be mistaken

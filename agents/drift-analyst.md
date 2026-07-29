@@ -93,11 +93,16 @@ If a concern is really "is it tested?" or "does it build?", say so and defer to 
      symbol column for the name rather than expecting its hits to cluster together. (Do NOT
      re-derive PROJECT-TOC freshness — that is `toc-freshness.sh`'s job.)
 
-     **Read stderr, not just stdout.** If stderr carries a `doc-drift-scan:
-     skipped — ...` line, the scan did **not** run: you may not report "no doc
-     drift found". Report the skip reason instead and state that documentation
-     was therefore not checked. Empty stdout means "no candidates" only when
-     stderr says `scanned N symbol(s) x M doc(s)`.
+     **Read stderr, not just stdout.** stderr carries three states, not two.
+     A `doc-drift-scan: skipped — ...` line means the scan did **not** run: you
+     may not report "no doc drift found" — report the skip reason instead and
+     state that documentation was therefore not checked. A `symbol set
+     truncated to N of M — results are PARTIAL` line means the scan ran but
+     dropped `M - N` symbols before ever reaching the `scanned ...` line —
+     report the scan as **incomplete** and state how many symbols were
+     dropped, even though stdout may look exactly like a clean run. Only when
+     stderr says `scanned N symbol(s) x M doc(s)` **with no `PARTIAL` line
+     above it** does empty stdout mean "no candidates".
 
      This is the same rule step 3 already applies to `golden-rules-check.sh`'s
      `CHECK-ERROR` — *"didn't look" must never read as "found nothing"* — extended

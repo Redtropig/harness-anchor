@@ -19,6 +19,9 @@ declare -a CASES=(
     "cpp-sanitizers:cpp-sanitizers.txt"
     "test-coverage-design:test-coverage-design.txt"
     "capturing-golden-rules:capturing-golden-rules.txt"
+    # Measured 2026-07-29: this case held 2/3 PASS (the pre-existing
+    # claim-without-evidence.txt case held 3/3 in the same session) — a
+    # registered case is not necessarily a reliably-passing one.
     "anti-hallucination-gates:negative-claim-unverified.txt"
 )
 # scope-jump.txt tests the UserPromptSubmit hook rather than skill invocation

@@ -149,7 +149,7 @@ on how the tool was found: a tool already on `PATH` keeps its **bare name** (bot
 git-tracked, so hardcoding a machine-local path there would break the next machine and CI),
 while a tool found off `PATH` gets a `PATH`-first lookup with the resolved path as fallback.
 If every tool was `NOT_FOUND`, it writes an honest "searched PATH + listed locations,
-not found (as of <YYYY-MM-DD>)" placeholder instead of asserting the tool isn't installed —
+not found (as of \<YYYY-MM-DD\>)" placeholder instead of asserting the tool isn't installed —
 the date is what keeps it honest a month later, once the tool may have arrived.
 
 **Arguments.** None.

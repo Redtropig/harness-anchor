@@ -134,10 +134,12 @@ Do NOT say:
 - "Tests should be green."
 - "This looks correct."
 - "These are old / unrelated changes." (said about uncommitted files **without** running `git diff` to confirm — verify before you dismiss; this is how a `pass`'s own source gets left behind)
+- "clang-tidy isn't installed on this machine." / "There's no such function." (a negative claim with no search scope and no date)
 
 Say instead:
 - "Build passes (evidence: <path>) / Build pending verification (recommend: <command>)"
 - The test status alongside a captured artifact path.
+- "searched PATH + <locations>, not found (as of <date>)"
 
 ## The "should" detector
 
@@ -155,6 +157,7 @@ Before saying ANY of {"done", "fixed", "ready", "complete", "passing", "working"
 - [ ] the passing tests exercise the spec's edge cases / risk paths — not just the happy path (run `/test-plan` if unsure)
 - [ ] if tests changed alongside source: I explained each test change (new coverage vs adjusted expectation)
 - [ ] I have a file path for each piece of evidence
+- [ ] if I claimed something is **absent** (not installed, no such function, nothing found): I stated the scope I searched and the date — `searched <scope>, not found (as of <date>)`
 - [ ] feature_list.json is updated with evidence object + timestamp + commit
 - [ ] if I claimed "committed / shipped / delivered": I reviewed the **full** `git status` and confirmed the committed HEAD builds (not just the working tree)
 ```
@@ -166,6 +169,7 @@ If any box is unchecked: state uncertainty explicitly, do NOT flip status to `pa
 - The user asks "is it done?"
 - You're about to update `feature_list.json` `status` to `"pass"`
 - You're about to say "the fix should work"
+- You're about to say a tool/function/file/test **doesn't exist** or **isn't available**
 - The PostToolUse hook injected warnings — do NOT silently ignore them; surface and address per `self-correction-loop`
 
 ## Looking up evidence commands for unfamiliar frameworks

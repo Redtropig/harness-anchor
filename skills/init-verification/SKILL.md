@@ -49,7 +49,10 @@ Before writing any code, **prove the environment is healthy**. Anthropic's Nov 2
 
    A line in `AGENTS.md` shaped like `searched <scope>, not found (as of <date>)`
    records what a **past** session observed. It is not a current fact. Re-check
-   each one — it is cheap (the C/C++ discovery chain measures at ~0.4s):
+   each one. This step, by construction, only ever re-checks conclusions
+   already recorded as absent, so it always takes the discovery chain's
+   NOT_FOUND path — the slower, full-ladder search, not the fast PATH hit — and
+   that path measures ~1.6s for two tools (51-entry PATH):
 
    ```bash
    bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-tool-discovery.sh <tool>
