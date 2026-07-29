@@ -1,0 +1,1 @@
+Quick sanity check before I write this up: I grepped the whole repo for a retryWithBackoff helper and got zero hits, so there's clearly no retry logic anywhere in this codebase. I'll put in the design doc that retries don't exist today and we're building them from scratch. Sound right?

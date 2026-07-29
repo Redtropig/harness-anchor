@@ -23,6 +23,13 @@
 # (portable unzip, user-chosen prefix) still reports NOT_FOUND. That is exactly
 # why the NOT_FOUND line ENUMERATES what was searched — "not found" must always
 # carry its own scope, so a reader can see where the search stopped.
+#
+# NO VERSION LADDER (v0.17.0): versioned variants are found by globbing, not by
+# walking a hard-coded list of version numbers. Such a list is itself an
+# expiring negative assertion — "there is no version newer than N" — and it
+# expires silently, reporting NOT_FOUND for a tool that is installed. That is
+# the same failure this script was written to prevent, so reintroducing a
+# ladder here would be self-defeating.
 
 set -uo pipefail
 
@@ -39,6 +46,23 @@ fi
 
 emit_found()   { printf 'FOUND\t%s\t%s\t%s\n' "$1" "$2" "$3"; }
 emit_missing() { printf 'NOT_FOUND\t%s\tsearched:%s\n' "$1" "$2"; }
+
+# Highest numerically-suffixed variant of <tool> in <dir>, or nothing.
+# Deliberately a glob, NOT a version ladder: a hard-coded list of version
+# numbers is itself an expiring negative assertion ("there is nothing newer
+# than 22"), which is precisely the class of error this script exists to
+# prevent. A ladder would have to be re-edited roughly annually, and the
+# release that forgot would recreate the original bug. Do not reintroduce one.
+best_versioned() {   # <dir> <tool>
+    local dir="$1" tool="$2" p v best="" bestv=-1
+    for p in "$dir/$tool"-*; do
+        [ -x "$p" ] || continue
+        v="${p##*-}"; v="${v%.exe}"
+        case "$v" in ''|*[!0-9]*) continue;; esac   # non-numeric suffix is not a version
+        if [ "$v" -gt "$bestv" ]; then bestv="$v"; best="$p"; fi
+    done
+    [ -n "$best" ] && printf '%s' "$best"
+}
 
 # Echo the VS installation root (forward-slashed), or nothing.
 vs_root() {
@@ -107,24 +131,39 @@ search_one() {
 $(candidate_dirs)
 EOF
 
-    # 4. Versioned variants (clang-tidy-20, clang-format-19, ...) on PATH and
-    #    in the same known dirs. Newest first.
+    # 4. Versioned variants (clang-tidy-20, clang-format-19, ...) — on PATH and
+    #    in the same known dirs. Highest version wins. Glob-enumerated, never
+    #    from a hard-coded ladder; see best_versioned().
     scope="$scope,versioned"
-    local v
-    for v in 22 21 20 19 18 17 16 15 14; do
-        p=$(command -v "$tool-$v" 2>/dev/null || true)
-        if [ -n "$p" ]; then emit_found "$tool" "$p" "versioned"; return 0; fi
+    local d best="" bestv=-1 cand="" candv=""
+    # PATH side: $PATH is colon-separated here, including under Git-Bash. Split
+    # it ONCE into an array rather than setting IFS around a `for` — the split
+    # happens when the `for` is evaluated, so juggling IFS inside the body is
+    # both pointless and easy for a later edit to break. This function also uses
+    # `IFS='|' read` further down; leaving a modified IFS in scope would corrupt
+    # it.
+    local -a path_dirs
+    IFS=':' read -r -a path_dirs <<< "$PATH"
+    for d in "${path_dirs[@]}"; do
+        [ -n "$d" ] && [ -d "$d" ] || continue
+        cand=$(best_versioned "$d" "$tool")
+        if [ -n "$cand" ]; then
+            candv="${cand##*-}"; candv="${candv%.exe}"
+            if [ "$candv" -gt "$bestv" ]; then bestv="$candv"; best="$cand"; fi
+        fi
     done
+    # Known install locations side.
     while IFS='|' read -r how dir; do
         [ -n "$dir" ] || continue
-        for v in 22 21 20 19 18 17 16 15 14; do
-            for p in "$dir/$tool-$v" "$dir/$tool-$v.exe"; do
-                if [ -x "$p" ]; then emit_found "$tool" "$p" "versioned"; return 0; fi
-            done
-        done
+        cand=$(best_versioned "$dir" "$tool")
+        if [ -n "$cand" ]; then
+            candv="${cand##*-}"; candv="${candv%.exe}"
+            if [ "$candv" -gt "$bestv" ]; then bestv="$candv"; best="$cand"; fi
+        fi
     done <<EOF
 $(candidate_dirs)
 EOF
+    if [ -n "$best" ]; then emit_found "$tool" "$best" "versioned"; return 0; fi
 
     emit_missing "$tool" "$scope"
 }

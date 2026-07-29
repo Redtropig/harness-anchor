@@ -12,6 +12,8 @@
 # Build:
 # Test:
 # Lint:
+#   ^ if no linter resolved, record it as a dated observation, not a fact:
+#     "none resolved — searched PATH + platform install locations, not found (as of 2026-07-29)"
 # Type-check:
 # Run:
 ```
@@ -60,7 +62,7 @@ A feature is "done" — i.e. its `status` may be flipped to `"pass"` in `feature
 4. Static analysis warnings reviewed (lint / clang-tidy / equivalent).
 5. `feature_list.json` updated with ISO timestamp + commit SHA in the `evidence` field.
 
-**Default-FAIL contract**: each criterion starts `false`. You may not assert "done" without an evidence path. If uncertain, say so explicitly: *"I am uncertain whether X passes because <reason>. Recommend running <command> to verify."*
+**Default-FAIL contract**: each criterion starts `false`. You may not assert "done" without an evidence path — nor assert that something is **absent** (a tool, a function, a test) without stating the scope you searched and when: `searched <scope>, not found (as of <date>)`. If uncertain, say so explicitly: *"I am uncertain whether X passes because <reason>. Recommend running <command> to verify."*
 
 ## Scope Boundaries
 

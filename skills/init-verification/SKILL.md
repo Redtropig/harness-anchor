@@ -45,6 +45,40 @@ Before writing any code, **prove the environment is healthy**. Anthropic's Nov 2
 
 5. **After fix**: re-run `init.sh`. Repeat until exit 0. Then continue work.
 
+6. **Re-check inherited NEGATIVE capability conclusions.**
+
+   A line in `AGENTS.md` shaped like `searched <scope>, not found (as of <date>)`
+   records what a **past** session observed. It is not a current fact. Re-check
+   each one. This step, by construction, only ever re-checks conclusions
+   already recorded as absent, so it always takes the discovery chain's
+   NOT_FOUND path — the slower, full-ladder search, not the fast PATH hit — and
+   that path measures ~1.6s for two tools (51-entry PATH):
+
+   ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-tool-discovery.sh <tool>
+   ```
+
+   For non-C/C++ ecosystems, the equivalent is `command -v <tool>` **plus** that
+   platform's known install locations — `command -v` alone is the check that
+   produced the wrong conclusion in the first place.
+
+   - Tool now present → **report it to the user** and propose updating that line.
+     Do not silently rewrite someone's operating manual.
+   - Still absent → refresh the date, or leave it; either is fine. What is not
+     fine is citing the old conclusion as if it were fresh evidence.
+
+   **Only negative conclusions get re-checked, and that asymmetry is deliberate:**
+
+   | Conclusion | How it fails once stale | Needs a proactive re-check? |
+   |---|---|---|
+   | Negative ("clang-tidy not found") | **Silently.** The tool gets installed, the note never updates, and the capability is skipped for the rest of the project's life. This is the observed failure mode. | **Yes** |
+   | Positive ("clang-tidy at /usr/bin/clang-tidy") | **Loudly.** The next invocation is `command not found`. | No |
+
+   **Residual blind spot:** this step only reaches lines written in the mandated
+   form above. A capability conclusion phrased freehand — or written before
+   v0.17.0 — is invisible to it. A clean re-check means "the dated conclusions
+   are current", never "the manual contains nothing stale".
+
 ## What init.sh should check (project-specific)
 
 The template provides scaffolding for:

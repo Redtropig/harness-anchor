@@ -5,7 +5,7 @@ Test layers, in order of cost:
 | Layer | What it tests | Speed | Requires Claude session? |
 |---|---|---|---|
 | `scripts/validate-anchor.sh` | Plugin self-consistency: file structure, JSON validity, skill/agent/command frontmatter (incl. `allowed-tools` shape), hook output shape | <1s | No |
-| `tests/unit/` | **Script unit tests**: `index-builder` summary extraction (every comment marker + truncation + `## Decisions` preservation + binary/lockfile skip) and **`## Directory map`**, `toc-freshness` status branches, `feature_list.schema.json` enforcement + **fixture id-uniqueness**, **`feature-list-sort` actionable-first reorder** (idempotent + lossless), **`feature-list-validate` id-uniqueness** (default + `--check` + read-only), **`progress-prepend` newest-first insert** | <2s | No |
+| `tests/unit/` | **Script unit tests**: `index-builder` summary extraction (every comment marker + truncation + `## Decisions` preservation + binary/lockfile skip) and **`## Directory map`**, `toc-freshness` status branches, `feature_list.schema.json` enforcement + **fixture id-uniqueness**, **`feature-list-sort` actionable-first reorder** (idempotent + lossless), **`feature-list-validate` id-uniqueness** (default + `--check` + read-only), **`progress-prepend` newest-first insert**, **C/C++ tool discovery**, **doc-drift symbol scan**, **mandated negative-capability phrasing** | ~65-75s (measured, all 18) | No |
 | `tests/hook-contracts/` | Hook **contract**: given synthetic stdin, hook produces expected JSON | <5s | No |
 | `tests/bench/` | Hook **timing**: wall-clock per hook vs. the 5s budget (invariant #7) | <10s | No |
 | `tests/cpp-detection/` | **Build system detection**: `cpp-detect.sh` identifies CMake/Meson/Make/Bazel, plus a negative `non-cpp-fixture` → `is_cpp_project:false` (invariant #5) | <1s | No |
@@ -16,13 +16,10 @@ Test layers, in order of cost:
 
 ```bash
 bash scripts/validate-anchor.sh
-bash tests/unit/index-builder-summary.sh
-bash tests/unit/index-builder-dirmap.sh
-bash tests/unit/toc-freshness.sh
-bash tests/unit/feature-list-schema.sh
-bash tests/unit/feature-list-sort.sh
-bash tests/unit/feature-list-validate.sh
-bash tests/unit/progress-prepend.sh
+# Glob, not an enumeration — CI does the same, for the reason its own comment
+# gives: enumeration rots. This list had already gone stale, silently omitting
+# the two unit tests v0.16.0 added.
+for t in tests/unit/*.sh; do bash "$t"; done
 bash tests/skill-triggering/check-coverage.sh
 bash tests/hook-contracts/post-tool-use-warn.sh
 bash tests/hook-contracts/session-start-banner.sh

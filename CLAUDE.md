@@ -23,7 +23,15 @@ Stop. Read this before doing anything.
 5. **C/C++ skills are gated by `cpp-detect.sh`.** They must include a frontmatter trigger condition referencing the detected build system; they must not activate in non-C/C++ projects.
 6. **Skill descriptions front-load distinctive trigger keywords.** First ~80 chars carry the load — Anthropic's skill listing budget is tight (see learn-harness `gotchas.md#12`).
 7. **Hooks must time out in ≤ 5 seconds** and fail silent on missing tools.
-8. **Default-FAIL evaluation contracts.** No skill or agent should mark anything "done" without an evidence path. This is the anti-hallucination invariant — do not soften it.
+8. **Default-FAIL evaluation contracts, both directions.** No skill or agent should
+   mark anything "done" without an evidence path — **and** none should assert that
+   something is **absent** (not installed / not available / no such symbol) without
+   stating the search scope it actually covered and when it looked. A scope-less
+   negative is wrong about *where* someone looked; a date-less one is wrong about
+   *when*. This is the anti-hallucination invariant — do not soften it.
+   Judgement-shaped negatives ("this is impossible", "that won't work") are
+   deliberately **out of scope**: they carry no evidence path, and admitting them
+   would turn the contract into unverifiable moralising.
 9. **docs-lookup is the canonical procedure** for unfamiliar tools/APIs/errors/library behavior. New skills MUST reference it rather than inlining Context7 → WebSearch waterfalls — the failure-mode detection and calibrated-uncertainty fallback live in one place by design.
 10. **Windows/Git-Bash is a supported surface.** `tests/windows-compat.sh` must pass:
     no direct `python3` invocation in hooks (JSON goes through `scripts/lib/portable.sh`'s
@@ -31,6 +39,32 @@ Stop. Read this before doing anything.
     paths are normalized at hook entry (`ha_normalize_path`); walk-up loops terminate
     by fixed point (`ha_find_project_root`), never by comparing against `"/"`; bash-consumed
     files carry `eol=lf` gitattributes (`run-hook.cmd` deliberately excluded — polyglot).
+
+## Shell hazards no tool in this repo catches
+
+These are conventions, deliberately **not** invariants: the list above is mechanically
+enforced by a test, and these cannot be. Putting an unenforceable rule in that list
+would imply a check that does not exist.
+
+1. **Under `set -u`, a bare `local x` is UNSET, not empty.** Reading it —
+   `[ -n "$x" ]`, `"$x"`, `${x}` — aborts the script with `x: unbound variable`.
+   Initialise every `local` you might read before assigning: `local x=""`. The
+   dangerous shape is narrow and easy to miss: a name whose assignments all sit
+   inside a loop or `if`, read after that block. It fires only on the path where
+   the block never runs — the least-exercised branch, which is usually the
+   not-found / empty / error path.
+
+   Shipped instance: `scripts/cpp-tool-discovery.sh`'s versioned-variant search
+   aborted on its true-`NOT_FOUND` path, i.e. the path the script exists to
+   report correctly.
+
+   **Neither grep nor shellcheck finds this** — both were tried against the real
+   instance. Deciding it needs to know whether an assignment happens on *every*
+   path, which line order does not tell you: a line-order scanner reports clean on
+   code that crashes. ShellCheck at `--severity=style` emitted SC2034 and SC2043
+   for that function and nothing about the unbound read. **The only detector is
+   executing the path**, so the real mitigation is a test that covers the
+   not-found / empty case — which is what caught this one.
 
 ## Authoring a New Skill (when explicitly asked)
 

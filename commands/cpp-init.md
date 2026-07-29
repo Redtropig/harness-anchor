@@ -24,7 +24,10 @@ as `/anchor`, C/C++ template map (init.sh per build system, `.clang-format`,
    that is best served by a bare name or a recorded path depends on `<how>`.
    A `NOT_FOUND` tool is still worth scaffolding config for (the config is
    version-controlled; the tool may arrive later) — but say so as
-   **"searched PATH + \<listed locations\>, not found"**, never "not installed" / "on this machine".
+   **"searched PATH + \<listed locations\>, not found (as of \<YYYY-MM-DD\>)"**, never
+   "not installed" / "on this machine". The date is not decoration: this line lands in
+   a git-tracked file that every later session reads, and a tool installed next week
+   will not come back to correct it.
 
 2. **Run the C/C++ scaffold:**
 
@@ -77,7 +80,8 @@ as `/anchor`, C/C++ template map (init.sh per build system, `.clang-format`,
 
    Fill `AGENTS.md`'s `# Lint:` line with the command a reader should actually
    run. If every tool was `NOT_FOUND`, write `# Lint: none resolved — searched
-   PATH + platform install locations; re-run /cpp-init after installing.` — never
+   PATH + platform install locations, not found (as of <YYYY-MM-DD>); re-run
+   /cpp-init after installing.` — never
    "not installed" / "on this machine" (e.g. not "none configured — not on this machine").
 
 ## Related

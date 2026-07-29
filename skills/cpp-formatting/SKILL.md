@@ -37,9 +37,11 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/cpp-tool-discovery.sh clang-format
 
 A `FOUND` line gives you an absolute path — invoke it directly; the binary does
 not need to be on PATH. Only `NOT_FOUND` licenses "unavailable", and then the
-honest phrasing is **"searched PATH + \<listed locations\>, not found"**, never
-"not installed" / "on this machine" (an empty `command -v` only tells you about PATH —
+honest phrasing is **"searched PATH + \<listed locations\>, not found (as of \<YYYY-MM-DD\>)"**,
+never "not installed" / "on this machine" (an empty `command -v` only tells you about PATH —
 the VS-bundled LLVM on Windows and keg-only Homebrew llvm on macOS both sit off it).
+The date matters as much as the scope: a scope-less negative is wrong about *where*
+you looked, a date-less one is wrong about *when*.
 
 ## Format a whole file
 

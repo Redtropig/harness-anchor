@@ -30,10 +30,13 @@ PATH to be usable). Only a `NOT_FOUND` line licenses you to call a tool unavaila
 
 **An empty `command -v` / `where` proves nothing.** On Windows the VS-bundled LLVM
 only joins PATH after `vcvars64.bat`; on macOS Homebrew's llvm is keg-only. Report
-absence as **"searched PATH + \<listed locations\>, not found"** —
+absence as **"searched PATH + \<listed locations\>, not found (as of \<YYYY-MM-DD\>)"** —
 never "not installed" / "on this machine". The first is a falsifiable claim about
 your search; the second is an unfalsifiable claim about the world, and it tends to
 get written into AGENTS.md where it silently disables this skill for every later session.
+The date carries the other half: a scope-less negative is wrong about *where* you
+looked, a date-less one is wrong about *when*. Both turn one observation into a
+standing fact — and AGENTS.md is exactly where standing facts go unchallenged.
 
 If any prerequisite is missing, **say so explicitly** instead of pretending to analyze:
 
