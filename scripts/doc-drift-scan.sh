@@ -43,14 +43,17 @@
 # be read as "the docs were checked".
 #
 # LANGUAGE SCOPE (a separate, orthogonal blind spot): the diff below is
-# pathspec-limited to C/C++ sources ('*.c' '*.cc' '*.cpp' '*.cxx' '*.h'
-# '*.hpp'). A change in any OTHER language extracts ZERO symbols even when it
-# IS call/definition-shaped — a Python `def cancel(job_id):` is exactly as
-# call-shaped as the C++ `bool cancel(JobId id)` this script is built around,
-# but a `.py` file never enters the diff pathspec, so it is invisible for a
-# reason that has nothing to do with symbol shape. "Only call/definition-shaped
-# symbols are covered" is true only *within* C/C++ files — a non-C/C++ project
-# sees this scan find nothing, ever, not "a floor with gaps".
+# pathspec-limited to the SCAN_PATHSPEC whitelist. That whitelist IS the
+# coverage declaration — a language not on it contributes ZERO symbols even
+# when its definitions are perfectly call-shaped (a Python `def cancel(job_id):`
+# is as call-shaped as the C++ `bool cancel(JobId id)` this script was built
+# around). v0.17.0 widened it from C/C++ only to the mainstream set, and — more
+# importantly — made the miss AUDIBLE: when a run changes files but none are in
+# the whitelist, that is announced on stderr rather than returning the same
+# silent exit 0 as a genuinely clean scan. Through v0.16.0 those two were
+# indistinguishable, which is how this script's total blindness on its own
+# repository (bash + markdown, zero C/C++ files changed in the whole release)
+# survived a full release cycle unnoticed.
 #
 # NOISE: symbol extraction takes any call-shaped token on any added line —
 # including ordinary call sites, not just new/renamed symbols — and doc
@@ -64,6 +67,20 @@
 # symbol.
 
 set -uo pipefail
+
+# Diagnostics go to stderr, never stdout: stdout is a parsed contract (one
+# candidate per line) and must stay pure. A caller that sees empty stdout AND
+# no stderr note has a genuinely clean scan; a caller that sees a `skipped`
+# note has NO scan. Those are different facts and must not share a channel.
+note() { printf 'doc-drift-scan: %s\n' "$1" >&2; }
+
+# The languages this scan can see. Widening this list is the supported way to
+# extend coverage; see LANGUAGE SCOPE in the header for what the list means.
+SCAN_PATHSPEC=(
+    '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp'
+    '*.py' '*.js' '*.jsx' '*.mjs' '*.ts' '*.tsx'
+    '*.go' '*.rs' '*.rb' '*.java' '*.kt' '*.cs' '*.sh'
+)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
@@ -102,8 +119,8 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$TARGET" ] || TARGET="$(pwd)"
 TARGET="$(ha_normalize_path "$TARGET")"
-cd "$TARGET" 2>/dev/null || exit 0
-git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+cd "$TARGET" 2>/dev/null || { note "skipped — target is not a readable directory: $TARGET"; exit 0; }
+git rev-parse --git-dir >/dev/null 2>&1 || { note "skipped — not a git repository: $TARGET"; exit 0; }
 
 if [ -z "$BASE" ]; then
     for cand in main master; do
@@ -126,7 +143,7 @@ if [ -n "$BASE" ]; then
 fi
 [ -n "$BASE" ] || BASE=$(git rev-parse --verify -q HEAD~1 2>/dev/null || true)
 [ -n "$BASE" ] || BASE=$(git hash-object -t tree /dev/null 2>/dev/null || true)
-[ -n "$BASE" ] || exit 0
+[ -n "$BASE" ] || { note "skipped — no usable base ref (no main/master, no HEAD~1, no empty-tree hash)"; exit 0; }
 
 # ---- 1. changed symbol names --------------------------------------------------
 # Two sources, unioned:
@@ -140,11 +157,11 @@ fi
 # `"$BASE"..HEAD`) — see the file header: uncommitted changes must be visible.
 SYMS=$(
   {
-    git diff -U0 "$BASE" -- '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp' 2>/dev/null |
+    git diff -U0 "$BASE" -- "${SCAN_PATHSPEC[@]}" 2>/dev/null |
       grep -E '^\+' | grep -vE '^\+\+\+' |
       grep -oE '\b[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(' |
       sed 's/[[:space:]]*($//; s/[[:space:]]*(//'
-    git diff -U0 "$BASE" -- '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp' 2>/dev/null |
+    git diff -U0 "$BASE" -- "${SCAN_PATHSPEC[@]}" 2>/dev/null |
       grep -E '^@@' |
       sed 's/^@@[^@]*@@//' |
       grep -oE '\b[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(' |
@@ -152,14 +169,26 @@ SYMS=$(
   } 2>/dev/null | sort -u |
     grep -vE '^(if|for|while|switch|return|sizeof|catch|and|or|not)$' || true
 )
-[ -n "$SYMS" ] || exit 0
+if [ -z "$SYMS" ]; then
+    n_all=$(git diff --name-only "$BASE" 2>/dev/null | grep -c . || true)
+    n_scanned=$(git diff --name-only "$BASE" -- "${SCAN_PATHSPEC[@]}" 2>/dev/null | grep -c . || true)
+    if [ "$n_scanned" -eq 0 ]; then
+        # The self-blindness case: work happened, this sensor simply cannot see
+        # the languages it happened in. Reporting "clean" here would be a lie.
+        note "skipped — $n_all file(s) changed, none in scanned languages (see LANGUAGE SCOPE)"
+    else
+        note "skipped — no changed symbols extracted from $n_scanned changed source file(s)"
+    fi
+    exit 0
+fi
 
 # ---- 2. reverse-grep the docs -------------------------------------------------
 # Product/build artefacts are not documentation — skip them.
 MD_FILES=$(git ls-files '*.md' 2>/dev/null |
     grep -vE '^(\.harness-anchor/|evidence/|docs/superpowers/|node_modules/)' || true)
-[ -n "$MD_FILES" ] || exit 0
+[ -n "$MD_FILES" ] || { note "skipped — no documentation files tracked"; exit 0; }
 
+RESULTS=$(
 printf '%s\n' "$SYMS" | while IFS= read -r sym; do
     [ -n "$sym" ] || continue
     # LEADING \b only — deliberately, and verified: the motivating case needs the
@@ -179,5 +208,12 @@ printf '%s\n' "$SYMS" | while IFS= read -r sym; do
         done
     done
 done | sort -u
+)
+[ -n "$RESULTS" ] && printf '%s\n' "$RESULTS"
+
+n_sym=$(printf '%s\n' "$SYMS" | grep -c . || true)
+n_md=$(printf '%s\n' "$MD_FILES" | grep -c . || true)
+n_hit=$(printf '%s\n' "$RESULTS" | grep -c . || true)
+note "scanned $n_sym symbol(s) x $n_md doc(s), $n_hit candidate(s)"
 
 exit 0

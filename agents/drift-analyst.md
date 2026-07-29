@@ -30,14 +30,14 @@ If a concern is really "is it tested?" or "does it build?", say so and defer to 
 > symbols — an identifier immediately followed by `(`. Two things fall outside it: a doc sentence
 > that names no symbol at all ("the pool is fast", "startup is instant"), AND a doc claim naming a
 > changed global variable, macro, enum constant, struct field, or typedef — none of those produce an
-> extracted symbol either, so they're just as invisible. **The scan is also C/C++-only** —
-> `doc-drift-scan.sh` diffs only `*.c`/`*.cc`/`*.cpp`/`*.cxx`/`*.h`/`*.hpp`, so a changed Python, JS,
-> or any other non-C/C++ symbol produces nothing, *even when it IS call/definition-shaped* (a Python
-> `def cancel(job_id):` is exactly as call-shaped as a C++ `bool cancel(JobId id)`) — this is a
-> language-scope gap, not a symbol-shape gap, and it means the check is silently inert on a non-C/C++
-> project. A clean doc-drift section therefore means *"no doc claim about a changed function-shaped
-> symbol in a C/C++ file looks stale"*, **not** "the docs were verified". Say it that way in the
-> report.
+> extracted symbol either, so they're just as invisible. **Language coverage is a whitelist**, not
+> everything: `doc-drift-scan.sh` diffs the extensions in its `SCAN_PATHSPEC` (C/C++, Python, JS/TS,
+> Go, Rust, Ruby, Java, Kotlin, C#, shell as of v0.17.0). A change in a language off that list yields
+> no symbol *even when it IS call/definition-shaped* — a language-scope gap, not a symbol-shape gap.
+> Unlike v0.16.0, that gap is no longer silent: the script announces it on stderr, and step 4 below
+> requires you to read it. A clean doc-drift section therefore means *"no doc claim about a changed
+> function-shaped symbol in a scanned language looks stale"*, **not** "the docs were verified". Say
+> it that way in the report.
 
 1. **Load golden rules.** Read `golden-rules.md` if present; parse each `GR-<n>` (rule + its Check).
    If absent, note it, run the generic heuristics only, and recommend seeding rules via the
@@ -92,6 +92,17 @@ If a concern is really "is it tested?" or "does it build?", say so and defer to 
      so a symbol's rows are interleaved with other symbols' and are NOT adjacent — scan down the
      symbol column for the name rather than expecting its hits to cluster together. (Do NOT
      re-derive PROJECT-TOC freshness — that is `toc-freshness.sh`'s job.)
+
+     **Read stderr, not just stdout.** If stderr carries a `doc-drift-scan:
+     skipped — ...` line, the scan did **not** run: you may not report "no doc
+     drift found". Report the skip reason instead and state that documentation
+     was therefore not checked. Empty stdout means "no candidates" only when
+     stderr says `scanned N symbol(s) x M doc(s)`.
+
+     This is the same rule step 3 already applies to `golden-rules-check.sh`'s
+     `CHECK-ERROR` — *"didn't look" must never read as "found nothing"* — extended
+     to the second sensor, which until v0.17.0 had no way to say which one had
+     happened.
    - **dead store / computed-but-never-used**: a value is built up — a formatted buffer, an
      accumulator, a timestamp — then never read on any path (distinct from an unused parameter; this
      is wasted work that *looks* like real logic, so it survives a casual read)

@@ -188,6 +188,65 @@ fi
 expect_contains "[default-base/on-main] uncommitted body-only change found with NO --base" \
   "${TAB}cancel${TAB}" "$out3"
 
+# ---- 8. §B1: pathspec is no longer C/C++-only. Python / Go / Rust definitions
+#         are exactly as call-shaped as the C++ case this script was built
+#         around; before v0.17.0 they were invisible for a reason that had
+#         nothing to do with symbol shape. ----
+ROOT4=$(mktemp -d); trap 'rm -rf "$ROOT" "$ROOT2" "$ROOT3" "$ROOT4"' EXIT
+cd "$ROOT4" || exit 1
+git init -q . && git config user.email t@t && git config user.name t
+mkdir -p src
+printf 'def cancel(job_id):\n    return True\n' > src/sched.py
+printf 'func Retry(n int) bool {\n    return true\n}\n' > src/retry.go
+printf 'fn purge(id: u32) -> bool {\n    true\n}\n' > src/purge.rs
+cat > README.md <<'EOF'
+# Notes
+
+- Cancellation is safe to call at any time.
+- Retry gives up after 3 attempts.
+- Purge removes the entry immediately.
+EOF
+git add -A && git commit -qm base
+printf 'def cancel(job_id):\n    if terminal(job_id):\n        return False\n    return True\n' > src/sched.py
+printf 'func Retry(n int) bool {\n    if n > 10 { return false }\n    return true\n}\n' > src/retry.go
+printf 'fn purge(id: u32) -> bool {\n    if pinned(id) { return false }\n    true\n}\n' > src/purge.rs
+git add -A && git commit -qm change
+out4=$(bash "$SCAN" --base HEAD~1 --target "$ROOT4" 2>/dev/null)
+expect_contains "[B1] Python def is reached"  "${TAB}cancel${TAB}" "$out4"
+expect_contains "[B1] Go func is reached"     "${TAB}Retry${TAB}"  "$out4"
+expect_contains "[B1] Rust fn is reached"     "${TAB}purge${TAB}"  "$out4"
+
+# ---- 9. §B2: "did not scan" and "scanned, found nothing" must be
+#         distinguishable at runtime. Before v0.17.0 both were exit 0 with
+#         empty stdout — which is precisely why this script's own total
+#         blindness on the harness-anchor repo went unnoticed through a whole
+#         release. stdout stays contract-pure; diagnostics go to stderr. ----
+
+# 9a. changed files, none in a scanned language
+ROOT5=$(mktemp -d); trap 'rm -rf "$ROOT" "$ROOT2" "$ROOT3" "$ROOT4" "$ROOT5"' EXIT
+cd "$ROOT5" || exit 1
+git init -q . && git config user.email t@t && git config user.name t
+printf 'a\n' > notes.txt && printf '# Doc\n\ncancel is safe.\n' > README.md
+git add -A && git commit -qm base
+printf 'b\n' > notes.txt
+git add -A && git commit -qm change
+err5=$(bash "$SCAN" --base HEAD~1 --target "$ROOT5" 2>&1 >/dev/null)
+expect_contains "[B2] no-scanned-language skip is announced" \
+  "none in scanned languages" "$err5"
+
+# 9b. not a git repository
+ROOT6=$(mktemp -d); trap 'rm -rf "$ROOT" "$ROOT2" "$ROOT3" "$ROOT4" "$ROOT5" "$ROOT6"' EXIT
+err6=$(bash "$SCAN" --target "$ROOT6" 2>&1 >/dev/null)
+expect_contains "[B2] non-git skip is announced" "not a git repository" "$err6"
+
+# 9c. a real scan announces its own size — "clean" must state what it covered
+err7=$(bash "$SCAN" --base HEAD~1 --target "$ROOT4" 2>&1 >/dev/null)
+expect_contains "[B2] completed scan reports coverage" "scanned " "$err7"
+
+# 9d. stdout purity is preserved: diagnostics must NOT leak into stdout, or
+#     every caller parsing candidate lines breaks.
+expect_not_contains "[B2] diagnostics stay off stdout" "doc-drift-scan:" "$out4"
+
 echo ""
 echo "doc-drift-scan: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
