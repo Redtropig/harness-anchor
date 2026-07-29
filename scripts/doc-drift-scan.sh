@@ -188,30 +188,116 @@ MD_FILES=$(git ls-files '*.md' 2>/dev/null |
     grep -vE '^(\.harness-anchor/|evidence/|docs/superpowers/|node_modules/)' || true)
 [ -n "$MD_FILES" ] || { note "skipped — no documentation files tracked"; exit 0; }
 
+# ---- 3. reverse-grep the docs ------------------------------------------------
+# One grep per DOC FILE per chunk — O(files), not O(symbols x files). The old
+# nested form ran one grep per (symbol, file) pair and measured 184s on 160
+# symbols x 60 docs.
+#
+# Files stay in a `while read` loop rather than being expanded into grep's
+# argument list: `git ls-files '*.md'` can return paths containing spaces, and
+# unquoted expansion would shred them. The loop keeps O(files) AND space safety.
+#
+# LEADING \b only — deliberately, and verified: the motivating case needs the
+# symbol `cancel` to match the prose word "Cancellation", so this MUST be a
+# prefix match. `\bcancel\b` matches neither "Cancellation" nor
+# "cancellation_policy" and would break the only case this exists for.
+# Prefix matching therefore also hits `cancellation_policy` — an ACCEPTED
+# over-match, not an oversight: this script emits CANDIDATES for a human or
+# agent to judge, never verdicts. Over-matching costs one read; under-matching
+# costs a silent miss, which is the failure being fixed. -i because prose
+# capitalises.
+CHUNK=400
+HARD_CAP=2000
+
+n_sym=$(printf '%s\n' "$SYMS" | grep -c . || true)
+if [ "$n_sym" -gt "$HARD_CAP" ]; then
+    SYMS=$(printf '%s\n' "$SYMS" | head -n "$HARD_CAP")
+    note "symbol set truncated to $HARD_CAP of $n_sym — results are PARTIAL"
+    n_sym="$HARD_CAP"
+fi
+
+# Longest symbols first so a longer name is preferred over a shorter one that
+# prefixes it (`getFoo` before `get`), without relying on the grep
+# implementation's leftmost-longest behaviour.
+SYMS_SORTED=$(printf '%s\n' "$SYMS" | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2-)
+
+n_chunks=$(( (n_sym + CHUNK - 1) / CHUNK ))
+[ "$n_chunks" -gt 1 ] && note "chunked into $n_chunks passes ($n_sym symbols)"
+
 RESULTS=$(
-printf '%s\n' "$SYMS" | while IFS= read -r sym; do
-    [ -n "$sym" ] || continue
-    # LEADING \b only — deliberately, and verified: the motivating case needs the
-    # symbol `cancel` to match the prose word "Cancellation", so this MUST be a
-    # prefix match. `\bcancel\b` matches neither "Cancellation" nor
-    # "cancellation_policy" and would break the only case this exists for.
-    # Prefix matching therefore also hits `cancellation_policy` — an ACCEPTED
-    # over-match, not an oversight: this script emits CANDIDATES for a human or
-    # agent to judge, never verdicts. Over-matching costs one read; under-matching
-    # costs a silent miss, which is the failure being fixed.
-    # -i because prose capitalises.
+  c=0
+  while [ "$c" -lt "$n_chunks" ]; do
+    CHUNK_SYMS=$(printf '%s\n' "$SYMS_SORTED" | tail -n +$(( c * CHUNK + 1 )) | head -n "$CHUNK")
+    ALT=$(printf '%s\n' "$CHUNK_SYMS" | paste -sd'|' -)
+    c=$((c+1))
+    [ -n "$ALT" ] || continue
     printf '%s\n' "$MD_FILES" | while IFS= read -r md; do
         [ -f "$md" ] || continue
-        grep -inE "\\b${sym}" "$md" 2>/dev/null | while IFS=: read -r ln text; do
-            printf '%s:%s\t%s\t%s\n' "$md" "$ln" "$sym" \
-                "$(printf '%s' "$text" | sed 's/^[[:space:]-]*//')"
-        done
+        # Attribution used to spawn `grep -oiE` + `grep -ix` PER CANDIDATE
+        # LINE, inside a `while IFS=: read` loop fed by the search grep below.
+        # Cheap-looking in isolation, but on the motivating repository
+        # candidate LINES vastly outnumber symbol-file pairs (5635 candidates
+        # vs. 76 symbols x 53 docs on --base v0.15.0): measured subprocess
+        # count went from 4028 (the pre-this-file nested per-(symbol,file)
+        # loop) to roughly 11,323 (53 searches + 2 greps x 5635 candidates),
+        # and wall time from 8m25.794s (completed) to >10min (killed by
+        # timeout, did not complete). The search-phase win this file
+        # collapses to O(files) x chunks is real; it was the attribution
+        # phase, still scaling with CANDIDATE count, that erased it. A single
+        # awk invocation attributes every matching symbol on every candidate
+        # line of a document in one pass — one fork per document for
+        # attribution, matching the one-fork-per-document search — so total
+        # forks per document return to ~2 regardless of candidate count.
+        #
+        # Attribute the hit back to EVERY symbol that matches on this line —
+        # not just the first. A single doc line can legitimately match more
+        # than one symbol from the chunk (two renamed functions mentioned in
+        # the same sentence is common in this repo's own CHANGELOG); emitting
+        # only the first (leftmost) match would silently drop every other
+        # symbol's candidate for that line — exactly the silent-miss failure
+        # this script exists to avoid (regression-tested: assertion 12).
+        #
+        # The symbol list is known up front (CHUNK_SYMS, already code-cased),
+        # so unlike the old grep -oiE capture there is no PROSE-cased match
+        # text to map back to a symbol via a second case-insensitive lookup:
+        # awk searches for each symbol's LOWERCASE form inside the LOWERCASE
+        # line text directly, and prints the symbol exactly as spelled in
+        # CHUNK_SYMS — never the prose casing ("Cancellation" is never
+        # printed; `cancel` is).
+        #
+        # LEADING \b only, reproduced by hand (awk has no \b): a match counts
+        # only when the character immediately before it is NOT [a-z0-9_].
+        # There is deliberately NO trailing-boundary check — the motivating
+        # case needs `cancel` to match inside "Cancellation", so this must
+        # stay a prefix match. Do not add one. The inner while-loop re-scans
+        # forward past a non-boundary occurrence (start = abs + 1), so
+        # `cancel` embedded in `precancel` is correctly skipped at that
+        # position while a later, properly-bounded `cancel` on the same line
+        # still matches (verified with both occurrences on one line).
+        grep -inE "\b(${ALT})" "$md" 2>/dev/null | awk -v syms="$CHUNK_SYMS" -v md="$md" '
+            BEGIN { n = split(syms, S, "\n") }
+            {
+                p = index($0, ":"); if (p == 0) next
+                ln = substr($0, 1, p-1); text = substr($0, p+1)
+                low = tolower(text)
+                stripped = text; sub(/^[[:space:]-]*/, "", stripped)
+                for (i = 1; i <= n; i++) {
+                    s = S[i]; if (s == "") continue
+                    ls = tolower(s); start = 1; found = 0
+                    while ((pos = index(substr(low, start), ls)) > 0) {
+                        abs = start + pos - 1
+                        prev = (abs == 1) ? "" : substr(low, abs-1, 1)
+                        if (prev !~ /[a-z0-9_]/) { found = 1; break }
+                        start = abs + 1
+                    }
+                    if (found) print md ":" ln "\t" s "\t" stripped
+                }
+            }'
     done
-done | sort -u
+  done | sort -u
 )
 [ -n "$RESULTS" ] && printf '%s\n' "$RESULTS"
 
-n_sym=$(printf '%s\n' "$SYMS" | grep -c . || true)
 n_md=$(printf '%s\n' "$MD_FILES" | grep -c . || true)
 n_hit=$(printf '%s\n' "$RESULTS" | grep -c . || true)
 note "scanned $n_sym symbol(s) x $n_md doc(s), $n_hit candidate(s)"

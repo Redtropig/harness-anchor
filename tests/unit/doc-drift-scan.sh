@@ -247,6 +247,65 @@ expect_contains "[B2] completed scan reports coverage" "scanned " "$err7"
 #     every caller parsing candidate lines breaks.
 expect_not_contains "[B2] diagnostics stay off stdout" "doc-drift-scan:" "$out4"
 
+# ---- 10. §B3: the rewrite must preserve prefix-matching semantics exactly.
+#          The motivating case needs the symbol `cancel` to match the prose word
+#          "Cancellation" — a leading \b only, never a trailing one. A rewrite
+#          that "tidied" the regex into \bcancel\b would pass every other
+#          assertion here and silently destroy the only case this script exists
+#          for. Assertion 2 already covers it for the C++ fixture; this one
+#          re-checks it AFTER the loop restructure, on the widened fixture. ----
+expect_contains "[B3] prefix match survives the rewrite (cancel -> Cancellation)" \
+  "${TAB}cancel${TAB}Cancellation is safe to call at any time." "$out4"
+
+# ---- 11. §B3: chunking must be announced, not silent. A scan that quietly
+#          covered only part of its symbol set, and then reported clean, is
+#          strictly more dangerous than one that says it skipped. ----
+ROOT7=$(mktemp -d); trap 'rm -rf "$ROOT" "$ROOT2" "$ROOT3" "$ROOT4" "$ROOT5" "$ROOT6" "$ROOT7"' EXIT
+cd "$ROOT7" || exit 1
+git init -q . && git config user.email t@t && git config user.name t
+mkdir -p src
+: > src/many.c
+i=0; while [ "$i" -lt 450 ]; do printf 'void fn%03d(void) { }\n' "$i" >> src/many.c; i=$((i+1)); done
+printf '# Doc\n\nfn001 does a thing.\n' > README.md
+git add -A && git commit -qm base
+i=0; while [ "$i" -lt 450 ]; do printf 'void fn%03d(void) { return; }\n' "$i" >> src/many.c; i=$((i+1)); done
+git add -A && git commit -qm change
+err8=$(bash "$SCAN" --base HEAD~1 --target "$ROOT7" 2>&1 >/dev/null)
+expect_contains "[B3] chunking above 400 symbols is announced" "chunked into" "$err8"
+
+# ---- 12. §B3 regression: a single doc line matching MULTIPLE symbols must
+#          produce one candidate PER symbol, not just the first (leftmost)
+#          match. Found empirically during Task 4's own performance
+#          measurement (a real-repo scan silently dropped ~35% of candidates
+#          once symbols were combined into one alternation): the old
+#          per-symbol loop emitted one candidate per (symbol, line) pair,
+#          independently per symbol, so an attribution step that stops at the
+#          first match on a line silently drops every other symbol's
+#          candidate for that same line — exactly the silent-miss failure this
+#          script exists to prevent. ----
+ROOT8=$(mktemp -d); trap 'rm -rf "$ROOT" "$ROOT2" "$ROOT3" "$ROOT4" "$ROOT5" "$ROOT6" "$ROOT7" "$ROOT8"' EXIT
+cd "$ROOT8" || exit 1
+git init -q . && git config user.email t@t && git config user.name t
+mkdir -p src
+cat > src/a.cpp <<'EOF'
+bool cancel(JobId id) { return true; }
+bool purge(JobId id) { return true; }
+EOF
+cat > README.md <<'EOF'
+# Notes
+
+- cancel and purge both run synchronously and return promptly.
+EOF
+git add -A && git commit -qm base
+cat > src/a.cpp <<'EOF'
+bool cancel(JobId id) { if (is_terminal(id)) return false; return true; }
+bool purge(JobId id) { if (is_terminal(id)) return false; return true; }
+EOF
+git add -A && git commit -qm change
+out9=$(bash "$SCAN" --base HEAD~1 --target "$ROOT8" 2>/dev/null)
+expect_contains "[B3] multi-symbol line: cancel candidate is not dropped" "${TAB}cancel${TAB}" "$out9"
+expect_contains "[B3] multi-symbol line: purge candidate is not dropped"  "${TAB}purge${TAB}"  "$out9"
+
 echo ""
 echo "doc-drift-scan: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
