@@ -23,7 +23,15 @@ Stop. Read this before doing anything.
 5. **C/C++ skills are gated by `cpp-detect.sh`.** They must include a frontmatter trigger condition referencing the detected build system; they must not activate in non-C/C++ projects.
 6. **Skill descriptions front-load distinctive trigger keywords.** First ~80 chars carry the load — Anthropic's skill listing budget is tight (see learn-harness `gotchas.md#12`).
 7. **Hooks must time out in ≤ 5 seconds** and fail silent on missing tools.
-8. **Default-FAIL evaluation contracts.** No skill or agent should mark anything "done" without an evidence path. This is the anti-hallucination invariant — do not soften it.
+8. **Default-FAIL evaluation contracts, both directions.** No skill or agent should
+   mark anything "done" without an evidence path — **and** none should assert that
+   something is **absent** (not installed / not available / no such symbol) without
+   stating the search scope it actually covered and when it looked. A scope-less
+   negative is wrong about *where* someone looked; a date-less one is wrong about
+   *when*. This is the anti-hallucination invariant — do not soften it.
+   Judgement-shaped negatives ("this is impossible", "that won't work") are
+   deliberately **out of scope**: they carry no evidence path, and admitting them
+   would turn the contract into unverifiable moralising.
 9. **docs-lookup is the canonical procedure** for unfamiliar tools/APIs/errors/library behavior. New skills MUST reference it rather than inlining Context7 → WebSearch waterfalls — the failure-mode detection and calibrated-uncertainty fallback live in one place by design.
 10. **Windows/Git-Bash is a supported surface.** `tests/windows-compat.sh` must pass:
     no direct `python3` invocation in hooks (JSON goes through `scripts/lib/portable.sh`'s

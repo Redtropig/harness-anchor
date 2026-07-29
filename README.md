@@ -65,7 +65,7 @@ bash init.sh     # health-check the environment
 | `feature-state-keeper` | Starting/advancing/finishing/blocking a feature |
 | `init-verification` | Start of work; after env change; when something stops working |
 | `self-correction-loop` | After tool/hook returns warning, lint/type/build error |
-| `anti-hallucination-gates` | Before claiming "done", "fixed", "passing" |
+| `anti-hallucination-gates` | Before claiming "done", "fixed", "passing" — or claiming something is absent ("not installed", "no such function") |
 | `test-coverage-design` | Deciding what to test; is a feature covered before "done" (dispatches `coverage-analyst`) |
 | `capturing-golden-rules` | The same mistake recurs / a review comment is really a convention — encode it as a durable rule (the feedback flywheel) |
 | `context-budget-discipline` | Long sessions; subagents; large file fetches |
@@ -116,7 +116,7 @@ bash init.sh     # health-check the environment
 ## Key design decisions
 
 - **Warn-only hooks.** PostToolUse / Stop / UserPromptSubmit / PreCompact hooks **never block** — they inject `additionalContext` for self-correction per Anthropic's "feedback loops > gates" guidance.
-- **Default-FAIL contracts.** Done criteria start `false`; the agent must produce a concrete evidence path (build log, test output, lint report) to flip them to `true`. See `skills/anti-hallucination-gates/`.
+- **Default-FAIL contracts, both directions.** Done criteria start `false`; the agent must produce a concrete evidence path (build log, test output, lint report) to flip them to `true`. Negative claims are bound the same way: asserting something is absent requires the search scope actually covered and the date it was checked — an empty `command -v` proves nothing about installation. See `skills/anti-hallucination-gates/`.
 - **Progressive Disclosure.** SessionStart injects ≤ 3000 tokens (banner + an adaptive `PROJECT-TOC` view — the directory map, or the full file list on a small repo — + the meta-skill, injected slimmed: frontmatter stripped; cpp-only sections gated by cpp-detect; os-<name> sections gated by the runtime platform, HA_OS). Deeper references live in skill subfolders — including per-platform `platform/<os>.md` sidecars — loaded on demand.
 - **docs-lookup is canonical.** No inline Context7 → WebSearch waterfalls in other skills — they all reference `docs-lookup` for the procedure (including failure-mode detection and calibrated-uncertainty fallback).
 - **Fresh-context evaluator.** `/verify` dispatches `verification-runner` in a subagent with read-only tools; mitigates "self-grading" leniency per Anthropic's March 2026 three-agent architecture.

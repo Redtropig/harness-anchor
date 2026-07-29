@@ -4,6 +4,64 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-07-29
+
+### Added
+
+- **The Default-FAIL contract now runs both ways.** `anti-hallucination-gates`
+  bound only positive claims ("done", "fixed", "passing"); a negative one —
+  "clang-tidy isn't installed here", "there's no such function" — was bound by
+  nothing, and the skill's own description carried no negative trigger, so it was
+  not even loaded at the moment it was needed. Adds a two-class contract
+  (capability / search) with an executable probe for each, the mirror of the
+  "should" detector, and an explicit exclusion for judgement-shaped negatives.
+- **Negative capability conclusions carry an observation date.** 0.16.0 made
+  "not found" state its search scope; it still did not state *when*. The mandated
+  form is now `searched <scope>, not found (as of <YYYY-MM-DD>)` at all five
+  sites, and `init-verification` re-checks inherited negative conclusions at
+  session start — only negative ones, because those fail silently while positive
+  ones fail loudly at the next invocation.
+- `tests/unit/mandated-phrasing.sh` — the wording rule spans six files and was
+  held together by instruction alone through 0.16.0, whose own review found it
+  already drifted, and whose release then drifted again between the command and
+  the docs page restating it. Now mechanical.
+- `doc-drift-scan.sh` announces what it did on stderr: `skipped — <reason>` for
+  every early-exit path, `scanned N symbol(s) x M doc(s)` on completion. stdout
+  remains a pure candidate list.
+
+### Changed
+
+- `doc-drift-scan.sh` scans a maintained language whitelist (C/C++, Python,
+  JS/TS, Go, Rust, Ruby, Java, Kotlin, C#, shell) instead of C/C++ only.
+- `doc-drift-scan.sh` runs one alternation grep per document per chunk instead of
+  one grep per (symbol, document) pair — O(files) rather than O(symbols x files).
+  Chunking above 400 symbols and truncation above 2000 are both announced.
+- The contract is restated in both directions everywhere it appears: `CLAUDE.md`
+  design invariant #8, the `using-harness-anchor` meta-skill's Hard Rule 1
+  (injected at every SessionStart), the README skill table and Default-FAIL
+  section, and the scaffolded `AGENTS.md` template's Definition of Done.
+
+### Fixed
+
+- `doc-drift-scan.sh` could not see a single one of 0.16.0's own 21 changed files
+  — it was pathspec-limited to C/C++ in a bash-and-markdown repository — and
+  reported that by returning exactly what a clean scan returns. "Did not scan"
+  and "scanned, found nothing" no longer share a channel.
+- `cpp-tool-discovery.sh` searched versioned tool variants against a hard-coded
+  ladder ending at 22, giving it a roughly twelve-month fuse: an installed
+  `clang-tidy-23` would have reported NOT_FOUND, recreating the exact bug the
+  script was written to fix. Versioned variants are now glob-enumerated.
+- `tests/README.md`'s "Quick test" block enumerated 7 of the 17 unit tests that
+  actually exist — the list had gone stale across several releases, so anyone
+  following the documented steps ran under 40% of the suite while believing they
+  had run it. Replaced with a glob, matching what CI already does for the reason
+  its own comment gives: enumeration rots.
+- `tests/windows-compat.sh` blamed a MSYS2 `grep` crash on backslashes. The
+  actual trigger is the `-i`+`-F` flag pair alone: it aborts during matcher
+  construction, so there is no safe input, and `grep` writes nothing to stderr —
+  inside `$(...)` or an `if` condition a SIGABRT is indistinguishable from a
+  clean "no match".
+
 ## [0.16.0] - 2026-07-28
 
 ### Added
@@ -610,7 +668,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/Redtropig/harness-anchor/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Redtropig/harness-anchor/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Redtropig/harness-anchor/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Redtropig/harness-anchor/compare/v0.13.0...v0.14.0

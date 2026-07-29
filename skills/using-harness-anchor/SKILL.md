@@ -52,7 +52,7 @@ If none exist, the project is **un-anchored**. Suggest the user run `/anchor` to
 
 ## Hard Rules
 
-1. **No "done" without evidence.** "pass" requires compile + tests + lint with concrete output paths; lacking evidence → status stays `in-progress`. Express uncertainty: *"I am uncertain whether X passes because <reason>."*
+1. **No "done" without evidence — and no "absent" without scope.** "pass" requires compile + tests + lint with concrete output paths; lacking evidence → status stays `in-progress`. The same rule runs in reverse: a claim that something is missing (tool not installed, no such function) must state what you searched and when — `searched <scope>, not found (as of <date>)`. Express uncertainty: *"I am uncertain whether X passes because <reason>."*
 2. **One active feature at a time** unless explicit multi-feature plan. Unrelated mid-feature request → surface the scope-jump and confirm before pivoting.
 3. **State lives on disk, not in chat.** Update `feature_list.json` / `progress.md` / `session-handoff.md`.
 4. **PROJECT-TOC.md before Glob.**
