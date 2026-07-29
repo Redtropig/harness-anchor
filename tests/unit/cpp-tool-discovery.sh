@@ -59,6 +59,26 @@ if grep -qE '(^|[^a-zA-Z_-])python3([^a-zA-Z_-]|$)' "$DISC"; then
   echo "  FAIL script invokes python3 directly"; FAIL=$((FAIL+1))
 else echo "  OK   no direct python3"; PASS=$((PASS+1)); fi
 
+# ---- 8. §B4: versioned discovery must not depend on a hard-coded version
+#         ladder. Through v0.16.0 the ladder topped out at 22, giving the script
+#         a ~12-month fuse: LLVM 23 ships, the tool is installed, and discovery
+#         reports NOT_FOUND — recreating the exact bug this script was written
+#         to fix. `-99` is above any ladder anyone would have written. ----
+FAKEDIR=$(mktemp -d); trap 'rm -rf "$FAKEDIR"' EXIT
+printf '#!/bin/sh\necho fake\n' > "$FAKEDIR/ha-faketool-99"
+chmod +x "$FAKEDIR/ha-faketool-99"
+out8=$(PATH="$FAKEDIR:$PATH" bash "$DISC" ha-faketool 2>/dev/null)
+expect_contains "[B4] version far above any ladder is found" "FOUND" "$out8"
+expect_contains "[B4] found via the versioned label" "${TAB}versioned" "$out8"
+
+# ---- 9. §B4: a non-numeric suffix is not a version and must not be mistaken
+#         for one (clang-tidy-dev, clang-format-diff, ...). ----
+FAKEDIR2=$(mktemp -d); trap 'rm -rf "$FAKEDIR" "$FAKEDIR2"' EXIT
+printf '#!/bin/sh\necho fake\n' > "$FAKEDIR2/ha-othertool-dev"
+chmod +x "$FAKEDIR2/ha-othertool-dev"
+out9=$(PATH="$FAKEDIR2:$PATH" bash "$DISC" ha-othertool 2>/dev/null)
+expect_contains "[B4] non-numeric suffix is not treated as a version" "NOT_FOUND" "$out9"
+
 echo ""
 echo "cpp-tool-discovery: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
