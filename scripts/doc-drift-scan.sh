@@ -274,8 +274,18 @@ RESULTS=$(
         # `cancel` embedded in `precancel` is correctly skipped at that
         # position while a later, properly-bounded `cancel` on the same line
         # still matches (verified with both occurrences on one line).
-        grep -inE "\b(${ALT})" "$md" 2>/dev/null | awk -v syms="$CHUNK_SYMS" -v md="$md" '
-            BEGIN { n = split(syms, S, "\n") }
+        # Both values reach awk through the ENVIRONMENT, never through -v.
+        # `-v` assignments undergo escape-sequence processing, and POSIX does
+        # not allow a physical newline in one at all: `gawk --posix` rejects
+        # `-v syms="$CHUNK_SYMS"` with "POSIX does not allow physical newlines
+        # in string values", and macOS's one-true-awk silently attributed
+        # NOTHING — every symbol assertion failed on macOS and Windows CI while
+        # passing on this repo's GNU-awk dev box and on ubuntu. ENVIRON values
+        # are passed verbatim, so the symbol list survives intact and a path
+        # containing a backslash is not mangled either.
+        grep -inE "\b(${ALT})" "$md" 2>/dev/null |
+        HA_SYMS="$CHUNK_SYMS" HA_MD="$md" awk '
+            BEGIN { n = split(ENVIRON["HA_SYMS"], S, "\n"); md = ENVIRON["HA_MD"] }
             {
                 p = index($0, ":"); if (p == 0) next
                 ln = substr($0, 1, p-1); text = substr($0, p+1)

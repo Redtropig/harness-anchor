@@ -306,6 +306,32 @@ out9=$(bash "$SCAN" --base HEAD~1 --target "$ROOT8" 2>/dev/null)
 expect_contains "[B3] multi-symbol line: cancel candidate is not dropped" "${TAB}cancel${TAB}" "$out9"
 expect_contains "[B3] multi-symbol line: purge candidate is not dropped"  "${TAB}purge${TAB}"  "$out9"
 
+# ---- 13. PORTABILITY: attribution must not depend on this box's awk.
+#          v0.17.0 shipped an attribution stage that passed the symbol list via
+#          `awk -v syms=...`. That value contains newlines, which POSIX does not
+#          permit in a -v assignment — `gawk --posix` rejects it outright, and
+#          macOS's one-true-awk silently attributed NOTHING. Every symbol
+#          assertion above failed on macOS and Windows CI while this same file
+#          reported 21/21 on a GNU-awk dev box: a green suite on one awk is not
+#          evidence about any other.
+#
+#          Re-run the motivating case with awk forced into strict POSIX mode
+#          where that is possible (gawk present), and with the system awk
+#          otherwise — on a BSD-awk box the system awk IS the strict one, so the
+#          check is meaningful either way and always runs. ----
+POSIX_SHIM=$(mktemp -d)
+if command -v gawk >/dev/null 2>&1; then
+    printf '#!/bin/sh\nexec gawk --posix "$@"\n' > "$POSIX_SHIM/awk"
+    chmod +x "$POSIX_SHIM/awk"
+    shim_label="gawk --posix"
+else
+    shim_label="system awk (no gawk here)"
+fi
+out10=$(PATH="$POSIX_SHIM:$PATH" bash "$SCAN" --base HEAD~1 --target "$ROOT8" 2>/dev/null)
+rm -rf "$POSIX_SHIM"
+expect_contains "[portability/$shim_label] attribution survives a strict awk" \
+  "${TAB}cancel${TAB}" "$out10"
+
 echo ""
 echo "doc-drift-scan: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
