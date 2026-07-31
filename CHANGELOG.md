@@ -67,10 +67,26 @@ capability, and it ships with a new gate check and a new contract test — an
   `run-all.sh` puts those prompts through a live session before a release. The
   error came from equating "no grep for it" with "not enforced"; a behavioural eval
   is the stronger form of enforcement, not the absence of one. #6 now says where it
-  is enforced and warns against replacing that eval with a static check — whether a
-  keyword is distinctive is a property of whether the skill fires, not of the
-  string. With #5, #7 and #9 closed in this release, all ten invariants are
-  enforced, which is what the section below the list has always claimed of it.
+  is enforced, in what tier, and warns against replacing that eval with a static
+  check on the description text. With #5, #7 and #9 closed in this release, all ten
+  invariants are enforced, which is what the section below the list has always
+  claimed of it.
+- **`check-coverage.sh` now verifies the prompts are actually adversarial**, and
+  self-tests its own matcher first. It had asserted only that a case was registered
+  and its file existed — so a prompt reading "use the docs-lookup skill" would have
+  satisfied it while testing nothing, since the run would pass on the user naming
+  the skill rather than on the description doing its job. Prompts are now rejected
+  if they contain their own skill name in either spelling.
+
+  The first cut of that check was itself vacuous, which is the more useful half of
+  the story: `grep -qi -e A -e B` **aborts** on the MSYS2 grep (exit 134, nothing on
+  stderr) — the same crash class `tests/windows-compat.sh` documents for `-i`
+  combined with `-F`. A crash returns non-zero, non-zero read as "no match", and all
+  fifteen prompts were reported clean by a grep that never ran. The loop-counter
+  guard did not notice, because the loop *had* run — it was the judge that was
+  broken. Single `-E` alternation is crash-free, and a matcher self-test against a
+  known-positive now runs before any prompt is believed clean. Both directions
+  verified by mutation. (44 assertions, was 28.)
 - **`tests/unit/doc-align.sh`** — integrity of the `doc-align` markers, which were
   a standing unverified claim. Per marker: exactly one 40-hex sha, it resolves to a
   real commit, that commit is an ancestor of HEAD, and any abbreviated sha in the

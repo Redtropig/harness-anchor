@@ -40,15 +40,22 @@ Stop. Read this before doing anything.
    it.
 6. **Skill descriptions front-load distinctive trigger keywords.** First ~80 chars
    carry the load — Anthropic's skill listing budget is tight (see learn-harness
-   `gotchas.md#12`). **Enforced by eval, not by grep.** Every skill ships an
-   adversarial prompt that never names it (§"Authoring a New Skill" #4);
-   `tests/skill-triggering/check-coverage.sh` guards that coverage structurally on
-   every CI run, and `run-all.sh` puts the prompts through a live session before a
-   release. Do not "close the gap" by adding a static text check: whether a keyword
-   is distinctive is a property of *whether the skill fires*, not of the string, so
-   any grep approximating it would pass descriptions the eval rejects and fail ones
-   it accepts. Reading the absence of a grep as an absence of enforcement is a
-   mistake that has already been made once against this entry.
+   `gotchas.md#12`). **Enforced by eval, not by grep**, in two tiers. Every
+   *model-pulled* skill ships a prompt that never names it (§"Authoring a New
+   Skill" #4); `using-harness-anchor` is exempt, because SessionStart injects it
+   and nothing has to trigger it. `tests/skill-triggering/check-coverage.sh` runs
+   on the non-Windows CI legs and asserts three things — the case is registered,
+   its prompt file exists, and the prompt does not name its own skill in either
+   spelling (`docs-lookup` or `docs lookup`). `run-all.sh` is the second tier: it
+   puts those prompts through a live session and is where triggering is actually
+   measured, but it is run **manually before a release**, so treat it as a ritual
+   you owe the release, not a gate that will stop you.
+
+   Do not "close the gap" with a static check on the description text. Whether a
+   keyword is distinctive is a property of *whether the skill fires*, not of the
+   string; any grep approximating it would pass descriptions the eval rejects and
+   fail ones it accepts. Reading the absence of a grep as an absence of
+   enforcement is a mistake already made once against this entry.
 7. **Hooks must time out in ≤ 5 seconds** and fail silent on missing tools.
 8. **Default-FAIL evaluation contracts, both directions.** No skill or agent should
    mark anything "done" without an evidence path — **and** none should assert that
