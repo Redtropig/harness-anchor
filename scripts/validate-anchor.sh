@@ -374,9 +374,35 @@ if [ -f "$LIB" ]; then
     # and the hook silently reverts to bare `python3`, which fails where only
     # `python`/`py`/`node` exist. Static presence is the invariant; the runtime
     # source is graceful (|| true), but the wiring must be in the file.
-    for h in hooks/session-start hooks/post-tool-use hooks/stop hooks/user-prompt-submit hooks/pre-compact; do
+    # The hook list is DERIVED from hooks/hooks.json — the file Claude Code
+    # actually executes — never enumerated here. An enumeration rots: the same
+    # one in tests/windows-compat.sh silently stopped covering hooks/pre-compact
+    # for two releases. Deriving it also closes a hole no check in this repo
+    # covered: a hook REGISTERED in hooks.json whose file is missing. [1/12]
+    # lists only two of the five hooks, and hooks.json itself is validated for
+    # JSON syntax alone, so a dangling registration was invisible.
+    #
+    # Complementary, not redundant, with windows-compat's [5/5]: that one globs
+    # hooks/ (present on disk -> must be wired); this one starts from the
+    # registry (registered -> must exist AND be wired). Neither direction alone
+    # catches both failures.
+    n_cmd=$(grep -c '"type"[[:space:]]*:[[:space:]]*"command"' hooks/hooks.json 2>/dev/null || true)
+    hook_cmds=$(sed -n 's|.*run-hook\.cmd[^ ]*[[:space:]]\([a-z][a-z0-9-]*\).*|\1|p' hooks/hooks.json 2>/dev/null)
+    n_parsed=$(printf '%s\n' "$hook_cmds" | grep -c . || true)
+    # Non-vacuity guard: a parse that returns nothing (or misses a registration
+    # written in an unrecognized shape) would make the loop below a no-op and
+    # report all-pass having checked nothing.
+    if [ "$n_parsed" -eq 0 ]; then
+        fail "no hook command parsed from hooks/hooks.json — the wiring loop would pass vacuously"
+    elif [ "$n_parsed" -ne "$n_cmd" ]; then
+        fail "hooks.json declares $n_cmd command hook(s), only $n_parsed parsed — an unrecognized command shape is unchecked"
+    else
+        ok "hooks.json: all $n_parsed registered hook command(s) parsed"
+    fi
+    for name in $(printf '%s\n' "$hook_cmds" | sort -u); do
+        h="hooks/$name"
         if [ ! -f "$h" ]; then
-            fail "missing hook: $h"
+            fail "hooks.json registers '$name' but $h does not exist"
             continue
         fi
         if grep -q 'scripts/lib/portable\.sh' "$h"; then ok "$h sources portable.sh"; else fail "$h does not source portable.sh (engine chain unwired)"; fi
