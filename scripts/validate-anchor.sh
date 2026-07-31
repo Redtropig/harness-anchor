@@ -6,7 +6,7 @@
 # Checks (labelled [1/12]..[12/12] in the output):
 #   [1/12]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
 #   [2/12]   JSON files parse; scripts/*.mjs pass node --check
-#   [3-4/12] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12), and every skills/cpp-* scopes itself to C/C++ within the first 80 chars — invariant #5's skill half, which nothing enforced before v0.18.0 (non-vacuity guarded)
+#   [3-4/12] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12); every skills/cpp-* scopes itself to C/C++ within the first 80 chars (invariant #5, skill half); every skill naming Context7/WebSearch also references docs-lookup rather than inlining the waterfall (invariant #9). Neither was enforced before v0.18.0; both non-vacuity guarded
 #   [5/12]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
 #   [6/12]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
 #   [7/12]   SessionStart hook is executable and produces valid JSON when run; meta-skill conditional regions (cpp-only + os-<name>) well-formed, jointly flat, taxonomy-whitelisted
@@ -108,10 +108,11 @@ fi
 echo ""
 
 # ---- 3 & 4. SKILL.md frontmatter ----
-echo "[3-4/12] SKILL.md frontmatter (name + description, ≤500 chars desc, invariant #5 scoping)..."
+echo "[3-4/12] SKILL.md frontmatter (name + desc ≤500 chars; invariant #5 C/C++ scoping; invariant #9 docs-lookup reference)..."
 # Initialised before the loop, not inside it: this file runs under `set -u`, where
 # reading an unset name aborts the script (CLAUDE.md, "Shell hazards", #1).
 CPP_SKILLS_SEEN=0
+LOOKUP_MENTIONS=0
 while IFS= read -r skill; do
     if ! head -1 "$skill" | grep -q '^---$'; then
         fail "$skill: missing frontmatter opener"
@@ -131,6 +132,27 @@ while IFS= read -r skill; do
     else
         ok "$skill description ${#desc} chars"
     fi
+
+    # Invariant #9, enforced from v0.18.0: docs-lookup is the canonical procedure,
+    # so a skill that names Context7 or WebSearch must POINT AT it rather than
+    # standing alone with its own copy of the waterfall. Naming them is fine and
+    # common — "Invoke `docs-lookup` … (Context7 → WebSearch fallback)" is the
+    # shape all seven current cases use; what the invariant forbids is that
+    # sentence without the reference, which is how the failure-mode detection and
+    # the calibrated-uncertainty fallback drift out of sync between copies.
+    case "$skill" in
+        skills/docs-lookup/*) : ;;  # the canonical procedure itself
+        *)
+            if grep -qiE 'context7|websearch' "$skill"; then
+                LOOKUP_MENTIONS=$((LOOKUP_MENTIONS+1))
+                if grep -q 'docs-lookup' "$skill"; then
+                    ok "$skill references docs-lookup alongside its Context7/WebSearch mention"
+                else
+                    fail "$skill: names Context7/WebSearch without referencing docs-lookup — inline waterfall (invariant #9)"
+                fi
+            fi
+            ;;
+    esac
 
     # Invariant #5, skill half (v0.18.0): a C/C++ skill must scope itself to C/C++
     # inside the first 80 chars — the window invariant #6 says carries the trigger
@@ -158,6 +180,11 @@ if [ "$CPP_SKILLS_SEEN" -eq 0 ]; then
     fail "no skills/cpp-* SKILL.md matched — the invariant #5 check above ran zero times"
 else
     ok "invariant #5 checked against $CPP_SKILLS_SEEN C/C++ skill(s)"
+fi
+if [ "$LOOKUP_MENTIONS" -eq 0 ]; then
+    fail "no skill outside docs-lookup names Context7/WebSearch — the invariant #9 check above ran zero times (the grep, or the convention, changed)"
+else
+    ok "invariant #9 checked against $LOOKUP_MENTIONS skill(s) naming Context7/WebSearch"
 fi
 echo ""
 

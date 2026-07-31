@@ -49,6 +49,22 @@ capability, and it ships with a new gate check and a new contract test — an
   showing improvement. It also would not have made the invariant's first sentence
   true. An unenforced entry in that list contradicts what the section below it
   promises: the list is the part that a test mechanically enforces.
+- **Invariant #9 is now enforced too — its wording needed no change.** Auditing
+  the other nine invariants after fixing #5 found that #9 ("docs-lookup is the
+  canonical procedure; new skills MUST reference it rather than inlining
+  Context7 → WebSearch waterfalls") was accurate but unchecked. `validate-anchor`
+  [3-4/12] now asserts that any skill naming Context7 or WebSearch also references
+  `docs-lookup`. Naming them is normal and expected — all seven current cases use
+  the shape *"Invoke `docs-lookup` … (Context7 → WebSearch fallback)"*; what the
+  check catches is that sentence with the reference removed, which is how the
+  failure-mode detection and the calibrated-uncertainty fallback drift out of sync
+  between copies. Non-vacuity guarded; both directions verified by mutation.
+
+  Invariant #6 ("skill descriptions front-load distinctive trigger keywords") is
+  the remaining unenforced entry, and deliberately left alone: "distinctive" is a
+  judgement, not a predicate, so a check would either be vacuous or wrong. Whether
+  it belongs in the mechanically-enforced list or in the conventions section below
+  it is an editorial call about CLAUDE.md's own structure.
 - **`tests/unit/doc-align.sh`** — integrity of the `doc-align` markers, which were
   a standing unverified claim. Per marker: exactly one 40-hex sha, it resolves to a
   real commit, that commit is an ancestor of HEAD, and any abbreviated sha in the
