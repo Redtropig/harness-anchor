@@ -47,6 +47,17 @@ nothing belongs in an `### Added` section.
   awk-consumes it for the conditional-region filter and the injection length
   count — and `tests/windows-compat.sh` [3/5] is the only place in the repo that
   reads an `eol` attribute at all. It did not check that file. It does now.
+- **A hook registered in `hooks.json` but missing on disk was invisible to every
+  gate.** `validate-anchor` [1/12] names two of the five hooks; [11/12]
+  enumerated all five by hand but only to check their *wiring*; `hooks.json`
+  itself is validated for JSON syntax alone. [11/12] now derives its list from
+  `hooks.json` — the file Claude Code actually executes — and runs registry →
+  disk: registered implies exists, sources `portable.sh`, calls
+  `ha_platform_init`. Complementary to `windows-compat` [5/5], which globs
+  `hooks/` and runs disk → wiring; neither direction alone catches both
+  failures. An empty parse, or a registration in a shape the parser does not
+  recognise (parsed count ≠ declared `"type": "command"` count), fails loudly
+  instead of skipping the loop.
 
 ### Changed
 
@@ -56,8 +67,16 @@ nothing belongs in an `### Added` section.
   three-character floor: a clean doc-drift section now means "no doc claim about
   a changed, 3+ character, function-shaped symbol in a scanned language looks
   stale".
+- `docs/troubleshooting.md` gains entries 14 and 15, covering the two sensors
+  0.16.0/0.17.0 added — both of which are built to report things that *look*
+  like failures and are not (`doc-drift-scan`'s six stderr states and its
+  candidates-not-violations contract; `cpp-tool-discovery`'s `NOT_FOUND` for a
+  tool in a non-standard prefix, and the dated phrasing that lets
+  `init-verification` re-check it next session). The file's `doc-align` marker
+  is deliberately left at v0.9.0: bumping it would assert a re-verification of
+  all entries that this release did not perform.
 - `tests/unit/doc-drift-scan.sh` 22 → 32 assertions; `tests/windows-compat.sh`
-  19 → 24.
+  19 → 24; `scripts/validate-anchor.sh` 157 → 158.
 
 ## [0.17.0] - 2026-07-29
 
