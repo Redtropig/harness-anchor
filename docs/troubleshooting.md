@@ -209,3 +209,70 @@ delete `.harness-anchor/pulse-<session>.*` and the session's
 `flush-warned-*` / `reset-advised-*` markers. A misfire costs one context line;
 a persistently misbehaving detector is a bug — report it rather than hand-patch
 the window file.
+
+## 14. `/gc` doc-drift: empty, `PARTIAL`, or hundreds of rows about one word
+
+**Symptom:** The drift report's doc-drift section says nothing at all; or it lists
+dozens of rows keyed on a common word (`read`, `file`, `check`); or it says results
+are `PARTIAL`.
+
+**Diagnosis:** `scripts/doc-drift-scan.sh` puts the candidate list on **stdout** and
+its *coverage* on **stderr**, because empty stdout has several meanings that must not
+be confused. Read stderr first:
+
+| stderr line | Meaning |
+|---|---|
+| `skipped — <reason>` | **No scan ran.** Not a git repo, no usable base ref, no tracked `*.md`, or no changed file in a scanned language (`SCAN_PATHSPEC` is a whitelist — a language off it contributes zero symbols). |
+| `not searched — <tokens>` | Those tokens were never looked for: under 3 characters, where case-insensitive prefix matching makes every row undecidable. |
+| `symbol set truncated to N of M — results are PARTIAL` | Only `N` symbols were searched. |
+| `per-symbol cap N hit by <sym(count)>…` | Those symbols show a first-`N` sample; the parenthesised number is the real total. |
+| `candidate list truncated to N of M — results are PARTIAL` | stdout is the first `N` rows of `M`. |
+| `scanned N symbol(s) x M doc(s), K candidate(s), S shown` | The coverage statement. `S < K` means you have a sample. |
+
+Only a `scanned …` line with `S == K` and no `PARTIAL` / `not searched` line above
+it means "searched, found nothing".
+
+**Fix:** Nothing is broken in most of these cases. Rows are **candidates, not
+violations** — matching is deliberately prefix-based (the symbol `cancel` has to
+match the prose word "Cancellation"), so a common-word symbol floods by design;
+discount its rows as a unit rather than reading each. Run the scan yourself to see
+both streams:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/doc-drift-scan.sh" --base <ref> --target "$(pwd)"
+```
+
+Tuning lives in named constants in that script: `SCAN_PATHSPEC` (add your
+language), `SYM_MINLEN`, `ROW_CAP_PER_SYM`, `ROW_CAP_TOTAL`. Widening `SCAN_PATHSPEC`
+is the supported way to extend coverage. Note the standing blind spot: only
+call/definition-shaped symbols are extracted, so a changed global, macro, enum
+constant, struct field or typedef produces no symbol — and a claim naming no symbol
+at all ("the pool is fast") has nothing to key on. A clean section is never "the docs
+were verified".
+
+## 15. A tool reports `NOT_FOUND` / "searched …, not found" but you know it is installed
+
+**Symptom:** `/cpp-init`, `cpp-static-analysis` or `cpp-formatting` reports
+`NOT_FOUND<TAB>clang-tidy<TAB>searched:PATH,vs-llvm,vs-cmake,versioned` for a tool
+that is definitely on the machine.
+
+**Diagnosis:** This is `scripts/cpp-tool-discovery.sh`'s documented residual blind
+spot, and the `searched:` list is there precisely so you can see where the search
+stopped. It covers PATH, the platform's known install locations (VS-bundled LLVM and
+Ninja on Windows, `xcrun` and keg-only Homebrew llvm on macOS, `/usr/lib/llvm-*` on
+Linux) and glob-enumerated versioned variants (`clang-tidy-21`, …). A portable unzip
+or a user-chosen prefix is in none of those.
+
+**Fix:** Put the directory on PATH — on Windows that usually means running
+`vcvars64.bat` in the shell first — then re-run discovery to confirm:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/cpp-tool-discovery.sh" clang-tidy clang-format
+```
+
+A `FOUND` line's absolute path is usable directly; the tool does not need to be on
+PATH for you to invoke it. If it stays `NOT_FOUND`, record that as
+`searched <scope>, not found (as of <YYYY-MM-DD>)` — never "not installed" or "not on
+this machine". The date is what lets the next session re-check it: `init-verification`
+step 6 re-checks inherited negative conclusions at session start, but **only** ones
+written in that exact form.
