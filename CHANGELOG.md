@@ -14,9 +14,13 @@ nothing belongs in an `### Added` section.
 - **`doc-drift-scan.sh` flooded the consumer it reports to.** `HARD_CAP` bounded
   the symbol set; nothing bounded the candidate *rows*, which are the unit the
   reader actually pays for. Measured on this repository's own `v0.16.0..v0.17.0`
-  range: 54 symbols → 4765 rows / 759 KB, a payload no tool hands a subagent
-  intact — so `drift-analyst` was adjudicating a list the harness had already
-  truncated, silently, with no note either end could see. The script announced
+  range: 54 symbols → 4765 rows / 759 KB. The 3000-token SessionStart budget
+  invariant is this repo's scale for what injected context may cost; 759 KB from
+  one sensor is not in that world. Wherever the consuming tool's output limit
+  falls, a payload that size is past it — so `drift-analyst` was adjudicating a
+  list the harness had already cut, silently, with no note either end could see
+  (an inference from the size, not a measurement of a particular tool; the
+  budget argument stands without it). The script announced
   `PARTIAL` for the one truncation it performed and was blind to the larger one
   it caused. Rows are now capped per symbol (12) and in total (400), each with a
   `PARTIAL` marker, and the summary reports matched-vs-shown

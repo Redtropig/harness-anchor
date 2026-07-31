@@ -248,10 +248,14 @@ HARD_CAP=2000
 # Output caps. HARD_CAP bounds the SYMBOL set; nothing bounded the CANDIDATE
 # ROWS, and rows are what the consumer actually pays for: this repository's own
 # v0.16.0..v0.17.0 range emitted 4765 rows / 759 KB from 54 symbols. The
-# drift-analyst reads that through a tool that will not hand it a payload of that
-# size, so the list it adjudicates was already being truncated — silently, by the
-# harness, with no note either end could see. Capping here makes the truncation
-# ours, and therefore announceable.
+# The 3000-token SessionStart budget invariant sets this repo's scale for what
+# injected context may cost; 759 KB from one sensor is not in that world at all.
+# And wherever the consuming tool's output limit falls, a payload this size is
+# past it — so the list drift-analyst adjudicated was already being cut, by the
+# harness, silently, with no note either end could see. (That the cut happens is
+# an inference from the size, not a measurement of any particular tool; the
+# context-budget argument above stands on its own either way.) Capping here makes
+# the cut ours, and therefore announceable.
 #
 # Two caps, because they fail differently. The per-symbol cap stops ONE
 # common-word symbol from crowding every other symbol out of the visible list;

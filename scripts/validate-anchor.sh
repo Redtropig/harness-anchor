@@ -3,7 +3,7 @@
 # Run inside the plugin root, or pass the plugin root as the first positional
 # argument (validate-anchor.sh [plugin-root]); it defaults to the repo root.
 #
-# Checks (labelled [1/12]..[11/12] in the output):
+# Checks (labelled [1/12]..[12/12] in the output):
 #   [1/12]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
 #   [2/12]   JSON files parse; scripts/*.mjs pass node --check
 #   [3-4/12] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
@@ -13,7 +13,7 @@
 #   [8/12]   Commands directory consistency (each commands/*.md is a usable /command)
 #   [9/12]   Every template referenced from commands/anchor.md + cpp-init.md AND from scaffold.sh's template map exists
 #   [10/12]  Command↔script wiring: the four mechanism scripts exist + executable + bash -n; every ${CLAUDE_PLUGIN_ROOT}/scripts/* referenced by a command/agent md resolves
-#   [11/12]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; every hook sources it AND calls ha_platform_init (the Windows python3→python→py→node engine-chain wiring)
+#   [11/12]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; the hook list is DERIVED from hooks/hooks.json (registry → disk: every registered hook exists, sources the lib, AND calls ha_platform_init — the Windows python3→python→py→node engine-chain wiring). tests/windows-compat.sh [5/5] runs the other direction (disk → wiring, globbing hooks/)
 #   [12/12]  Platform sidecars (v0.14.0): skills/*/platform/<os>.md ↔ SKILL.md pointer integrity (bidirectional, same-skill relative); os names in taxonomy
 
 set -uo pipefail   # no -e so we report all failures, not abort on first
