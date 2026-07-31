@@ -1,17 +1,19 @@
 # Troubleshooting — harness-anchor
 
-<!-- doc-align: 230abfc99e07fdcda103c63824253346623d7c5d · 2026-07-31 · harness-anchor v0.17.1 -->
-> **Aligned with commit** [`230abfc`](https://github.com/Redtropig/harness-anchor/commit/230abfc99e07fdcda103c63824253346623d7c5d) (harness-anchor v0.17.1, 2026-07-31).
-> **Scope of that verification:** all 15 entries re-checked against `hooks/` and
-> `scripts/` at this commit — every mechanically checkable claim (file paths, script
-> invocation forms, emitted message strings, constant names, compile-DB search order,
-> manifest field paths, test file names) was run or grepped rather than read. Two were
-> stale and are fixed in the same pass: #5 drew a tool-absent conclusion from a
-> PATH-only check (pre-0.16.0), and #6 required `python3` specifically (pre-0.13.0).
-> Prose advice that is not mechanically checkable — "choose skip for files you
-> customized" — was read, not executed. Re-verify and bump this marker when the hooks
-> or scripts change; the marker had sat at v0.9.0 through eight releases, including two
-> that added entries to this very file.
+<!-- doc-align: 420d7687a04177104daacf3509dcd4af37c1708f · 2026-07-31 · harness-anchor v0.18.0 -->
+> **Aligned with commit** [`420d768`](https://github.com/Redtropig/harness-anchor/commit/420d7687a04177104daacf3509dcd4af37c1708f) (harness-anchor v0.18.0, 2026-07-31).
+> **Scope of that verification:** entry **#16 is new** in this pass — every hook now
+> carries the 5s watchdog, so "the hook went silent" became a diagnosable symptom with
+> no entry covering it. Its claims were checked against the code, not written from
+> memory: the engine-probe order and the fact that the probe *executes* each
+> interpreter (`scripts/lib/portable.sh`), the emit-nothing-exit-0 timeout behaviour
+> (`hooks/*` R1 blocks), and the bench's five-hook coverage guard
+> (`tests/bench/hook-timing.sh`, run). Entries #1–#15 were verified at `230abfc`
+> (v0.17.1) and are unchanged since; the hook edits in this release touched only the
+> watchdog wrapper, which none of them describe. Prose advice that is not mechanically
+> checkable — "choose skip for files you customized" — was read, not executed.
+> Re-verify and bump this marker when the hooks or scripts change; it once sat at
+> v0.9.0 through eight releases, including two that added entries to this very file.
 
 Common failure modes with diagnosis and fix steps.
 
@@ -298,3 +300,52 @@ PATH for you to invoke it. If it stays `NOT_FOUND`, record that as
 this machine". The date is what lets the next session re-check it: `init-verification`
 step 6 re-checks inherited negative conclusions at session start, but **only** ones
 written in that exact form.
+
+---
+
+## 16. A hook goes completely silent (the 5s watchdog fired)
+
+**Symptom:** A hook that used to say something says nothing at all — no banner, no
+nudge, no error. Nothing appears in the transcript, and nothing looks broken.
+
+**Diagnosis:** Every hook runs its whole body under a 5-second SIGKILL watchdog
+(invariant #7). On timeout it emits **nothing** and exits 0, because a half-written
+JSON object is worse than silence — the harness would reject it, and a hook must
+never fail the event it observes. So a timeout and a legitimately quiet hook look
+identical from the outside. That is deliberate, and it is also why silence is not
+evidence the hook checked anything.
+
+The usual cause is the JSON engine, not the hook. `ha_json_engine_init` probes by
+actually running `python3 -c 'print(1)'`, then `python`, `py -3`, `node` — so a
+wedged interpreter stalls the probe itself. On Windows the common culprits are
+real-time antivirus scanning a first-run interpreter, a `python3` shim from the
+Microsoft Store that blocks on a store lookup, and a PATH entry on a disconnected
+network share.
+
+**Confirm it:** time the hook by hand. Under 5s means the watchdog is not your
+problem; a hard 5s means it is.
+
+```bash
+time ( cd /your/project && bash "${CLAUDE_PLUGIN_ROOT}/hooks/stop" </dev/null )
+```
+
+Then time the engine probe on its own — if this is slow, the hook was never the
+issue:
+
+```bash
+time python3 -c 'print(1)'
+time node -e 'console.log(1)'
+```
+
+**Fix:** remove the slow engine from the equation. Any *one* of python3 / python /
+py -3 / node is enough, so excluding a wedged one is usually sufficient — add an
+antivirus exclusion for the interpreter, uninstall the Store `python3` alias
+(Settings → Apps → App execution aliases), or drop the unreachable share from PATH.
+With no engine at all the hooks still run: the banner, project typing and version
+stay real, and ledger-derived lines say `(needs python3 or node)` rather than
+reporting a false zero.
+
+**Not this entry:** if the hook emits *malformed* output rather than none, see #8.
+
+`bash tests/bench/hook-timing.sh` measures all five hooks against the budget and
+fails if any hook on disk is not benchmarked.

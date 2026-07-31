@@ -30,6 +30,27 @@ capability, and it ships with a new gate check and a new contract test — an
   every hook `hooks/hooks.json` registers, so a newly added hook cannot ship
   without one. Structural check: it catches absence, not misbehaviour — proving
   the watchdog *fires* is the contract test's job. (163 assertions, was 158.)
+- **`tests/unit/doc-align.sh`** — integrity of the `doc-align` markers, which were
+  a standing unverified claim. Per marker: exactly one 40-hex sha, it resolves to a
+  real commit, that commit is an ancestor of HEAD, and any abbreviated sha in the
+  prose agrees with it. Markers are discovered by glob with a non-vacuity guard.
+  Two real failures in one session motivated it: a 40-character sha typed out from
+  a 7-character one (the second time that has happened in this repo), and a marker
+  left pointing at a commit an `--amend` had rewritten. Both look exactly like a
+  correct marker when read. Sha resolution needs real history, so it SKIPs — loudly
+  — on the shallow clone CI checks out by default.
+- **`tests/bench/hook-timing.sh` covers `pre-compact`, and guards its own list.**
+  The benchmark for the 5s budget enumerated four hooks and had silently omitted
+  `pre-compact` since v0.15.0 — the test for invariant #7 was not measuring one of
+  the hooks the invariant governs. The hooks stay enumerated, because each needs
+  its own env/stdin to reach its active path, but a completeness check now fails
+  if any hook on disk is not benchmarked.
+- **`docs/troubleshooting.md` #16 — "a hook goes completely silent".** With every
+  hook now bounded at 5s, a wedged JSON engine produces silence indistinguishable
+  from a legitimately quiet hook. The entry names the likely causes (antivirus on
+  first interpreter run, the Microsoft Store `python3` alias, an unreachable
+  network share on PATH), gives the two timing commands that tell them apart, and
+  states that any one engine of the four is enough.
 
 ### Fixed
 
@@ -48,6 +69,20 @@ capability, and it ships with a new gate check and a new contract test — an
   still described PostToolUse as firing only on `Edit`/`Write`, which stopped
   being true in v0.15.0. The new marker carries an explicit scope note naming what
   was checked against implementation versus merely read.
+- **`tests/README.md` listed five hook-contract tests while sixteen shipped**, and
+  its "quick test" block enumerated them by hand directly below a comment
+  explaining that enumeration rots. The per-file table is now indexed by hook —
+  five rows that change when the hook set does, not when a test is added — and the
+  quick-test block globs. Also corrected there: the hook-contract timing (two
+  tests deliberately wait out a 5s watchdog, so `<5s` was never true of the
+  directory) and the CI matrix, which has included Windows since v0.13.0.
+- **`docs/design.md` claimed `cpp-detect.sh` gates which C/C++ skills load.** It
+  does not. Skills are selected by description matching — all four C/C++ ones open
+  with "Use in C/C++ projects", which is the actual gate — while `cpp-detect.sh`
+  gates the injected meta-skill's `cpp-only` regions and makes `/cpp-init` and
+  `/sanitize` refuse outright. The sentence had restated CLAUDE.md's *normative*
+  wording ("must include a frontmatter trigger condition") as a description of
+  what the files do; only one of the four actually names a build system.
 - **`tests/windows-compat.sh` [1/5] punished documenting the hazard it polices.**
   Its own comment promised that "prose mentions and comments must NOT trip this",
   but the grep had no comment filter — so a comment explaining that

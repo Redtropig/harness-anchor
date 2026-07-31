@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# hook-timing.sh — Wall-clock benchmark for the four warn-only hooks (P1).
+# hook-timing.sh — Wall-clock benchmark for every warn-only hook (P1).
+#
+# The hooks are enumerated below, not globbed, because each needs its own env /
+# stdin / cwd to reach its active path — a glob loop would run them all down their
+# early-return path and measure nothing. Enumeration rots, so the list is guarded:
+# the final check asserts the number benchmarked equals the number of hooks on
+# disk and FAILS if it does not. That guard exists because the list had already
+# rotted — hooks/pre-compact shipped in v0.15.0 and was never added, so the test
+# for the 5s budget silently skipped a hook for three releases.
 #
 # Complements scripts/measure-context.sh: that guards the *byte* budget
 # (invariant #2, SessionStart ≤ 12000 chars); this guards the *time* budget
@@ -103,6 +111,28 @@ s=$(now_ms)
 ( cd "$FIXTURE_DIR" && bash "$PLUGIN_ROOT/hooks/stop" >/dev/null 2>&1 ) || true
 e=$(now_ms)
 report "stop" $((e - s))
+
+# ---- pre-compact (stdin = PreCompact event; writes the forensics marker) ----
+# A real transcript path is not needed: the hook stats whatever it is given and
+# records the size, so a missing file exercises the same code path.
+pc_input=$(printf '{"session_id":"bench","transcript_path":"%s/transcript.jsonl","cwd":"%s","hook_event_name":"PreCompact","trigger":"auto"}' "$FIXTURE_DIR" "$FIXTURE_DIR")
+s=$(now_ms)
+( cd "$FIXTURE_DIR" && printf '%s' "$pc_input" | bash "$PLUGIN_ROOT/hooks/pre-compact" >/dev/null 2>&1 ) || true
+e=$(now_ms)
+report "pre-compact" $((e - s))
+
+# ---- Completeness guard: the enumeration above must cover every hook on disk ----
+# Same discipline as tests/windows-compat.sh [0/5]: a benchmark that silently
+# skips a hook reports all-green while the 5s budget goes unmeasured for it.
+n_disk=$(find "$PLUGIN_ROOT/hooks" -maxdepth 1 -type f ! -name '*.json' ! -name '*.cmd' | grep -c .)
+n_bench=$((PASS + WARN + FAIL))
+if [ "$n_bench" -eq "$n_disk" ]; then
+    echo "  OK    coverage: benchmarked $n_bench of $n_disk hook(s) on disk"
+    PASS=$((PASS+1))
+else
+    echo "  FAIL  coverage: benchmarked $n_bench but $n_disk hook(s) exist — add the missing one(s) above"
+    FAIL=$((FAIL+1))
+fi
 
 echo ""
 echo "==================================="

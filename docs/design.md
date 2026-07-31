@@ -1,15 +1,26 @@
 # Design notes
 
-<!-- doc-align: 2d9a7e664e38393ceae9f77f3434ceb1dff1399e · 2026-07-31 · harness-anchor v0.17.1 -->
+<!-- doc-align: 420d7687a04177104daacf3509dcd4af37c1708f · 2026-07-31 · harness-anchor v0.18.0 -->
 
 Why harness-anchor is shaped the way it is. [README.md](../README.md) states what
 each component does; this file states why it was built that way and what was
 rejected. Content here is the long form of the README's "Design notes" bullets.
 
-**Scope of that verification:** the `doc-align` commit above is the tree this
-file's claims were read against. Sections were checked by reading the named
-component (`hooks/*`, `skills/*/SKILL.md`, `scripts/*`); no gate was executed for
-this document, because it makes no claim a gate covers.
+**Scope of that verification.** Claims that a script or manifest can settle were
+checked against it rather than read: the archival window constants
+(`scripts/state-archive.mjs` — `PROGRESS_KEEP = 20`, `PASS_KEEP = 10`), the
+auto-fix cycle bound (`commands/verify.md`), the `--overwrite` allowlist shape
+(`scripts/scaffold.sh`), the read-only frontmatter of all four evaluator agents,
+the three-state golden-rules Check (`scripts/golden-rules-check.sh`), and what
+`scripts/cpp-detect.sh` actually gates. The rest — the reasoning about *why* each
+choice was made — is argument, not fact, and is traceable to `CLAUDE.md`,
+`CHANGELOG.md`, or the named `SKILL.md` rather than independently verifiable.
+
+One claim in the first draft of this file did not survive that check: it said
+`cpp-detect.sh` gates which C/C++ skills load. It does not — skills are selected
+by description matching, and `cpp-detect.sh` gates the injected meta-skill
+regions and the two C/C++ commands. The C/C++ section below now says which gate
+is which.
 
 ## The five-subsystem mapping
 
