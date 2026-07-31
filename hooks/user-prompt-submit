@@ -6,80 +6,125 @@
 # before pivoting.
 #
 # Warn-only — never blocks the user's prompt.
+#
+# R1 total watchdog (5s): this hook forks a JSON engine via ha_json_engine_init,
+# ha_json_field and ha_flist_active. A wedged interpreter — an antivirus scan, a
+# network-mounted PATH entry, a broken python3 shim — would otherwise stall every
+# prompt submission with nothing to intervene. Added in v0.18.0; the three peers
+# had it since v0.10.0.
 
 set -uo pipefail
 
 # Read stdin (the user's prompt arrives as JSON with a 'prompt' field).
+# Deliberately BEFORE backgrounding — the hazard class pre-compact documents:
+# a backgrounded reader would race the parent for the same fd.
 input="$(cat 2>/dev/null || true)"
 if [ -z "$input" ]; then
     exit 0
 fi
 
 # Platform layer (v0.13.0), sourced AFTER the stdin read so nothing can disturb it.
-# Pre-warm the engine once so the exported HA_JSON_ENGINE is inherited by $(...) below.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/../scripts/lib/portable.sh" 2>/dev/null || exit 0
 ha_platform_init
-ha_json_engine_init
 
-# Engine-chained; narrow bash tier flattens newlines (keyword scan unaffected).
-# Residual (v0.13.0): (a) with zero engines AND a prompt the bash tier cannot
-# extract, the hook skips — silence is not proof the prompt was scanned;
-# (b) the 也-heuristic below uses ${#prompt_text}, which counts BYTES under a
-# C/POSIX locale but CHARACTERS under UTF-8 — Git Bash's locale may differ from
-# macOS, shifting the <80 threshold for CJK prompts (accepted: scope-jump
-# detection is a warn-only heuristic, not a correctness gate).
-prompt_text=$(printf '%s' "$input" | ha_json_field prompt)
+# ---- main() — all logic wrapped for the R1 total watchdog ----
+main() {
+    # Pre-warm the engine once so the exported HA_JSON_ENGINE is inherited by the
+    # $(...) calls below. Deliberately INSIDE main: the probe runs `python3 -c` /
+    # `node -e` for real, so a wedged interpreter hangs HERE. Outside main that hang
+    # would sit in front of the watchdog rather than behind it.
+    ha_json_engine_init
 
-if [ -z "$prompt_text" ]; then
-    exit 0
-fi
+    # Engine-chained; narrow bash tier flattens newlines (keyword scan unaffected).
+    # Residual (v0.13.0): (a) with zero engines AND a prompt the bash tier cannot
+    # extract, the hook skips — silence is not proof the prompt was scanned;
+    # (b) the trailing-particle heuristic below uses ${#prompt_text}, which counts
+    # BYTES under a C/POSIX locale but CHARACTERS under UTF-8 — Git Bash's locale may
+    # differ from macOS, shifting the <80 threshold for CJK prompts (accepted:
+    # scope-jump detection is a warn-only heuristic, not a correctness gate).
+    prompt_text=$(printf '%s' "$input" | ha_json_field prompt)
 
-# Find project root (fixed-point walk-up: terminates on /, C:/, ., UNC roots).
-project_root=$(ha_find_project_root "$(pwd)" || true)
-
-if [ -z "$project_root" ]; then
-    exit 0
-fi
-
-# Identify scope-jump keywords (中英文混合).
-# Case-insensitive; whole-phrase or substring match.
-lower=$(printf '%s' "$prompt_text" | tr '[:upper:]' '[:lower:]')
-
-scope_jump=0
-for kw in "顺便" "另外" "再加" "还要" "by the way" "btw" " also " "while you're at it" "while you are at it" "let's also" "lets also"; do
-    case "$lower" in
-        *"$kw"*) scope_jump=1; break ;;
-    esac
-done
-
-# Special-case the bare Chinese 也 — it's very common as a particle, so we require
-# it to be followed by an action verb-like context. Heuristic: skip 也 alone unless
-# the prompt is short and starts with it.
-if [ "$scope_jump" -eq 0 ]; then
-    short_len=${#prompt_text}
-    if [ "$short_len" -lt 80 ] && printf '%s' "$prompt_text" | grep -q "^.\{0,5\}也"; then
-        scope_jump=1
+    if [ -z "$prompt_text" ]; then
+        return 0
     fi
+
+    # Find project root (fixed-point walk-up: terminates on /, C:/, ., UNC roots).
+    project_root=$(ha_find_project_root "$(pwd)" || true)
+
+    if [ -z "$project_root" ]; then
+        return 0
+    fi
+
+    # Identify scope-jump keywords. The list is deliberately bilingual: the Chinese
+    # entries below are load-bearing, not decoration — a Chinese-language prompt is
+    # the common case for this plugin's author, and dropping them would make the
+    # detector silent exactly where it is needed most.
+    # Case-insensitive; whole-phrase or substring match.
+    lower=$(printf '%s' "$prompt_text" | tr '[:upper:]' '[:lower:]')
+
+    scope_jump=0
+    for kw in "顺便" "另外" "再加" "还要" "by the way" "btw" " also " "while you're at it" "while you are at it" "let's also" "lets also"; do
+        case "$lower" in
+            *"$kw"*) scope_jump=1; break ;;
+        esac
+    done
+
+    # Special-case the bare Chinese particle U+4E5F ("also"), matched literally in the
+    # grep below. It is extremely common as ordinary sentence glue, so matching it
+    # anywhere would fire on almost every prompt. Heuristic: only treat it as a
+    # scope-jump signal when the prompt is short AND opens with it — the position
+    # where it reads as "also do X" rather than as grammatical filler.
+    if [ "$scope_jump" -eq 0 ]; then
+        short_len=${#prompt_text}
+        if [ "$short_len" -lt 80 ] && printf '%s' "$prompt_text" | grep -q "^.\{0,5\}也"; then
+            scope_jump=1
+        fi
+    fi
+
+    if [ "$scope_jump" -eq 0 ]; then
+        return 0
+    fi
+
+    # Check for active feature.
+    active=$(ha_flist_active "$project_root/feature_list.json")
+    case "$active" in "(no in-progress feature)") active="" ;; esac
+
+    if [ -z "$active" ]; then
+        return 0
+    fi
+
+    msg="Scope-jump phrasing detected. Active feature: $active. The new request may be out of scope. Confirm with the user whether to (a) finish active feature first, (b) pause and switch, or (c) record as a planned feature in feature_list.json."
+
+    escaped=$(printf '%s' "$msg" | ha_json_escape)
+
+    printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "UserPromptSubmit",\n    "additionalContext": "<harness-anchor scope-check>\\n%s\\n</harness-anchor scope-check>"\n  }\n}\n' "$escaped"
+    return 0
+}
+
+# ---- R1: Total watchdog (5s cap, tempfile-guarded; same pattern as peers) ----
+# SIGKILL + detached stdio, mirroring hooks/post-tool-use and hooks/session-start
+# (v0.10.0 lesson, measured on macOS bash 3.2): a subshell blocked on `sleep` DEFERS
+# SIGTERM until the sleep completes, so a TERM watchdog (a) made every consumer's
+# `wait` burn the full 5s window and (b) never actually killed a runaway main; an
+# attached-stdio watchdog also holds a command-substitution consumer's pipe open
+# for the same 5s.
+OUTPUT_FILE=$(mktemp)
+main > "$OUTPUT_FILE" 2>/dev/null &
+main_pid=$!
+
+( sleep 5; kill -9 $main_pid 2>/dev/null ) >/dev/null 2>&1 &
+watchdog_pid=$!
+
+wait $main_pid 2>/dev/null
+main_rc=$?
+kill -9 $watchdog_pid 2>/dev/null
+wait $watchdog_pid 2>/dev/null
+
+if [ "$main_rc" -eq 0 ] && [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then
+    cat "$OUTPUT_FILE"
 fi
-
-if [ "$scope_jump" -eq 0 ]; then
-    exit 0
-fi
-
-# Check for active feature.
-active=$(ha_flist_active "$project_root/feature_list.json")
-case "$active" in "(no in-progress feature)") active="" ;; esac
-
-if [ -z "$active" ]; then
-    exit 0
-fi
-
-msg="Scope-jump phrasing detected. Active feature: $active. The new request may be out of scope. Confirm with the user whether to (a) finish active feature first, (b) pause and switch, or (c) record as a planned feature in feature_list.json."
-
-escaped=$(printf '%s' "$msg" | ha_json_escape)
-
-printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "UserPromptSubmit",\n    "additionalContext": "<harness-anchor scope-check>\\n%s\\n</harness-anchor scope-check>"\n  }\n}\n' "$escaped"
+rm -f "$OUTPUT_FILE" 2>/dev/null
 
 exit 0

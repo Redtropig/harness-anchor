@@ -13,73 +13,110 @@
 #   lesson stay invisible, and systemMessage reaches the USER, not the model. A silent
 #   stop is NOT proof everything durable is on disk.
 #   v0.13.0: with no JSON engine, Check 1 (ledger) skips silently — mtime checks still run.
+#
+# R1 total watchdog (5s): this hook forks a JSON engine via ha_json_engine_init and
+# ha_flist_active. A wedged interpreter — an antivirus scan, a network-mounted
+# PATH entry, a broken python3 shim — would otherwise hang the stop indefinitely
+# with nothing to intervene. Added in v0.18.0; the three peers had it since v0.10.0.
 
 set -uo pipefail
 
 # Platform layer (v0.13.0): engine chain + Windows PATH shield. Missing lib =
-# broken install → silent no-op. Pre-warm the engine once so the exported
-# HA_JSON_ENGINE is inherited by the $(...) calls below (no per-call re-probe).
+# broken install → silent no-op.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/../scripts/lib/portable.sh" 2>/dev/null || exit 0
 ha_platform_init
-ha_json_engine_init
 
-# Find project root via feature_list.json walk-up from CWD (fixed-point:
-# terminates on /, C:/, ., UNC roots — the old `!= "/"` loop never ended on Windows).
-project_root=$(ha_find_project_root "$(pwd)" || true)
+# ---- main() — all logic wrapped for the R1 total watchdog ----
+main() {
+    # Pre-warm the engine once so the exported HA_JSON_ENGINE is inherited by the
+    # $(...) calls below (no per-call re-probe). Deliberately INSIDE main: the probe
+    # runs `python3 -c` / `node -e` for real, so a wedged interpreter hangs HERE.
+    # Outside main that hang would sit in front of the watchdog, not behind it.
+    ha_json_engine_init
 
-if [ -z "$project_root" ]; then
-    exit 0
-fi
+    # Find project root via feature_list.json walk-up from CWD (fixed-point:
+    # terminates on /, C:/, ., UNC roots — the old `!= "/"` loop never ended on Windows).
+    project_root=$(ha_find_project_root "$(pwd)" || true)
 
-reminders=()
-
-# ---- Check 1: in-progress feature has no evidence ----
-in_progress_without_evidence=""
-active_line=$(ha_flist_active "$project_root/feature_list.json")
-case "$active_line" in
-    ""|"(no in-progress feature)") : ;;
-    *) in_progress_without_evidence="Active feature: '${active_line%%:*}' is still in-progress." ;;
-esac
-if [ -n "$in_progress_without_evidence" ]; then
-    reminders+=("$in_progress_without_evidence")
-fi
-
-# ---- Check 2: progress.md staleness ----
-# mtime arithmetic (ha_mtime) instead of `find -mmin`: drops the System32-find
-# shadow hazard on Windows AND the BSD/GNU find divergence in one move.
-now_epoch=$(date +%s)
-if [ -f "$project_root/progress.md" ]; then
-    # session start heuristic: file older than 30 minutes is "stale this session"
-    pm=$(ha_mtime "$project_root/progress.md")
-    if [ -n "$pm" ] && [ $((now_epoch - pm)) -gt 1800 ]; then
-        reminders+=("progress.md may not have been updated this session. If durable memory is still chat-only (golden-rule stubs, decisions, milestones), flush it to disk now — then /session-end writes handoff + log.")
+    if [ -z "$project_root" ]; then
+        return 0
     fi
-fi
 
-# ---- Check 3: session-handoff.md staleness (>24h) ----
-if [ -f "$project_root/session-handoff.md" ]; then
-    hm=$(ha_mtime "$project_root/session-handoff.md")
-    if [ -n "$hm" ] && [ $((now_epoch - hm)) -gt 86400 ]; then
-        reminders+=("session-handoff.md is >24h old. /session-end will refresh it.")
+    reminders=()
+
+    # ---- Check 1: in-progress feature has no evidence ----
+    in_progress_without_evidence=""
+    active_line=$(ha_flist_active "$project_root/feature_list.json")
+    case "$active_line" in
+        ""|"(no in-progress feature)") : ;;
+        *) in_progress_without_evidence="Active feature: '${active_line%%:*}' is still in-progress." ;;
+    esac
+    if [ -n "$in_progress_without_evidence" ]; then
+        reminders+=("$in_progress_without_evidence")
     fi
-fi
 
-if [ "${#reminders[@]}" -eq 0 ]; then
-    exit 0
-fi
+    # ---- Check 2: progress.md staleness ----
+    # mtime arithmetic (ha_mtime) instead of `find -mmin`: drops the System32-find
+    # shadow hazard on Windows AND the BSD/GNU find divergence in one move.
+    now_epoch=$(date +%s)
+    if [ -f "$project_root/progress.md" ]; then
+        # session start heuristic: file older than 30 minutes is "stale this session"
+        pm=$(ha_mtime "$project_root/progress.md")
+        if [ -n "$pm" ] && [ $((now_epoch - pm)) -gt 1800 ]; then
+            reminders+=("progress.md may not have been updated this session. If durable memory is still chat-only (golden-rule stubs, decisions, milestones), flush it to disk now — then /session-end writes handoff + log.")
+        fi
+    fi
 
-joined=""
-for r in "${reminders[@]}"; do
-    if [ -z "$joined" ]; then joined="$r"; else joined="$joined
+    # ---- Check 3: session-handoff.md staleness (>24h) ----
+    if [ -f "$project_root/session-handoff.md" ]; then
+        hm=$(ha_mtime "$project_root/session-handoff.md")
+        if [ -n "$hm" ] && [ $((now_epoch - hm)) -gt 86400 ]; then
+            reminders+=("session-handoff.md is >24h old. /session-end will refresh it.")
+        fi
+    fi
+
+    if [ "${#reminders[@]}" -eq 0 ]; then
+        return 0
+    fi
+
+    joined=""
+    for r in "${reminders[@]}"; do
+        if [ -z "$joined" ]; then joined="$r"; else joined="$joined
 $r"; fi
-done
-escaped=$(printf '%s' "$joined" | ha_json_escape)
+    done
+    escaped=$(printf '%s' "$joined" | ha_json_escape)
 
-# Warn-only: the Stop event has NO additionalContext channel, and decision:"block"
-# / stopReason would *block* the stop (forbidden by design invariant #1). systemMessage
-# is the non-blocking, schema-valid way to surface a wrap-up reminder.
-printf '{\n  "systemMessage": "harness-anchor wrap-up reminder:\\n%s"\n}\n' "$escaped"
+    # Warn-only: the Stop event has NO additionalContext channel, and decision:"block"
+    # / stopReason would *block* the stop (forbidden by design invariant #1). systemMessage
+    # is the non-blocking, schema-valid way to surface a wrap-up reminder.
+    printf '{\n  "systemMessage": "harness-anchor wrap-up reminder:\\n%s"\n}\n' "$escaped"
+    return 0
+}
+
+# ---- R1: Total watchdog (5s cap, tempfile-guarded; same pattern as peers) ----
+# SIGKILL + detached stdio, mirroring hooks/post-tool-use and hooks/session-start
+# (v0.10.0 lesson, measured on macOS bash 3.2): a subshell blocked on `sleep` DEFERS
+# SIGTERM until the sleep completes, so a TERM watchdog (a) made every consumer's
+# `wait` burn the full 5s window and (b) never actually killed a runaway main; an
+# attached-stdio watchdog also holds a command-substitution consumer's pipe open
+# for the same 5s.
+OUTPUT_FILE=$(mktemp)
+main > "$OUTPUT_FILE" 2>/dev/null &
+main_pid=$!
+
+( sleep 5; kill -9 $main_pid 2>/dev/null ) >/dev/null 2>&1 &
+watchdog_pid=$!
+
+wait $main_pid 2>/dev/null
+main_rc=$?
+kill -9 $watchdog_pid 2>/dev/null
+wait $watchdog_pid 2>/dev/null
+
+if [ "$main_rc" -eq 0 ] && [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then
+    cat "$OUTPUT_FILE"
+fi
+rm -f "$OUTPUT_FILE" 2>/dev/null
 
 exit 0

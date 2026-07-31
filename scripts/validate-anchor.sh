@@ -13,7 +13,7 @@
 #   [8/12]   Commands directory consistency (each commands/*.md is a usable /command)
 #   [9/12]   Every template referenced from commands/anchor.md + cpp-init.md AND from scaffold.sh's template map exists
 #   [10/12]  Command↔script wiring: the four mechanism scripts exist + executable + bash -n; every ${CLAUDE_PLUGIN_ROOT}/scripts/* referenced by a command/agent md resolves
-#   [11/12]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; the hook list is DERIVED from hooks/hooks.json (registry → disk: every registered hook exists, sources the lib, AND calls ha_platform_init — the Windows python3→python→py→node engine-chain wiring). tests/windows-compat.sh [5/5] runs the other direction (disk → wiring, globbing hooks/)
+#   [11/12]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; the hook list is DERIVED from hooks/hooks.json (registry → disk: every registered hook exists, sources the lib, calls ha_platform_init — the Windows python3→python→py→node engine-chain wiring — AND carries the R1 5s watchdog, invariant #7, v0.18.0). tests/windows-compat.sh [5/5] runs the other direction (disk → wiring, globbing hooks/)
 #   [12/12]  Platform sidecars (v0.14.0): skills/*/platform/<os>.md ↔ SKILL.md pointer integrity (bidirectional, same-skill relative); os names in taxonomy
 
 set -uo pipefail   # no -e so we report all failures, not abort on first
@@ -407,6 +407,20 @@ if [ -f "$LIB" ]; then
         fi
         if grep -q 'scripts/lib/portable\.sh' "$h"; then ok "$h sources portable.sh"; else fail "$h does not source portable.sh (engine chain unwired)"; fi
         if grep -q 'ha_platform_init' "$h"; then ok "$h calls ha_platform_init"; else fail "$h missing ha_platform_init call"; fi
+        # CLAUDE.md invariant #7: hooks must time out in <=5s. Sourcing the lib is
+        # what CREATES the exposure — ha_json_engine_init probes by running
+        # `python3 -c` for real, so a wedged interpreter hangs the hook with
+        # nothing to intervene. Nothing checked this until v0.18.0, and two of the
+        # five hooks had shipped without a watchdog since the pattern was
+        # introduced in v0.10.0; the README even asserted all of them had one.
+        # Structural check only: it cannot prove the watchdog FIRES — that is
+        # tests/hook-contracts/{session-start,stop-prompt}-timeout.sh, which wedge
+        # the engine and measure wall-clock. This catches the absence, not the bug.
+        if grep -qE 'sleep 5; *kill -9|R1: Total watchdog' "$h"; then
+            ok "$h has the R1 watchdog"
+        else
+            fail "$h has no R1 watchdog (invariant #7: hooks must time out in <=5s)"
+        fi
     done
 else
     fail "$LIB missing — the v0.13.0 platform layer is not installed"
