@@ -46,6 +46,14 @@ nothing belongs in an `### Added` section.
   empty discovery fails loudly instead of passing every loop below it. Same
   defect class `tests/README.md` and the CI workflow already name in their own
   comments: enumeration rots.
+- **Two troubleshooting entries gave pre-0.13.0 / pre-0.16.0 advice.** #6 named a
+  missing `python3` as a cause of hook-contract failures — false since v0.13.0
+  made the engine chain `python3` → `python` → `py -3` → `node` → pure-bash and
+  made an engine-less machine emit `SKIP`, never `FAIL`, so the entry sent
+  Windows users chasing an interpreter that cannot be the problem. #5 told the
+  reader to install a build tool on the strength of `init.sh`'s `command -v`
+  check, which is PATH-only — the exact inference 0.16.0's discovery chain
+  exists to prevent, in the guide that is supposed to teach it.
 - **The meta-skill's `eol=lf` pin had never been verified.** `.gitattributes`
   pins `skills/using-harness-anchor/SKILL.md` because `hooks/session-start`
   awk-consumes it for the conditional-region filter and the injection length
@@ -76,9 +84,14 @@ nothing belongs in an `### Added` section.
   like failures and are not (`doc-drift-scan`'s six stderr states and its
   candidates-not-violations contract; `cpp-tool-discovery`'s `NOT_FOUND` for a
   tool in a non-standard prefix, and the dated phrasing that lets
-  `init-verification` re-check it next session). The file's `doc-align` marker
-  is deliberately left at v0.9.0: bumping it would assert a re-verification of
-  all entries that this release did not perform.
+  `init-verification` re-check it next session).
+- **`docs/troubleshooting.md`'s `doc-align` marker is re-verified and bumped**,
+  v0.9.0 → v0.17.1. It had sat at v0.9.0 through eight releases — two of which
+  added entries to that very file — while its own text said "re-verify and bump
+  this marker if they change". All 15 entries were re-checked against `hooks/`
+  and `scripts/`, every mechanically checkable claim run or grepped rather than
+  read, and the marker now states that scope instead of asserting bare
+  "verified".
 - `tests/unit/doc-drift-scan.sh` 22 → 32 assertions; `tests/windows-compat.sh`
   19 → 24; `scripts/validate-anchor.sh` 157 → 158.
 

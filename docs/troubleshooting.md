@@ -1,7 +1,17 @@
 # Troubleshooting — harness-anchor
 
-<!-- doc-align: 10b742dc0869b64b9d23d068480b1a1216ae1627 · 2026-07-04 · harness-anchor v0.9.0 -->
-> **Aligned with commit** [`10b742d`](https://github.com/Redtropig/harness-anchor/commit/10b742dc0869b64b9d23d068480b1a1216ae1627) (harness-anchor v0.9.0, 2026-07-04). Verified against the hooks and scripts at this commit; re-verify and bump this marker if they change.
+<!-- doc-align: 230abfc99e07fdcda103c63824253346623d7c5d · 2026-07-31 · harness-anchor v0.17.1 -->
+> **Aligned with commit** [`230abfc`](https://github.com/Redtropig/harness-anchor/commit/230abfc99e07fdcda103c63824253346623d7c5d) (harness-anchor v0.17.1, 2026-07-31).
+> **Scope of that verification:** all 15 entries re-checked against `hooks/` and
+> `scripts/` at this commit — every mechanically checkable claim (file paths, script
+> invocation forms, emitted message strings, constant names, compile-DB search order,
+> manifest field paths, test file names) was run or grepped rather than read. Two were
+> stale and are fixed in the same pass: #5 drew a tool-absent conclusion from a
+> PATH-only check (pre-0.16.0), and #6 required `python3` specifically (pre-0.13.0).
+> Prose advice that is not mechanically checkable — "choose skip for files you
+> customized" — was read, not executed. Re-verify and bump this marker when the hooks
+> or scripts change; the marker had sat at v0.9.0 through eight releases, including two
+> that added entries to this very file.
 
 Common failure modes with diagnosis and fix steps.
 
@@ -92,7 +102,11 @@ diagnostics would be garbage and are withheld. Fix the toolchain, not the code: 
 
 **Fix:**
 - Run `/anchor` first to scaffold missing state files.
-- Install missing build tools (cmake, clang-tidy, etc.).
+- Install missing build tools (cmake, clang-tidy, etc.) — but confirm they are
+  actually missing first. `init.sh`'s tool checks are `command -v`, i.e. **PATH-only**,
+  and the generated `WARN` line says `not on PATH` for exactly that reason: a tool can
+  be installed and off PATH (VS-bundled LLVM before `vcvars64.bat`, keg-only Homebrew
+  llvm). Resolve it properly before installing a second copy — see entry 15.
 - Fix CMakeLists.txt errors before re-running `init.sh`.
 
 ---
@@ -101,17 +115,25 @@ diagnostics would be garbage and are withheld. Fix the toolchain, not the code: 
 
 **Symptom:** Running `bash tests/hook-contracts/<test>.sh` reports FAIL.
 
-**Cause:** Most commonly, the hook script has been modified and produces unexpected output. Less commonly, the test environment differs (missing `python3`, missing `git`).
+**Cause:** Most commonly, the hook script has been modified and produces unexpected
+output. Less commonly, `git` is unavailable.
+
+**A missing `python3` is not a cause.** Since v0.13.0 the JSON engine chain is
+`python3` → `python` → `py -3` → `node` → a narrow pure-bash fallback, and a machine
+with none of them gets an honest `SKIP json-validity (no JSON engine on this
+machine)` rather than a FAIL. So a FAIL is never about the engine — chasing the
+interpreter is the pre-0.13.0 reflex and will waste your time.
 
 **Diagnosis:**
 1. Run the failing test with verbose output to see what's expected vs actual.
 2. Run `bash scripts/validate-anchor.sh` — does the SessionStart smoke test pass?
-3. Check that `python3` and `git` are available in your PATH.
+3. Check `git` is on PATH. Engine presence only changes SKIP vs OK, never OK vs FAIL.
 
 **Fix:**
 - If you modified a hook, re-run the contract test for that hook.
 - If `validate-anchor.sh` also fails, fix the underlying issue first.
-- If tools are missing, install them or mark the test as expected-skip.
+- Read the SKIP lines before concluding the suite passed: a run that is all-SKIP on
+  the JSON assertions checked less than a run that is all-OK.
 
 ---
 
