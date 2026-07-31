@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # windows-compat.sh — Static Windows-compatibility invariants (any platform).
 #
+#   [0/5] Hook discovery (glob, not enumeration) + the non-vacuity guard the four
+#         hook-scoped checks below depend on — an empty list would make them no-ops
 #   [1/5] No bare python3 invocation in hooks (must go through scripts/lib/portable.sh)
 #   [2/5] No '!= "/"' loop termination anywhere in hooks/ or scripts/ (non-portable
 #         on drive-letter paths; use ha_find_project_root / fixed-point dirname)

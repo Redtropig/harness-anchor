@@ -222,7 +222,7 @@ be confused. Read stderr first:
 
 | stderr line | Meaning |
 |---|---|
-| `skipped — <reason>` | **No scan ran.** Not a git repo, no usable base ref, no tracked `*.md`, or no changed file in a scanned language (`SCAN_PATHSPEC` is a whitelist — a language off it contributes zero symbols). |
+| `skipped — <reason>` | **No scan ran.** Unreadable target, not a git repo, no usable base ref, no tracked `*.md`, no changed file in a scanned language (`SCAN_PATHSPEC` is a whitelist — a language off it contributes zero symbols), no symbol extracted from the files that did change, or every extracted symbol below the length floor. |
 | `not searched — <tokens>` | Those tokens were never looked for: under 3 characters, where case-insensitive prefix matching makes every row undecidable. |
 | `symbol set truncated to N of M — results are PARTIAL` | Only `N` symbols were searched. |
 | `per-symbol cap N hit by <sym(count)>…` | Those symbols show a first-`N` sample; the parenthesised number is the real total. |
