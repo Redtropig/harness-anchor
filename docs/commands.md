@@ -1,7 +1,30 @@
 # Command Manual — harness-anchor
 
-<!-- doc-align: 74a06ebcc802bd784029a376a4f979f2d2d90d4e · 2026-07-14 · harness-anchor v0.12.0 -->
-> **Aligned with commit** [`74a06ebcc802bd784029a376a4f979f2d2d90d4e`](https://github.com/Redtropig/harness-anchor/commit/74a06ebcc802bd784029a376a4f979f2d2d90d4e) (harness-anchor v0.12.0, 2026-07-14). Verified against `commands/*.md` at this commit; re-verify and bump this marker if the command set changes.
+<!-- doc-align: d0574fa1000872b4f70c216bdc43de0f9551b2dd · 2026-07-31 · harness-anchor v0.18.0 -->
+> **Aligned with commit** [`d0574fa1000872b4f70c216bdc43de0f9551b2dd`](https://github.com/Redtropig/harness-anchor/commit/d0574fa1000872b4f70c216bdc43de0f9551b2dd) (harness-anchor v0.18.0, 2026-07-31). Re-verify and bump this marker if the command set changes.
+>
+> **Scope of that verification.** Every one of the nine commands was re-read against its
+> own file under `commands/`, and each claim below that names a number, an exit code, a
+> report section, or a file list was checked against the implementation rather than the
+> command prose: `scripts/scaffold.sh` (the nine `/anchor` targets; `--cpp` exit 4 = not
+> anchored, exit 3 = not C/C++), `scripts/index-builder.mjs` (100 KB skip, ≤80-char
+> summary), `scripts/status-report.sh` (section set, `N rule(s) (K mechanical)`),
+> `scripts/session-end-precheck.sh` (60 s init watchdog), `scripts/lib/portable.sh` (the
+> engine chain), `scripts/doc-drift-scan.sh` (the 3-character floor and row caps),
+> `agents/verification-runner.md` (the nine report sections), and `hooks/hooks.json`
+> (matchers). Not covered: no command was executed end-to-end for this pass, so the prose
+> describing *interaction* — what each `AskUserQuestion` offers, the exact wording of a
+> recommendation — is verified as written in `commands/`, not as observed at runtime.
+>
+> The previous marker stood at `74a06eb` (v0.12.0, 2026-07-14) through six releases. What
+> that staleness had hidden, found on this pass: the `/verify` report was described with
+> five sections when the agent emits nine and had gained `### Integrity`; `/status` was
+> documented as parsing JSON with `python3→node` when the chain has been
+> python3 → python → py -3 → node → pure-bash since v0.13.0; `/session-end`'s fact-gathering
+> omitted the secrets scan and state-hygiene facts, and its numbered steps omitted the
+> consent-gated golden-rules consolidation and the secrets-before-commit gate; `/gc` did not
+> mention that doc-drift scanning is bounded and can return PARTIAL; the discoverability
+> table still described PostToolUse as firing only on `Edit`/`Write`.
 
 Reference for every slash command shipped by harness-anchor: what it does, **when to
 reach for it**, its arguments, prerequisites, outputs, and how the harness reminds you to
@@ -223,8 +246,11 @@ anything is "done / fixed / passing".
 
 **What it does.** Dispatches the `verification-runner` subagent (read-only), which runs the
 documented verification commands (from `AGENTS.md`, else inferred from project type) and
-returns a fixed report: `### Build`, `### Tests`, `### Deliverable state` (clean tree → evidence reflects the committed `HEAD`; dirty tree → evidence reflects only the working tree, so `HEAD` isn't proven buildable), `### Verdict`, `### Recommendation`. The
-command surfaces that report **verbatim**. On a `READY` verdict it offers to update
+returns a fixed nine-section report: `### Environment`, `### Build`, `### Type-check`,
+`### Tests`, `### Static analysis`, `### Deliverable state` (clean tree → evidence reflects
+the committed `HEAD`; dirty tree → evidence reflects only the working tree, so `HEAD` isn't
+proven buildable), `### Integrity`, `### Verdict`, `### Recommendation` — the authoritative
+list is `agents/verification-runner.md`. The command surfaces that report **verbatim**. On a `READY` verdict it offers to update
 `feature_list.json` with the evidence; on `NOT READY` it surfaces the failing criteria.
 
 **Arguments.**
@@ -325,6 +351,15 @@ files, TODO pileup, **doc-drift**), grades findings **must / should / nice**, an
 `### Generic drift findings` · `### Recommended actions` · `### Verdict` CLEAN / DRIFT FOUND ·
 `### Uncertainties`), surfaced **verbatim**.
 
+**Doc-drift scanning is bounded, and says so (v0.17.1).** `scripts/doc-drift-scan.sh` drops
+symbols under 3 characters (prefix matching makes their rows undecidable), caps candidate
+rows at 12 per symbol and 400 overall, and announces each of those on **stderr** — `not
+searched`, `per-symbol cap`, `candidate list truncated`, plus a closing `scanned … shown`
+line. Empty output therefore means "no candidates" **only** when that closing line reports
+every symbol searched and no `PARTIAL` or `not searched` note precedes it. A `/gc` verdict of
+CLEAN on a truncated scan is a CLEAN over the part that was scanned — the analyst is required
+to say which.
+
 **Arguments.** *(optional)* a path or feature id; else changed files / the active feature.
 
 **Prerequisites.** Code written or changed to scan. Not callable from inside a subagent
@@ -364,6 +399,10 @@ crash / leak / hang / intermittent failure.
 INFRA-FAIL) · `### Recommendation`. An abort of the sanitizer tooling *itself* (e.g. an
 `ASAN_OPTIONS` flag unsupported on this OS) is reported as **INFRA-FAIL** — not a code
 finding, and never CLEAN; the fix path is `cpp-sanitizers` platform notes / `docs-lookup`.
+The named case is Windows: TSan does not exist there, so a TSan request is INFRA-FAIL with a
+pointer to WSL2 / Linux CI / Intel Inspector; ASan+UBSan run normally under clang or MinGW,
+while pure MSVC offers ASan only — UBSan flags fail at configure, which is also INFRA-FAIL
+rather than CLEAN.
 
 **Arguments.** None (it asks which config when the symptom is ambiguous).
 
@@ -411,8 +450,10 @@ staleness, and a state-budget line using the SessionStart sentinel's thresholds 
 signals, not a dashboard). Feature counts show archived `pass` entries as
 `pass: N (+M archived)`. The agent appends at most ONE suggestion line (`/anchor` when
 un-anchored; `/session-end` on an `OVER` budget entry; `/index-project` on a stale/absent
-TOC). JSON parsing runs python3→node; if both are missing only the JSON-derived lines degrade
-to `(needs python3 or node)` — the other sections still report. If the script itself fails,
+TOC). JSON parsing goes through `scripts/lib/portable.sh`'s engine chain —
+python3 → python → py -3 → node → a narrow pure-bash tier — and only the JSON-derived
+lines degrade to `(needs python3 or node)` when none of them is available; the other
+sections still report. If the script itself fails,
 the error is reported first; being read-only, `/status` may then fall back to a minimal
 manual snapshot (the only thin-wrapper command allowed to).
 
@@ -446,8 +487,9 @@ can resume from disk, not from chat memory.
    reports: active feature + counts · init.sh result (60 s watchdog; `--skip-init` only on
    explicit request) · archival backlog (`state-archive.mjs --dry-run` relay) · ledger
    validation (`feature-list-validate.mjs` relay) · the working tree in two columns
-   (state files / source) · TOC structural changes since the anchor. If the script fails the
-   ritual stops and reports — the gathering is never hand-replayed (writes follow it).
+   (state files / source) · **a secrets scan over the state files** · **state hygiene**
+   (golden-rules count and size) · TOC structural changes since the anchor. If the script
+   fails the ritual stops and reports — the gathering is never hand-replayed (writes follow it).
 2. Identifies the active feature from the facts (asks if none).
 3. **Overwrites** `session-handoff.md` (timestamp, active feature, what's in flight,
    build/test/lint state, the ONE next action, risks; ≤ 300 words).
@@ -463,8 +505,16 @@ can resume from disk, not from chat memory.
 7. **Flywheel reflection** — the safety net for the write-at-realization contract: lessons
    should already be on disk (`capturing-golden-rules` writes in the turn a signal appears);
    this step catches anything still chat-only. Usually nothing, a few-seconds reflex.
+   **Golden-rules consolidation (consent-gated)**: when step 1's state-hygiene fact shows the
+   file over budget (>30 rules or >8 KB) it *offers* a guided merge of near-duplicate rules and
+   pruning of ones whose origin no longer applies — showing the diff first. Rules whose
+   `Why / origin` line carries `[user]` are protected: never merged, reworded, or deleted.
 8. Offers a `PROJECT-TOC.md` refresh if step 1's structural-change fact is non-empty.
-9. **Surfaces uncommitted source** (step 1's two-column tree fact) with a HEAD-buildability
+9. **Surfaces any secrets finding first.** If step 1's secrets scan is not `(clean)`, every
+   `SECRET?` line is shown **before** the commit offer, with a recommendation to redact
+   (replace the value with `[REDACTED]`). Your state files are never auto-edited; if you
+   knowingly choose to commit anyway, it proceeds — warn-only, like everything else here.
+10. **Surfaces uncommitted source** (step 1's two-column tree fact) with a HEAD-buildability
    caveat — a `pass` whose source isn't committed leaves the committed HEAD unbuildable —
    then offers to commit **state files only** (`chore(harness): session N handoff —
    <feature id>`); it still never auto-commits your source.
@@ -496,7 +546,7 @@ through two channels:
 | Channel | Timing | Recommends |
 |---|---|---|
 | **SessionStart** banner | Session start, on missing artifacts | `/anchor` (no state), `/cpp-init` (C/C++, no clang config), `/index-project` (TOC absent/stale) |
-| **PostToolUse** hook | After an `Edit`/`Write` | `/verify` (edited a passed feature's files), `/sanitize` (C/C++ source change) |
+| **PostToolUse** hook | After **any** tool call since v0.15.0; these two nudges stay `Edit`/`Write`-gated | `/verify` (edited a passed feature's files), `/sanitize` (C/C++ source change) |
 | **Stop** hook | When the agent wraps up | `/session-end` (stale progress / handoff) |
 | **`using-harness-anchor`** meta-skill | Injected every session (model-facing) | All commands, each with a *when-to-recommend* trigger — including `/status` and `/gc`, which have no hook nudge by design |
 

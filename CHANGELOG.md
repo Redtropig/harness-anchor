@@ -33,6 +33,21 @@ capability, and it ships with a new gate check and a new contract test — an
 
 ### Fixed
 
+- **`docs/commands.md` had drifted for six releases and said so nowhere.** Its
+  `doc-align` marker still pointed at `74a06eb` (v0.12.0, 2026-07-14) — an
+  assertion of "verified" that had not been true since v0.13.0. Re-read against
+  every file under `commands/` plus the scripts and agent that implement them.
+  What the stale marker had been hiding: `/verify`'s report was documented with
+  five sections when `verification-runner` emits nine and had gained
+  `### Integrity`; `/status` was documented as parsing JSON with `python3→node`
+  when the chain has been python3 → python → py -3 → node → pure-bash since
+  v0.13.0; `/session-end`'s fact-gathering omitted the secrets scan and
+  state-hygiene facts, and its steps omitted the consent-gated golden-rules
+  consolidation and the secrets-before-commit gate; `/gc` never mentioned that
+  doc-drift scanning is bounded and can return PARTIAL; the discoverability table
+  still described PostToolUse as firing only on `Edit`/`Write`, which stopped
+  being true in v0.15.0. The new marker carries an explicit scope note naming what
+  was checked against implementation versus merely read.
 - **`tests/windows-compat.sh` [1/5] punished documenting the hazard it polices.**
   Its own comment promised that "prose mentions and comments must NOT trip this",
   but the grep had no comment filter — so a comment explaining that
