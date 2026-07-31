@@ -60,11 +60,17 @@ capability, and it ships with a new gate check and a new contract test — an
   failure-mode detection and the calibrated-uncertainty fallback drift out of sync
   between copies. Non-vacuity guarded; both directions verified by mutation.
 
-  Invariant #6 ("skill descriptions front-load distinctive trigger keywords") is
-  the remaining unenforced entry, and deliberately left alone: "distinctive" is a
-  judgement, not a predicate, so a check would either be vacuous or wrong. Whether
-  it belongs in the mechanically-enforced list or in the conventions section below
-  it is an editorial call about CLAUDE.md's own structure.
+  Invariant #6 was first written up in this release as "the remaining unenforced
+  entry". **That was wrong**, and the correction is the more useful finding: #6 is
+  enforced by the skill-triggering harness — `check-coverage.sh` asserts on every
+  CI run that each skill has an adversarial prompt that never names it, and
+  `run-all.sh` puts those prompts through a live session before a release. The
+  error came from equating "no grep for it" with "not enforced"; a behavioural eval
+  is the stronger form of enforcement, not the absence of one. #6 now says where it
+  is enforced and warns against replacing that eval with a static check — whether a
+  keyword is distinctive is a property of whether the skill fires, not of the
+  string. With #5, #7 and #9 closed in this release, all ten invariants are
+  enforced, which is what the section below the list has always claimed of it.
 - **`tests/unit/doc-align.sh`** — integrity of the `doc-align` markers, which were
   a standing unverified claim. Per marker: exactly one 40-hex sha, it resolves to a
   real commit, that commit is an ancestor of HEAD, and any abbreviated sha in the

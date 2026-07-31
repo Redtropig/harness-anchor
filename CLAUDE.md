@@ -38,7 +38,17 @@ Stop. Read this before doing anything.
    reason to — nor what actually gates them, and nothing enforced it. An
    unenforced entry in this list contradicts what the section below promises about
    it.
-6. **Skill descriptions front-load distinctive trigger keywords.** First ~80 chars carry the load — Anthropic's skill listing budget is tight (see learn-harness `gotchas.md#12`).
+6. **Skill descriptions front-load distinctive trigger keywords.** First ~80 chars
+   carry the load — Anthropic's skill listing budget is tight (see learn-harness
+   `gotchas.md#12`). **Enforced by eval, not by grep.** Every skill ships an
+   adversarial prompt that never names it (§"Authoring a New Skill" #4);
+   `tests/skill-triggering/check-coverage.sh` guards that coverage structurally on
+   every CI run, and `run-all.sh` puts the prompts through a live session before a
+   release. Do not "close the gap" by adding a static text check: whether a keyword
+   is distinctive is a property of *whether the skill fires*, not of the string, so
+   any grep approximating it would pass descriptions the eval rejects and fail ones
+   it accepts. Reading the absence of a grep as an absence of enforcement is a
+   mistake that has already been made once against this entry.
 7. **Hooks must time out in ≤ 5 seconds** and fail silent on missing tools.
 8. **Default-FAIL evaluation contracts, both directions.** No skill or agent should
    mark anything "done" without an evidence path — **and** none should assert that
