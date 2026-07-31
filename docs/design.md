@@ -48,11 +48,15 @@ invariant, not a preference: no hook may emit `"permissionDecision": "deny"`,
 
 ## Default-FAIL, both directions
 
-Done criteria start `false`; the agent must produce a concrete evidence path
-(build log, test output, lint report) to flip them to `true`. Negative claims are
-bound the same way: asserting something is absent requires the search scope
-actually covered and the date it was checked — an empty `command -v` proves
-nothing about installation. See `skills/anti-hallucination-gates/`.
+Every criterion starts false; the agent must produce a concrete evidence path
+(build log, test output, lint report) before a feature counts as done. That
+stance has a narrow mechanical enforcement point: `evidence: null` means `status`
+cannot be `pass`, and `feature_list.schema.json` rejects the pair. `done_criteria`
+itself is a list of statements rather than booleans — the default-false is the
+discipline, and the schema is the part that bites. Negative claims are bound the
+same way: asserting something is absent requires the search scope actually
+covered and the date it was checked — an empty `command -v` proves nothing about
+installation. See `skills/anti-hallucination-gates/`.
 
 Judgement-shaped negatives ("this is impossible", "that won't work") are
 deliberately out of scope. They carry no evidence path, and admitting them would

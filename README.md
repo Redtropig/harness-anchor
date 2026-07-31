@@ -35,9 +35,10 @@ Next action: wire the renderer into the CLI, then run scripts/lint.sh
 
 ## The failure modes it's built around
 
-**"Done." — with nothing run.** Done criteria start at `false`. Flipping one to
-`true` requires a concrete evidence path: a build log, test output, a lint
-report. No path, no `pass`.
+**"Done." — with nothing run.** Every criterion starts false. A feature cannot
+reach `status: pass` while its `evidence` is `null`, and `feature_list.schema.json`
+rejects that combination — the gate is a schema, not a good intention. Evidence
+means a path you can open: a build log, test output, a lint report.
 
 **"That's not installed." — after checking one place.** The same contract runs
 in reverse. Asserting absence requires the scope searched and the date checked —
@@ -110,15 +111,18 @@ Full manual — arguments, prerequisites, outputs: [docs/commands.md](docs/comma
 - **C/C++** — `cpp-build-systems`, `cpp-static-analysis`, `cpp-formatting`, `cpp-sanitizers`
 - **Meta** — `using-harness-anchor`, injected at every session start
 
-## Subagents (5, read-only)
+## Subagents (5)
 
 `verification-runner` (`/verify`), `coverage-analyst` (`/test-plan`) and
 `drift-analyst` (`/gc`) are fresh-context evaluators — separating who writes the
 code from who grades it is what keeps the grade honest. `coverage-analyst` is
-the code-aware pass TDD deliberately cannot do — it derives test obligations
-from the code as written, and flags paths the test runner never reaches.
-`cpp-build-doctor` diagnoses build failures from compiler output;
-`index-curator` is the sole writer of `PROJECT-TOC.md`.
+the code-aware pass TDD deliberately cannot do: it derives test obligations from
+the code as written, and flags paths the test runner never reaches.
+`cpp-build-doctor` diagnoses build failures from compiler output.
+
+Those four are read-only by frontmatter, not by convention — an evaluator that
+can edit what it grades has an incentive to make the finding go away.
+`index-curator` is the one that can write, and only to `PROJECT-TOC.md`.
 
 ## Hooks (5, all warn-only)
 
