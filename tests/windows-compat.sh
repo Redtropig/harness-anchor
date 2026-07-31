@@ -50,8 +50,18 @@ fi
 echo "[1/5] No bare python3 INVOCATION in hooks..."
 # Match invocation shapes only (python3 -c / python3 - "$f" / | python3 / $(python3);
 # prose mentions like "(needs python3 or node)" and comments must NOT trip this.
-if grep -nE 'python3[[:space:]]+-|[|]([[:space:]])*python3|\$\(python3' $HOOKS 2>/dev/null | grep -q .; then
-    grep -nE 'python3[[:space:]]+-|[|]([[:space:]])*python3|\$\(python3' $HOOKS
+#
+# Comment lines are dropped the same way [2/5] does it. Until v0.18.0 the intent
+# above was stated but not implemented: a COMMENT containing the invocation shape
+# tripped the check. It fired on hooks/stop and hooks/user-prompt-submit for
+# comments explaining that ha_json_engine_init probes by running `python3 -c` —
+# i.e. it punished documenting the very hazard this file exists to police. An
+# executable line is never comment-leading, so dropping those loses no coverage;
+# a trailing comment after real code still matches, which is correct.
+PY_INVOKE='python3[[:space:]]+-|[|]([[:space:]])*python3|\$\(python3'
+py_hits=$(grep -nE "$PY_INVOKE" $HOOKS 2>/dev/null | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
+if [ -n "$py_hits" ]; then
+    printf '%s\n' "$py_hits"
     fail "bare python3 invocation in a hook — use the portable.sh engine chain"
 else
     ok "hooks have no direct python3 invocation (engine chain only)"
