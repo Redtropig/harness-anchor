@@ -56,8 +56,14 @@ WEDGED_PATH="$STUB_DIR:/usr/bin:$PATH"
 run_timed() {  # $1=label  $2=hook path  $3=stdin payload
     _label="$1"; _hook="$2"; _stdin="$3"
     _t0=$(date +%s)
+    # HA_JSON_ENGINE/HA_PY are cleared to empty STRINGS, not unset: portable.sh's
+    # ha_json_engine_init short-circuits on `[ -n "${HA_JSON_ENGINE:-}" ]`, so an
+    # empty value forces the re-probe this test depends on. Written `=''` rather
+    # than the bare form, which is SC1007 at warning severity and so fails the
+    # lint gate in CI. (Do not start a comment line with the linter's own name —
+    # it is read as a directive and errors out. That is SC1072/SC1073.)
     _out=$(cd "$FIXTURE" && printf '%s' "$_stdin" \
-        | PATH="$WEDGED_PATH" HA_JSON_ENGINE= HA_PY= \
+        | PATH="$WEDGED_PATH" HA_JSON_ENGINE='' HA_PY='' \
           bash "$_hook" 2>/dev/null)
     _rc=$?
     _t1=$(date +%s)

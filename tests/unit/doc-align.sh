@@ -22,9 +22,15 @@
 #   [3] that commit is an ancestor of HEAD        (skipped on a shallow clone)
 #   [4] any short sha in the human-readable line below is a prefix of the long one
 #
-# Checks 2 and 3 need real history. CI checks out with actions/checkout's default
-# fetch-depth of 1, so they SKIP there rather than fail — and say so, because a
-# skipped check that prints OK is the failure mode this whole file exists to stop.
+# Checks 2 and 3 need real history, which a shallow clone does not have. Rather
+# than fail there, they SKIP — and say so on their own line, because a skipped
+# check that prints OK is the failure mode this whole file exists to stop.
+#
+# CI is NOT shallow: .github/workflows/validate.yml sets fetch-depth: 0 on the
+# fast-tests job precisely so these two run. Without it the check would pass on a
+# marker pointing at a commit that does not exist, which is the case it was
+# written for. If that setting is ever removed, this file keeps working and
+# quietly stops being a gate — the SKIP line is the only thing that tells you.
 
 set -uo pipefail
 

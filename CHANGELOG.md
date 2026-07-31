@@ -72,8 +72,10 @@ capability, and it ships with a new gate check and a new contract test — an
   Two real failures in one session motivated it: a 40-character sha typed out from
   a 7-character one (the second time that has happened in this repo), and a marker
   left pointing at a commit an `--amend` had rewritten. Both look exactly like a
-  correct marker when read. Sha resolution needs real history, so it SKIPs — loudly
-  — on the shallow clone CI checks out by default.
+  correct marker when read. Sha resolution needs real history, so it SKIPs —
+  loudly, on its own line — where the clone is shallow; the CI `fast-tests` job now
+  checks out with `fetch-depth: 0` so that the two assertions that matter actually
+  run there rather than self-skipping past the exact case they exist to catch.
 - **`tests/bench/hook-timing.sh` covers `pre-compact`, and guards its own list.**
   The benchmark for the 5s budget enumerated four hooks and had silently omitted
   `pre-compact` since v0.15.0 — the test for invariant #7 was not measuring one of
