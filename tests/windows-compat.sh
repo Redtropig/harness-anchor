@@ -4,12 +4,12 @@
 #   [1/5] No bare python3 invocation in hooks (must go through scripts/lib/portable.sh)
 #   [2/5] No '!= "/"' loop termination anywhere in hooks/ or scripts/ (non-portable
 #         on drive-letter paths; use ha_find_project_root / fixed-point dirname)
-#   [3/5] Every extensionless hook carries gitattributes eol=lf; index has no CRLF
+#   [3/5] Every bash-consumed file carries gitattributes eol=lf; index has no CRLF
 #   [4/5] run-hook.cmd: env-var Git paths + WSL System32 bash exclusion present
 #   [5/5] Every hook sources scripts/lib/portable.sh and calls ha_platform_init
 #
 # Exit 1 on any violation.
-# shellcheck disable=SC2086  # $HOOKS word-splitting is intentional (fixed known list)
+# shellcheck disable=SC2086  # $HOOKS word-splitting is intentional (discovered list)
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -19,7 +19,31 @@ PASS=0; FAIL=0
 ok()   { echo "  OK   $*"; PASS=$((PASS+1)); }
 fail() { echo "  FAIL $*"; FAIL=$((FAIL+1)); }
 
-HOOKS="hooks/session-start hooks/post-tool-use hooks/stop hooks/user-prompt-submit"
+# Hooks are DISCOVERED, not enumerated — everything under hooks/ except the JSON
+# manifest and the cmd/bash polyglot launcher (CLAUDE.md #10 excludes run-hook.cmd
+# from eol=lf on purpose; it is not a bash hook either).
+#
+# The old hard-coded list had already rotted: hooks/pre-compact shipped in v0.15.0
+# and was never added to it, so checks [1/5], [3/5] and [5/5] silently skipped the
+# newest hook for two releases. Enumeration rots — this is the same defect class
+# tests/README.md and CI both call out in their own comments.
+HOOKS=""
+for _h in hooks/*; do
+    case "$_h" in *.json|*.cmd) continue ;; esac
+    [ -f "$_h" ] || continue
+    HOOKS="$HOOKS $_h"
+done
+HOOKS="${HOOKS# }"
+
+echo "[0/5] Hook discovery..."
+# Non-vacuity guard: an empty HOOKS makes every loop below a no-op and the suite
+# would report all-pass having checked nothing — the exact "didn't look reads as
+# found nothing" failure this repo bans elsewhere.
+if [ -z "$HOOKS" ]; then
+    fail "no hooks discovered under hooks/ — every check below would pass vacuously"
+else
+    ok "discovered $(printf '%s\n' $HOOKS | grep -c .) hook(s): $HOOKS"
+fi
 
 echo "[1/5] No bare python3 INVOCATION in hooks..."
 # Match invocation shapes only (python3 -c / python3 - "$f" / | python3 / $(python3);
@@ -44,7 +68,12 @@ else
 fi
 
 echo "[3/5] eol=lf attributes + clean index..."
-for h in $HOOKS scripts/lib/portable.sh; do
+# Beyond the hooks: the shared lib, and the meta-skill — awk-consumed by
+# hooks/session-start for the conditional-region filter and the injection length
+# count, so its marker anchors and byte counts must not shift with a CRLF
+# checkout (.gitattributes says exactly this). Nothing else in the repo verifies
+# that pin; it was added in v0.14.0 and this check never learned about it.
+for h in $HOOKS scripts/lib/portable.sh skills/using-harness-anchor/SKILL.md; do
     attr=$(git check-attr eol -- "$h" 2>/dev/null | sed 's/.*: eol: //')
     if [ "$attr" = "lf" ]; then ok "eol=lf: $h"; else fail "missing eol=lf attribute: $h (got '$attr')"; fi
 done
