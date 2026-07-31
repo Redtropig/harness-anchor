@@ -65,6 +65,14 @@
 # accepted trade-off, not a bug — see agents/drift-analyst.md's doc-drift step
 # for triage guidance when a candidate list is dominated by a common-word
 # symbol.
+#
+# BOUNDED (v0.17.1): that trade-off was accepted without bounding what it costs
+# the reader. Two limits now do. Tokens under SYM_MINLEN characters are never
+# searched (their rows are undecidable, and they are overwhelmingly prose caught
+# in comments rather than code); candidate rows are capped per symbol and in
+# total. Every one of those three is announced on stderr — by name for dropped
+# tokens, with a PARTIAL marker for either cap. The contract is unchanged:
+# stdout is a candidate list, stderr says what the list is a view OF.
 
 set -uo pipefail
 
@@ -169,6 +177,30 @@ SYMS=$(
   } 2>/dev/null | sort -u |
     grep -vE '^(if|for|while|switch|return|sizeof|catch|and|or|not)$' || true
 )
+# Sub-3-character tokens are dropped before the search. Matching below is
+# PREFIX-based and case-insensitive by design, so a 1-2 character token matches
+# nearly every English word starting with those letters, and the resulting row
+# is UNDECIDABLE at any count: a reader cannot tell a real reference to a
+# 2-letter symbol from the hundreds of words that merely begin with it.
+#
+# They are also, in practice, not symbols. Extraction runs over raw diff lines,
+# COMMENTS INCLUDED, so English prose containing `word (` is harvested as if it
+# were a declaration. Measured on this repository's own v0.16.0..v0.17.0 range:
+# `O` (from `O(files)`), `b` (from the regex `\b(${ALT})`) and `it` (from
+# `prefixes it (`) produced 3100 of 4765 candidate rows — 65% of the output,
+# none of it referring to any code symbol at all.
+#
+# This is NOT the accepted common-word noise the header documents (`read`,
+# `get`, `check` are real identifiers whose rows a reader CAN judge, and they
+# stay). Dropped tokens are announced BY NAME: a symbol this scan chose not to
+# look for must never be mistaken for one it looked for and found nothing about.
+SYM_MINLEN=3
+SYMS_DROPPED=$(printf '%s\n' "$SYMS" | awk -v n="$SYM_MINLEN" 'length($0) > 0 && length($0) < n' | sort -u)
+if [ -n "$SYMS_DROPPED" ]; then
+    SYMS=$(printf '%s\n' "$SYMS" | awk -v n="$SYM_MINLEN" 'length($0) >= n')
+    note "not searched — $(printf '%s\n' "$SYMS_DROPPED" | paste -sd',' -) (under $SYM_MINLEN chars: prefix matching makes their rows undecidable)"
+fi
+
 if [ -z "$SYMS" ]; then
     n_all=$(git diff --name-only "$BASE" 2>/dev/null | grep -c . || true)
     n_scanned=$(git diff --name-only "$BASE" -- "${SCAN_PATHSPEC[@]}" 2>/dev/null | grep -c . || true)
@@ -176,6 +208,11 @@ if [ -z "$SYMS" ]; then
         # The self-blindness case: work happened, this sensor simply cannot see
         # the languages it happened in. Reporting "clean" here would be a lie.
         note "skipped — $n_all file(s) changed, none in scanned languages (see LANGUAGE SCOPE)"
+    elif [ -n "$SYMS_DROPPED" ]; then
+        # Distinct from the branch below: symbols WERE extracted, the length
+        # filter removed all of them. "Nothing to search" and "everything was
+        # filtered out" are different facts and get different sentences.
+        note "skipped — every extracted symbol was under $SYM_MINLEN chars; nothing searchable"
     else
         note "skipped — no changed symbols extracted from $n_scanned changed source file(s)"
     fi
@@ -208,6 +245,22 @@ MD_FILES=$(git ls-files '*.md' 2>/dev/null |
 # capitalises.
 CHUNK=400
 HARD_CAP=2000
+# Output caps. HARD_CAP bounds the SYMBOL set; nothing bounded the CANDIDATE
+# ROWS, and rows are what the consumer actually pays for: this repository's own
+# v0.16.0..v0.17.0 range emitted 4765 rows / 759 KB from 54 symbols. The
+# drift-analyst reads that through a tool that will not hand it a payload of that
+# size, so the list it adjudicates was already being truncated — silently, by the
+# harness, with no note either end could see. Capping here makes the truncation
+# ours, and therefore announceable.
+#
+# Two caps, because they fail differently. The per-symbol cap stops ONE
+# common-word symbol from crowding every other symbol out of the visible list;
+# agents/drift-analyst.md already tells the reader to discount such a symbol as a
+# unit, and that call takes a handful of rows, not dozens. The total cap is the
+# long-tail backstop for when no single symbol dominates — on the measured range
+# above it does not bind (the per-symbol cap alone brings 4765 rows to ~340).
+ROW_CAP_PER_SYM=12
+ROW_CAP_TOTAL=400
 
 n_sym=$(printf '%s\n' "$SYMS" | grep -c . || true)
 if [ "$n_sym" -gt "$HARD_CAP" ]; then
@@ -306,10 +359,32 @@ RESULTS=$(
     done
   done | sort -u
 )
-[ -n "$RESULTS" ] && printf '%s\n' "$RESULTS"
-
 n_md=$(printf '%s\n' "$MD_FILES" | grep -c . || true)
 n_hit=$(printf '%s\n' "$RESULTS" | grep -c . || true)
-note "scanned $n_sym symbol(s) x $n_md doc(s), $n_hit candidate(s)"
+
+# ---- 4. bound the payload, and say so ----------------------------------------
+# Both caps emit a PARTIAL line, matching the symbol-truncation contract
+# agents/drift-analyst.md already reads: a PARTIAL line above the `scanned ...`
+# summary means stdout is an incomplete view, even though it looks exactly like
+# a complete one. Rows keep their `sort -u` (md-file:line) order throughout, so
+# a cap keeps a deterministic prefix, never a random sample.
+OVER=$(printf '%s\n' "$RESULTS" | awk -F'\t' -v cap="$ROW_CAP_PER_SYM" '
+    NF > 1 { c[$2]++ } END { for (s in c) if (c[s] > cap) printf "%s(%d)\n", s, c[s] }' | sort)
+if [ -n "$OVER" ]; then
+    RESULTS=$(printf '%s\n' "$RESULTS" | awk -F'\t' -v cap="$ROW_CAP_PER_SYM" '
+        NF > 1 { c[$2]++; if (c[$2] <= cap) print }')
+    note "per-symbol cap $ROW_CAP_PER_SYM hit by $(printf '%s\n' "$OVER" | paste -sd',' -) — those symbols' rows are PARTIAL"
+fi
+
+n_shown=$(printf '%s\n' "$RESULTS" | grep -c . || true)
+if [ "$n_shown" -gt "$ROW_CAP_TOTAL" ]; then
+    RESULTS=$(printf '%s\n' "$RESULTS" | head -n "$ROW_CAP_TOTAL")
+    note "candidate list truncated to $ROW_CAP_TOTAL of $n_shown — results are PARTIAL"
+    n_shown="$ROW_CAP_TOTAL"
+fi
+
+[ -n "$RESULTS" ] && printf '%s\n' "$RESULTS"
+
+note "scanned $n_sym symbol(s) x $n_md doc(s), $n_hit candidate(s), $n_shown shown"
 
 exit 0

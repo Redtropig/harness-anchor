@@ -332,6 +332,87 @@ rm -rf "$POSIX_SHIM"
 expect_contains "[portability/$shim_label] attribution survives a strict awk" \
   "${TAB}cancel${TAB}" "$out10"
 
+# ---- 14. v0.17.1: the payload is BOUNDED, and every bound is announced.
+#          Through v0.17.0 HARD_CAP bounded the symbol set and nothing bounded
+#          the candidate ROWS — the units the consumer actually pays for. The
+#          harness-anchor repo's own v0.16.0..v0.17.0 range emitted 4765 rows /
+#          759 KB, which no tool hands to a subagent intact: drift-analyst was
+#          adjudicating a list the harness had already truncated, silently, with
+#          no note either end could see.
+#
+#          Three separate facts must reach stderr, because each one means a
+#          different thing was NOT looked at:
+#            a) tokens under SYM_MINLEN were never searched (named individually);
+#            b) a symbol's rows were cut to the per-symbol cap (PARTIAL);
+#            c) the whole list was cut to the total cap (PARTIAL).
+#          Assertion (a) also pins stdout: a dropped token must not appear there,
+#          or the "we didn't look" note contradicts the payload.
+ROOT9=$(mktemp -d)
+trap 'rm -rf "$ROOT" "$ROOT2" "$ROOT3" "$ROOT4" "$ROOT5" "$ROOT6" "$ROOT7" "$ROOT8" "$ROOT9"' EXIT
+cd "$ROOT9" || exit 1
+git init -q . && git config user.email t@t && git config user.name t
+mkdir -p src
+# 40 call-shaped symbols + one 2-character token (`at`), all on added lines.
+{
+    i=0; while [ "$i" -lt 40 ]; do printf 'void sym%02d(void) { }\n' "$i"; i=$((i+1)); done
+    printf 'int at(void) { return 0; }\n'
+} > src/many.c
+# 15 doc lines, each naming every symbol: 40 symbols x 15 lines = 600 candidate
+# rows before capping, 15 per symbol (> the 12 per-symbol cap), 40 x 12 = 480
+# after it (> the 400 total cap). One fixture trips both bounds.
+{
+    printf '# Doc\n\n'
+    j=0
+    while [ "$j" -lt 15 ]; do
+        printf -- '- line %02d:' "$j"
+        i=0; while [ "$i" -lt 40 ]; do printf ' sym%02d' "$i"; i=$((i+1)); done
+        printf ' at are all fine.\n'
+        j=$((j+1))
+    done
+} > README.md
+git add -A && git commit -qm base
+{
+    i=0; while [ "$i" -lt 40 ]; do printf 'void sym%02d(void) { return; }\n' "$i"; i=$((i+1)); done
+    printf 'int at(void) { return 1; }\n'
+} > src/many.c
+git add -A && git commit -qm change
+
+out11=$(bash "$SCAN" --base HEAD~1 --target "$ROOT9" 2>/dev/null)
+err11=$(bash "$SCAN" --base HEAD~1 --target "$ROOT9" 2>&1 >/dev/null)
+
+expect_contains     "[bound] sub-minimum token is named, not silently dropped" "not searched — at" "$err11"
+expect_not_contains "[bound] a token we did not search never reaches stdout"   "${TAB}at${TAB}"    "$out11"
+expect_contains     "[bound] per-symbol cap is announced"                      "per-symbol cap 12 hit by" "$err11"
+expect_contains     "[bound] per-symbol cap says PARTIAL"                      "PARTIAL"           "$err11"
+expect_contains     "[bound] total cap is announced"                           "truncated to 400 of 480" "$err11"
+expect_contains     "[bound] summary separates matched from shown"             ", 400 shown"       "$err11"
+expect_not_contains "[bound] cap diagnostics stay off stdout"                  "doc-drift-scan:"   "$out11"
+n_rows=$(printf '%s\n' "$out11" | grep -c . || true)
+if [ "$n_rows" -eq 400 ]; then echo "  OK   [bound] stdout is exactly the announced 400 rows"; PASS=$((PASS+1))
+else echo "  FAIL [bound] stdout has $n_rows rows, announced 400"; FAIL=$((FAIL+1)); fi
+# The cap must keep a REPRESENTATIVE slice, not amputate whole symbols: every
+# symbol that had hits must still be visible. A cap that silently erased symbols
+# would reintroduce the exact miss this script exists to prevent.
+n_syms=$(printf '%s\n' "$out11" | cut -f2 | sort -u | grep -c . || true)
+if [ "$n_syms" -ge 33 ]; then echo "  OK   [bound] $n_syms/40 symbols survive the cap (none amputated wholesale)"; PASS=$((PASS+1))
+else echo "  FAIL [bound] only $n_syms/40 symbols survive the cap"; FAIL=$((FAIL+1)); fi
+
+# 14b. the all-dropped case gets its OWN sentence — "nothing was extracted" and
+#      "everything extracted was filtered out" are different facts.
+ROOT10=$(mktemp -d)
+trap 'rm -rf "$ROOT" "$ROOT2" "$ROOT3" "$ROOT4" "$ROOT5" "$ROOT6" "$ROOT7" "$ROOT8" "$ROOT9" "$ROOT10"' EXIT
+cd "$ROOT10" || exit 1
+git init -q . && git config user.email t@t && git config user.name t
+mkdir -p src
+printf 'int at(void) { return 0; }\n' > src/tiny.c
+printf '# Doc\n\nat is fast.\n' > README.md
+git add -A && git commit -qm base
+printf 'int at(void) { return 1; }\n' > src/tiny.c
+git add -A && git commit -qm change
+err12=$(bash "$SCAN" --base HEAD~1 --target "$ROOT10" 2>&1 >/dev/null)
+expect_contains "[bound] all-symbols-dropped is its own skip reason" \
+  "every extracted symbol was under 3 chars" "$err12"
+
 echo ""
 echo "doc-drift-scan: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
