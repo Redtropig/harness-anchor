@@ -18,12 +18,12 @@ Every session opens with this — real output, from an anchored project:
 
 ```
 <harness-anchor-state>
-Plugin:           harness-anchor v0.17.1
+Plugin:           harness-anchor v0.18.0
 Project root:     /home/you/invoice-service
 Active feature:   feat-3: PDF export pipeline
 Project type:     generic
 Platform:         linux
-TOC freshness:    fresh (b4a7c3273f214f7cbc6b7be63317c2500ac8eec1)
+TOC freshness:    fresh (8243585b3b97b927cd16672b6095d9270ccc3a3f)
 Golden rules:     3 rule(s) — /gc scans changed code against them
 Last session handoff (first 10 lines):
 # Session Handoff
@@ -134,9 +134,9 @@ can edit what it grades has an incentive to make the finding go away.
 | `PreCompact` | Records compaction forensics for the post-compaction notice |
 | `Stop` | Nudges a `progress.md` update, a handoff refresh, and flushing chat-only memory |
 
-Hooks fail silent on missing tools and are budgeted at ≤5s; SessionStart,
-PostToolUse and PreCompact enforce that with an explicit watchdog — on timeout
-they emit nothing and exit 0.
+Every hook fails silent on missing tools and carries a ≤5s watchdog — on timeout
+it emits nothing and exits 0. `scripts/validate-anchor.sh` asserts the watchdog
+is present in each hook the manifest registers, so a new one cannot ship without it.
 
 ## Design notes
 

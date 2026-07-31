@@ -4,6 +4,58 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-07-31
+
+MINOR: watchdog coverage on two hooks that never had it is a new backward-compatible
+capability, and it ships with a new gate check and a new contract test — an
+`### Added` section, which per the versioning rule means MINOR rather than PATCH.
+
+### Added
+
+- **`hooks/stop` and `hooks/user-prompt-submit` now carry the R1 5s watchdog.**
+  Both fork a JSON engine — `ha_json_engine_init` probes by *running*
+  `python3 -c 'print(1)'`, and both then call `ha_flist_active` — so a wedged
+  interpreter (antivirus scan, network-mounted PATH entry, broken `python3` shim)
+  hung them indefinitely with nothing to intervene. Measured against the wedged
+  engine before the fix: **25s and still running** when the harness cut it off, on
+  both hooks. After: **5s**, emitting nothing, exit 0. The three peers have had
+  this since v0.10.0; these two were missed and nothing noticed for eight releases.
+  `ha_json_engine_init` is deliberately *inside* `main()` — outside it, the probe's
+  own hang would sit in front of the watchdog rather than behind it.
+- **`tests/hook-contracts/stop-prompt-timeout.sh`** — wedges every engine in the
+  chain (`python3`/`python`/`py`/`node` stubs that sleep 30) against an anchored
+  fixture, then asserts each hook exits 0 within 8s emitting nothing. Verified red
+  on the pre-fix hooks before being accepted as green on the fixed ones.
+- **`scripts/validate-anchor.sh` [11/12] now asserts the watchdog's presence** in
+  every hook `hooks/hooks.json` registers, so a newly added hook cannot ship
+  without one. Structural check: it catches absence, not misbehaviour — proving
+  the watchdog *fires* is the contract test's job. (163 assertions, was 158.)
+
+### Fixed
+
+- **`tests/windows-compat.sh` [1/5] punished documenting the hazard it polices.**
+  Its own comment promised that "prose mentions and comments must NOT trip this",
+  but the grep had no comment filter — so a comment explaining that
+  `ha_json_engine_init` probes by running `python3 -c` was reported as a bare
+  `python3` invocation. It fired on both hooks touched in this release. Comment
+  lines are now dropped exactly as [2/5] already did it. Coverage is unchanged:
+  an executable line is never comment-leading, and a trailing comment after real
+  code still matches. Both directions verified by mutation.
+
+### Changed
+
+- **`README.md` rewritten** to lead with the failure modes and a real
+  `hooks/session-start` banner rather than a component inventory; the long-form
+  rationale moved to the new `docs/design.md`. Also corrects a stale hook count
+  (four claimed, five shipping), a false "Subagents (5, read-only)" heading
+  (`index-curator` carries `Write` — it has to), and a description of
+  `done_criteria` as booleans (it is an array of strings; the enforced rule is
+  `evidence: null` ⇒ `status` cannot be `pass`, per `feature_list.schema.json`).
+- **`docs/design.md` added** — the design rationale at full depth, with the
+  alternative rejected in each case. Its warn-only section corrects the previous
+  README's claim that all four warn hooks inject `additionalContext`: Stop has no
+  such channel and uses `systemMessage`, and PreCompact reaches only the user.
+
 ## [0.17.1] - 2026-07-31
 
 PATCH, not MINOR: both entries are repairs to components that already shipped —
@@ -770,7 +822,8 @@ nothing belongs in an `### Added` section.
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.17.1...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/Redtropig/harness-anchor/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/Redtropig/harness-anchor/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/Redtropig/harness-anchor/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Redtropig/harness-anchor/compare/v0.15.0...v0.16.0
