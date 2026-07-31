@@ -25,6 +25,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # Full history: tests/unit/doc-align.sh resolves each doc-align marker's
+          # sha and checks it is an ancestor of HEAD. At the action's default
+          # fetch-depth of 1 those two assertions self-skip, leaving only the
+          # format check — the marker that matters most (one pointing at a commit
+          # that does not exist) would sail through CI. 231 commits, 3.8 MB.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6

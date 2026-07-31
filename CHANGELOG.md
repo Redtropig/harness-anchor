@@ -4,6 +4,167 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-07-31
+
+MINOR: watchdog coverage on two hooks that never had it is a new backward-compatible
+capability, and it ships with a new gate check and a new contract test — an
+`### Added` section, which per the versioning rule means MINOR rather than PATCH.
+
+### Added
+
+- **`hooks/stop` and `hooks/user-prompt-submit` now carry the R1 5s watchdog.**
+  Both fork a JSON engine — `ha_json_engine_init` probes by *running*
+  `python3 -c 'print(1)'`, and both then call `ha_flist_active` — so a wedged
+  interpreter (antivirus scan, network-mounted PATH entry, broken `python3` shim)
+  hung them indefinitely with nothing to intervene. Measured against the wedged
+  engine before the fix: **25s and still running** when the harness cut it off, on
+  both hooks. After: **5s**, emitting nothing, exit 0. The three peers have had
+  this since v0.10.0; these two were missed and nothing noticed for eight releases.
+  `ha_json_engine_init` is deliberately *inside* `main()` — outside it, the probe's
+  own hang would sit in front of the watchdog rather than behind it.
+- **`tests/hook-contracts/stop-prompt-timeout.sh`** — wedges every engine in the
+  chain (`python3`/`python`/`py`/`node` stubs that sleep 30) against an anchored
+  fixture, then asserts each hook exits 0 within 8s emitting nothing. Verified red
+  on the pre-fix hooks before being accepted as green on the fixed ones.
+- **`scripts/validate-anchor.sh` [11/12] now asserts the watchdog's presence** in
+  every hook `hooks/hooks.json` registers, so a newly added hook cannot ship
+  without one. Structural check: it catches absence, not misbehaviour — proving
+  the watchdog *fires* is the contract test's job. (163 assertions, was 158.)
+- **Invariant #5 is now enforced, and reworded to describe what actually gates
+  what.** It read "C/C++ skills are gated by `cpp-detect.sh`. They must include a
+  frontmatter trigger condition referencing the detected build system" — wrong on
+  both counts. `cpp-detect.sh` gates the banner's project type, the meta-skill's
+  `cpp-only` regions and the two C/C++ commands, but *not* skill loading: skills
+  are chosen by description matching, and nothing consults it at that moment. And
+  three of the four skills name no build system, correctly — clang-format has no
+  reason to. The rewritten invariant states both gates and requires what actually
+  does the work: every `skills/cpp-*` description must scope itself to C/C++
+  inside the first 80 characters, the window invariant #6 reserves for trigger
+  load. `validate-anchor` [3-4/12] now asserts exactly that, with a non-vacuity
+  guard for the day the glob stops matching. (168 assertions, was 163.)
+
+  The skills were left alone deliberately. Editing four descriptions to name build
+  systems would spend the scarcest trigger real estate on a term irrelevant to
+  three of them — and CLAUDE.md forbids rewriting skill descriptions without evals
+  showing improvement. It also would not have made the invariant's first sentence
+  true. An unenforced entry in that list contradicts what the section below it
+  promises: the list is the part that a test mechanically enforces.
+- **Invariant #9 is now enforced too — its wording needed no change.** Auditing
+  the other nine invariants after fixing #5 found that #9 ("docs-lookup is the
+  canonical procedure; new skills MUST reference it rather than inlining
+  Context7 → WebSearch waterfalls") was accurate but unchecked. `validate-anchor`
+  [3-4/12] now asserts that any skill naming Context7 or WebSearch also references
+  `docs-lookup`. Naming them is normal and expected — all seven current cases use
+  the shape *"Invoke `docs-lookup` … (Context7 → WebSearch fallback)"*; what the
+  check catches is that sentence with the reference removed, which is how the
+  failure-mode detection and the calibrated-uncertainty fallback drift out of sync
+  between copies. Non-vacuity guarded; both directions verified by mutation.
+
+  Invariant #6 was first written up in this release as "the remaining unenforced
+  entry". **That was wrong**, and the correction is the more useful finding: #6 is
+  enforced by the skill-triggering harness — `check-coverage.sh` asserts on every
+  CI run that each skill has an adversarial prompt that never names it, and
+  `run-all.sh` puts those prompts through a live session before a release. The
+  error came from equating "no grep for it" with "not enforced"; a behavioural eval
+  is the stronger form of enforcement, not the absence of one. #6 now says where it
+  is enforced, in what tier, and warns against replacing that eval with a static
+  check on the description text. With #5, #7 and #9 closed in this release, all ten
+  invariants are enforced, which is what the section below the list has always
+  claimed of it.
+- **`check-coverage.sh` now verifies the prompts are actually adversarial**, and
+  self-tests its own matcher first. It had asserted only that a case was registered
+  and its file existed — so a prompt reading "use the docs-lookup skill" would have
+  satisfied it while testing nothing, since the run would pass on the user naming
+  the skill rather than on the description doing its job. Prompts are now rejected
+  if they contain their own skill name in either spelling.
+
+  The first cut of that check was itself vacuous, which is the more useful half of
+  the story: `grep -qi -e A -e B` **aborts** on the MSYS2 grep (exit 134, nothing on
+  stderr) — the same crash class `tests/windows-compat.sh` documents for `-i`
+  combined with `-F`. A crash returns non-zero, non-zero read as "no match", and all
+  fifteen prompts were reported clean by a grep that never ran. The loop-counter
+  guard did not notice, because the loop *had* run — it was the judge that was
+  broken. Single `-E` alternation is crash-free, and a matcher self-test against a
+  known-positive now runs before any prompt is believed clean. Both directions
+  verified by mutation. (44 assertions, was 28.)
+- **`tests/unit/doc-align.sh`** — integrity of the `doc-align` markers, which were
+  a standing unverified claim. Per marker: exactly one 40-hex sha, it resolves to a
+  real commit, that commit is an ancestor of HEAD, and any abbreviated sha in the
+  prose agrees with it. Markers are discovered by glob with a non-vacuity guard.
+  Two real failures in one session motivated it: a 40-character sha typed out from
+  a 7-character one (the second time that has happened in this repo), and a marker
+  left pointing at a commit an `--amend` had rewritten. Both look exactly like a
+  correct marker when read. Sha resolution needs real history, so it SKIPs —
+  loudly, on its own line — where the clone is shallow; the CI `fast-tests` job now
+  checks out with `fetch-depth: 0` so that the two assertions that matter actually
+  run there rather than self-skipping past the exact case they exist to catch.
+- **`tests/bench/hook-timing.sh` covers `pre-compact`, and guards its own list.**
+  The benchmark for the 5s budget enumerated four hooks and had silently omitted
+  `pre-compact` since v0.15.0 — the test for invariant #7 was not measuring one of
+  the hooks the invariant governs. The hooks stay enumerated, because each needs
+  its own env/stdin to reach its active path, but a completeness check now fails
+  if any hook on disk is not benchmarked.
+- **`docs/troubleshooting.md` #16 — "a hook goes completely silent".** With every
+  hook now bounded at 5s, a wedged JSON engine produces silence indistinguishable
+  from a legitimately quiet hook. The entry names the likely causes (antivirus on
+  first interpreter run, the Microsoft Store `python3` alias, an unreachable
+  network share on PATH), gives the two timing commands that tell them apart, and
+  states that any one engine of the four is enough.
+
+### Fixed
+
+- **`docs/commands.md` had drifted for six releases and said so nowhere.** Its
+  `doc-align` marker still pointed at `74a06eb` (v0.12.0, 2026-07-14) — an
+  assertion of "verified" that had not been true since v0.13.0. Re-read against
+  every file under `commands/` plus the scripts and agent that implement them.
+  What the stale marker had been hiding: `/verify`'s report was documented with
+  five sections when `verification-runner` emits nine and had gained
+  `### Integrity`; `/status` was documented as parsing JSON with `python3→node`
+  when the chain has been python3 → python → py -3 → node → pure-bash since
+  v0.13.0; `/session-end`'s fact-gathering omitted the secrets scan and
+  state-hygiene facts, and its steps omitted the consent-gated golden-rules
+  consolidation and the secrets-before-commit gate; `/gc` never mentioned that
+  doc-drift scanning is bounded and can return PARTIAL; the discoverability table
+  still described PostToolUse as firing only on `Edit`/`Write`, which stopped
+  being true in v0.15.0. The new marker carries an explicit scope note naming what
+  was checked against implementation versus merely read.
+- **`tests/README.md` listed five hook-contract tests while sixteen shipped**, and
+  its "quick test" block enumerated them by hand directly below a comment
+  explaining that enumeration rots. The per-file table is now indexed by hook —
+  five rows that change when the hook set does, not when a test is added — and the
+  quick-test block globs. Also corrected there: the hook-contract timing (two
+  tests deliberately wait out a 5s watchdog, so `<5s` was never true of the
+  directory) and the CI matrix, which has included Windows since v0.13.0.
+- **`docs/design.md` claimed `cpp-detect.sh` gates which C/C++ skills load.** It
+  does not. Skills are selected by description matching — all four C/C++ ones open
+  with "Use in C/C++ projects", which is the actual gate — while `cpp-detect.sh`
+  gates the injected meta-skill's `cpp-only` regions and makes `/cpp-init` and
+  `/sanitize` refuse outright. The sentence had restated CLAUDE.md's *normative*
+  wording ("must include a frontmatter trigger condition") as a description of
+  what the files do; only one of the four actually names a build system.
+- **`tests/windows-compat.sh` [1/5] punished documenting the hazard it polices.**
+  Its own comment promised that "prose mentions and comments must NOT trip this",
+  but the grep had no comment filter — so a comment explaining that
+  `ha_json_engine_init` probes by running `python3 -c` was reported as a bare
+  `python3` invocation. It fired on both hooks touched in this release. Comment
+  lines are now dropped exactly as [2/5] already did it. Coverage is unchanged:
+  an executable line is never comment-leading, and a trailing comment after real
+  code still matches. Both directions verified by mutation.
+
+### Changed
+
+- **`README.md` rewritten** to lead with the failure modes and a real
+  `hooks/session-start` banner rather than a component inventory; the long-form
+  rationale moved to the new `docs/design.md`. Also corrects a stale hook count
+  (four claimed, five shipping), a false "Subagents (5, read-only)" heading
+  (`index-curator` carries `Write` — it has to), and a description of
+  `done_criteria` as booleans (it is an array of strings; the enforced rule is
+  `evidence: null` ⇒ `status` cannot be `pass`, per `feature_list.schema.json`).
+- **`docs/design.md` added** — the design rationale at full depth, with the
+  alternative rejected in each case. Its warn-only section corrects the previous
+  README's claim that all four warn hooks inject `additionalContext`: Stop has no
+  such channel and uses `systemMessage`, and PreCompact reaches only the user.
+
 ## [0.17.1] - 2026-07-31
 
 PATCH, not MINOR: both entries are repairs to components that already shipped —
@@ -770,7 +931,8 @@ nothing belongs in an `### Added` section.
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.17.1...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/Redtropig/harness-anchor/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/Redtropig/harness-anchor/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/Redtropig/harness-anchor/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Redtropig/harness-anchor/compare/v0.15.0...v0.16.0

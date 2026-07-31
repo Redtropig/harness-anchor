@@ -6,14 +6,14 @@
 # Checks (labelled [1/12]..[12/12] in the output):
 #   [1/12]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
 #   [2/12]   JSON files parse; scripts/*.mjs pass node --check
-#   [3-4/12] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
+#   [3-4/12] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12); every skills/cpp-* scopes itself to C/C++ within the first 80 chars (invariant #5, skill half); every skill naming Context7/WebSearch also references docs-lookup rather than inlining the waterfall (invariant #9). Neither was enforced before v0.18.0; both non-vacuity guarded
 #   [5/12]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
 #   [6/12]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
 #   [7/12]   SessionStart hook is executable and produces valid JSON when run; meta-skill conditional regions (cpp-only + os-<name>) well-formed, jointly flat, taxonomy-whitelisted
 #   [8/12]   Commands directory consistency (each commands/*.md is a usable /command)
 #   [9/12]   Every template referenced from commands/anchor.md + cpp-init.md AND from scaffold.sh's template map exists
 #   [10/12]  Command↔script wiring: the four mechanism scripts exist + executable + bash -n; every ${CLAUDE_PLUGIN_ROOT}/scripts/* referenced by a command/agent md resolves
-#   [11/12]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; the hook list is DERIVED from hooks/hooks.json (registry → disk: every registered hook exists, sources the lib, AND calls ha_platform_init — the Windows python3→python→py→node engine-chain wiring). tests/windows-compat.sh [5/5] runs the other direction (disk → wiring, globbing hooks/)
+#   [11/12]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; the hook list is DERIVED from hooks/hooks.json (registry → disk: every registered hook exists, sources the lib, calls ha_platform_init — the Windows python3→python→py→node engine-chain wiring — AND carries the R1 5s watchdog, invariant #7, v0.18.0). tests/windows-compat.sh [5/5] runs the other direction (disk → wiring, globbing hooks/)
 #   [12/12]  Platform sidecars (v0.14.0): skills/*/platform/<os>.md ↔ SKILL.md pointer integrity (bidirectional, same-skill relative); os names in taxonomy
 
 set -uo pipefail   # no -e so we report all failures, not abort on first
@@ -108,7 +108,11 @@ fi
 echo ""
 
 # ---- 3 & 4. SKILL.md frontmatter ----
-echo "[3-4/12] SKILL.md frontmatter (name + description, ≤500 chars desc)..."
+echo "[3-4/12] SKILL.md frontmatter (name + desc ≤500 chars; invariant #5 C/C++ scoping; invariant #9 docs-lookup reference)..."
+# Initialised before the loop, not inside it: this file runs under `set -u`, where
+# reading an unset name aborts the script (CLAUDE.md, "Shell hazards", #1).
+CPP_SKILLS_SEEN=0
+LOOKUP_MENTIONS=0
 while IFS= read -r skill; do
     if ! head -1 "$skill" | grep -q '^---$'; then
         fail "$skill: missing frontmatter opener"
@@ -128,7 +132,60 @@ while IFS= read -r skill; do
     else
         ok "$skill description ${#desc} chars"
     fi
+
+    # Invariant #9, enforced from v0.18.0: docs-lookup is the canonical procedure,
+    # so a skill that names Context7 or WebSearch must POINT AT it rather than
+    # standing alone with its own copy of the waterfall. Naming them is fine and
+    # common — "Invoke `docs-lookup` … (Context7 → WebSearch fallback)" is the
+    # shape all seven current cases use; what the invariant forbids is that
+    # sentence without the reference, which is how the failure-mode detection and
+    # the calibrated-uncertainty fallback drift out of sync between copies.
+    case "$skill" in
+        skills/docs-lookup/*) : ;;  # the canonical procedure itself
+        *)
+            if grep -qiE 'context7|websearch' "$skill"; then
+                LOOKUP_MENTIONS=$((LOOKUP_MENTIONS+1))
+                if grep -q 'docs-lookup' "$skill"; then
+                    ok "$skill references docs-lookup alongside its Context7/WebSearch mention"
+                else
+                    fail "$skill: names Context7/WebSearch without referencing docs-lookup — inline waterfall (invariant #9)"
+                fi
+            fi
+            ;;
+    esac
+
+    # Invariant #5, skill half (v0.18.0): a C/C++ skill must scope itself to C/C++
+    # inside the first 80 chars — the window invariant #6 says carries the trigger
+    # load. cpp-detect.sh gates the injected meta-skill regions and the two C/C++
+    # commands, but NOT skill loading: skills are chosen by description matching,
+    # so this string is the whole gate. Nothing checked it before, and the
+    # invariant's old wording asked for something else entirely (a build-system
+    # reference), which three of the four skills correctly do not have.
+    case "$skill" in
+        skills/cpp-*)
+            CPP_SKILLS_SEEN=$((CPP_SKILLS_SEEN+1))
+            head80=$(printf '%s' "$desc" | cut -c1-80)
+            if printf '%s' "$head80" | grep -qF 'C/C++'; then
+                ok "$skill scopes to C/C++ in its first 80 chars"
+            else
+                fail "$skill: no 'C/C++' in the first 80 chars of the description — it can trigger in a non-C/C++ project (invariant #5)"
+            fi
+            ;;
+    esac
 done < <(find skills -name SKILL.md 2>/dev/null)
+
+# Non-vacuity guard: if the glob stops matching, every C/C++ assertion above
+# silently vanishes and this section reports all-pass having checked nothing.
+if [ "$CPP_SKILLS_SEEN" -eq 0 ]; then
+    fail "no skills/cpp-* SKILL.md matched — the invariant #5 check above ran zero times"
+else
+    ok "invariant #5 checked against $CPP_SKILLS_SEEN C/C++ skill(s)"
+fi
+if [ "$LOOKUP_MENTIONS" -eq 0 ]; then
+    fail "no skill outside docs-lookup names Context7/WebSearch — the invariant #9 check above ran zero times (the grep, or the convention, changed)"
+else
+    ok "invariant #9 checked against $LOOKUP_MENTIONS skill(s) naming Context7/WebSearch"
+fi
 echo ""
 
 # ---- 5. Agent frontmatter (name + description) ----
@@ -407,6 +464,20 @@ if [ -f "$LIB" ]; then
         fi
         if grep -q 'scripts/lib/portable\.sh' "$h"; then ok "$h sources portable.sh"; else fail "$h does not source portable.sh (engine chain unwired)"; fi
         if grep -q 'ha_platform_init' "$h"; then ok "$h calls ha_platform_init"; else fail "$h missing ha_platform_init call"; fi
+        # CLAUDE.md invariant #7: hooks must time out in <=5s. Sourcing the lib is
+        # what CREATES the exposure — ha_json_engine_init probes by running
+        # `python3 -c` for real, so a wedged interpreter hangs the hook with
+        # nothing to intervene. Nothing checked this until v0.18.0, and two of the
+        # five hooks had shipped without a watchdog since the pattern was
+        # introduced in v0.10.0; the README even asserted all of them had one.
+        # Structural check only: it cannot prove the watchdog FIRES — that is
+        # tests/hook-contracts/{session-start,stop-prompt}-timeout.sh, which wedge
+        # the engine and measure wall-clock. This catches the absence, not the bug.
+        if grep -qE 'sleep 5; *kill -9|R1: Total watchdog' "$h"; then
+            ok "$h has the R1 watchdog"
+        else
+            fail "$h has no R1 watchdog (invariant #7: hooks must time out in <=5s)"
+        fi
     done
 else
     fail "$LIB missing — the v0.13.0 platform layer is not installed"
