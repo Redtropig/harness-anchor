@@ -4,6 +4,97 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-07-31
+
+PATCH, not MINOR: both entries are repairs to components that already shipped —
+nothing belongs in an `### Added` section.
+
+### Fixed
+
+- **`doc-drift-scan.sh` flooded the consumer it reports to.** `HARD_CAP` bounded
+  the symbol set; nothing bounded the candidate *rows*, which are the unit the
+  reader actually pays for. Measured on this repository's own `v0.16.0..v0.17.0`
+  range: 54 symbols → 4765 rows / 759 KB. The 3000-token SessionStart budget
+  invariant is this repo's scale for what injected context may cost; 759 KB from
+  one sensor is not in that world. Wherever the consuming tool's output limit
+  falls, a payload that size is past it — so `drift-analyst` was adjudicating a
+  list the harness had already cut, silently, with no note either end could see
+  (an inference from the size, not a measurement of a particular tool; the
+  budget argument stands without it). The script announced
+  `PARTIAL` for the one truncation it performed and was blind to the larger one
+  it caused. Rows are now capped per symbol (12) and in total (400), each with a
+  `PARTIAL` marker, and the summary reports matched-vs-shown
+  (`K candidate(s), S shown`). Same range after: 379 rows / 70 KB (−91%).
+- **`doc-drift-scan.sh` harvested comment prose as if it were code.** Symbol
+  extraction reads raw diff lines, comments included, so English containing
+  `word (` becomes a "symbol": `O` (from `O(files)`), `b` (from the regex
+  `\b(${ALT})`) and `it` (from `prefixes it (`) produced 3100 of those 4765 rows
+  — 65% of the output, none of it naming any code symbol. Tokens under three
+  characters are no longer searched at all: prefix matching is case-insensitive
+  by design, so their rows are undecidable at *any* count. They are named
+  individually on stderr — a symbol the scan chose not to look for must never
+  read as one it looked for and found nothing about. This does **not** touch the
+  common-word noise the header documents (`read`, `get`, `check` are real
+  identifiers whose rows a reader can judge; they stay).
+- **`tests/windows-compat.sh` stopped checking the newest hook two releases
+  ago.** Its `HOOKS` list was hard-coded and never learned about
+  `hooks/pre-compact` (v0.15.0), so checks [1/5] (no bare `python3`), [3/5]
+  (`eol=lf`) and [5/5] (sources `portable.sh` + `ha_platform_init`) skipped it
+  — and [1/5] has no other coverage anywhere in the suite. Nothing was broken
+  (the hook complies with all three), but invariant #10's only mechanical gate
+  was not enforcing it. Hooks are now globbed, with a non-vacuity guard so an
+  empty discovery fails loudly instead of passing every loop below it. Same
+  defect class `tests/README.md` and the CI workflow already name in their own
+  comments: enumeration rots.
+- **Two troubleshooting entries gave pre-0.13.0 / pre-0.16.0 advice.** #6 named a
+  missing `python3` as a cause of hook-contract failures — false since v0.13.0
+  made the engine chain `python3` → `python` → `py -3` → `node` → pure-bash and
+  made an engine-less machine emit `SKIP`, never `FAIL`, so the entry sent
+  Windows users chasing an interpreter that cannot be the problem. #5 told the
+  reader to install a build tool on the strength of `init.sh`'s `command -v`
+  check, which is PATH-only — the exact inference 0.16.0's discovery chain
+  exists to prevent, in the guide that is supposed to teach it.
+- **The meta-skill's `eol=lf` pin had never been verified.** `.gitattributes`
+  pins `skills/using-harness-anchor/SKILL.md` because `hooks/session-start`
+  awk-consumes it for the conditional-region filter and the injection length
+  count — and `tests/windows-compat.sh` [3/5] is the only place in the repo that
+  reads an `eol` attribute at all. It did not check that file. It does now.
+- **A hook registered in `hooks.json` but missing on disk was invisible to every
+  gate.** `validate-anchor` [1/12] names two of the five hooks; [11/12]
+  enumerated all five by hand but only to check their *wiring*; `hooks.json`
+  itself is validated for JSON syntax alone. [11/12] now derives its list from
+  `hooks.json` — the file Claude Code actually executes — and runs registry →
+  disk: registered implies exists, sources `portable.sh`, calls
+  `ha_platform_init`. Complementary to `windows-compat` [5/5], which globs
+  `hooks/` and runs disk → wiring; neither direction alone catches both
+  failures. An empty parse, or a registration in a shape the parser does not
+  recognise (parsed count ≠ declared `"type": "command"` count), fails loudly
+  instead of skipping the loop.
+
+### Changed
+
+- `agents/drift-analyst.md` reads the scan's stderr through a six-row state
+  table (up from three prose states), including the two new cap markers and the
+  never-searched token list. Its known-blind-spot header records the new
+  three-character floor: a clean doc-drift section now means "no doc claim about
+  a changed, 3+ character, function-shaped symbol in a scanned language looks
+  stale".
+- `docs/troubleshooting.md` gains entries 14 and 15, covering the two sensors
+  0.16.0/0.17.0 added — both of which are built to report things that *look*
+  like failures and are not (`doc-drift-scan`'s six stderr states and its
+  candidates-not-violations contract; `cpp-tool-discovery`'s `NOT_FOUND` for a
+  tool in a non-standard prefix, and the dated phrasing that lets
+  `init-verification` re-check it next session).
+- **`docs/troubleshooting.md`'s `doc-align` marker is re-verified and bumped**,
+  v0.9.0 → v0.17.1. It had sat at v0.9.0 through eight releases — two of which
+  added entries to that very file — while its own text said "re-verify and bump
+  this marker if they change". All 15 entries were re-checked against `hooks/`
+  and `scripts/`, every mechanically checkable claim run or grepped rather than
+  read, and the marker now states that scope instead of asserting bare
+  "verified".
+- `tests/unit/doc-drift-scan.sh` 22 → 32 assertions; `tests/windows-compat.sh`
+  19 → 24; `scripts/validate-anchor.sh` 157 → 158.
+
 ## [0.17.0] - 2026-07-29
 
 ### Added
@@ -679,7 +770,8 @@ All notable changes to harness-anchor are documented here. Format follows [Keep 
 
 - README rewrite, agent compression, docs-lookup test case (`bdb0f99`)
 
-[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/Redtropig/harness-anchor/compare/v0.17.1...HEAD
+[0.17.1]: https://github.com/Redtropig/harness-anchor/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/Redtropig/harness-anchor/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Redtropig/harness-anchor/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Redtropig/harness-anchor/compare/v0.14.0...v0.15.0

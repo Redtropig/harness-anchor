@@ -1,7 +1,17 @@
 # Troubleshooting — harness-anchor
 
-<!-- doc-align: 10b742dc0869b64b9d23d068480b1a1216ae1627 · 2026-07-04 · harness-anchor v0.9.0 -->
-> **Aligned with commit** [`10b742d`](https://github.com/Redtropig/harness-anchor/commit/10b742dc0869b64b9d23d068480b1a1216ae1627) (harness-anchor v0.9.0, 2026-07-04). Verified against the hooks and scripts at this commit; re-verify and bump this marker if they change.
+<!-- doc-align: 230abfc99e07fdcda103c63824253346623d7c5d · 2026-07-31 · harness-anchor v0.17.1 -->
+> **Aligned with commit** [`230abfc`](https://github.com/Redtropig/harness-anchor/commit/230abfc99e07fdcda103c63824253346623d7c5d) (harness-anchor v0.17.1, 2026-07-31).
+> **Scope of that verification:** all 15 entries re-checked against `hooks/` and
+> `scripts/` at this commit — every mechanically checkable claim (file paths, script
+> invocation forms, emitted message strings, constant names, compile-DB search order,
+> manifest field paths, test file names) was run or grepped rather than read. Two were
+> stale and are fixed in the same pass: #5 drew a tool-absent conclusion from a
+> PATH-only check (pre-0.16.0), and #6 required `python3` specifically (pre-0.13.0).
+> Prose advice that is not mechanically checkable — "choose skip for files you
+> customized" — was read, not executed. Re-verify and bump this marker when the hooks
+> or scripts change; the marker had sat at v0.9.0 through eight releases, including two
+> that added entries to this very file.
 
 Common failure modes with diagnosis and fix steps.
 
@@ -92,7 +102,11 @@ diagnostics would be garbage and are withheld. Fix the toolchain, not the code: 
 
 **Fix:**
 - Run `/anchor` first to scaffold missing state files.
-- Install missing build tools (cmake, clang-tidy, etc.).
+- Install missing build tools (cmake, clang-tidy, etc.) — but confirm they are
+  actually missing first. `init.sh`'s tool checks are `command -v`, i.e. **PATH-only**,
+  and the generated `WARN` line says `not on PATH` for exactly that reason: a tool can
+  be installed and off PATH (VS-bundled LLVM before `vcvars64.bat`, keg-only Homebrew
+  llvm). Resolve it properly before installing a second copy — see entry 15.
 - Fix CMakeLists.txt errors before re-running `init.sh`.
 
 ---
@@ -101,17 +115,25 @@ diagnostics would be garbage and are withheld. Fix the toolchain, not the code: 
 
 **Symptom:** Running `bash tests/hook-contracts/<test>.sh` reports FAIL.
 
-**Cause:** Most commonly, the hook script has been modified and produces unexpected output. Less commonly, the test environment differs (missing `python3`, missing `git`).
+**Cause:** Most commonly, the hook script has been modified and produces unexpected
+output. Less commonly, `git` is unavailable.
+
+**A missing `python3` is not a cause.** Since v0.13.0 the JSON engine chain is
+`python3` → `python` → `py -3` → `node` → a narrow pure-bash fallback, and a machine
+with none of them gets an honest `SKIP json-validity (no JSON engine on this
+machine)` rather than a FAIL. So a FAIL is never about the engine — chasing the
+interpreter is the pre-0.13.0 reflex and will waste your time.
 
 **Diagnosis:**
 1. Run the failing test with verbose output to see what's expected vs actual.
 2. Run `bash scripts/validate-anchor.sh` — does the SessionStart smoke test pass?
-3. Check that `python3` and `git` are available in your PATH.
+3. Check `git` is on PATH. Engine presence only changes SKIP vs OK, never OK vs FAIL.
 
 **Fix:**
 - If you modified a hook, re-run the contract test for that hook.
 - If `validate-anchor.sh` also fails, fix the underlying issue first.
-- If tools are missing, install them or mark the test as expected-skip.
+- Read the SKIP lines before concluding the suite passed: a run that is all-SKIP on
+  the JSON assertions checked less than a run that is all-OK.
 
 ---
 
@@ -209,3 +231,70 @@ delete `.harness-anchor/pulse-<session>.*` and the session's
 `flush-warned-*` / `reset-advised-*` markers. A misfire costs one context line;
 a persistently misbehaving detector is a bug — report it rather than hand-patch
 the window file.
+
+## 14. `/gc` doc-drift: empty, `PARTIAL`, or hundreds of rows about one word
+
+**Symptom:** The drift report's doc-drift section says nothing at all; or it lists
+dozens of rows keyed on a common word (`read`, `file`, `check`); or it says results
+are `PARTIAL`.
+
+**Diagnosis:** `scripts/doc-drift-scan.sh` puts the candidate list on **stdout** and
+its *coverage* on **stderr**, because empty stdout has several meanings that must not
+be confused. Read stderr first:
+
+| stderr line | Meaning |
+|---|---|
+| `skipped — <reason>` | **No scan ran.** Unreadable target, not a git repo, no usable base ref, no tracked `*.md`, no changed file in a scanned language (`SCAN_PATHSPEC` is a whitelist — a language off it contributes zero symbols), no symbol extracted from the files that did change, or every extracted symbol below the length floor. |
+| `not searched — <tokens>` | Those tokens were never looked for: under 3 characters, where case-insensitive prefix matching makes every row undecidable. |
+| `symbol set truncated to N of M — results are PARTIAL` | Only `N` symbols were searched. |
+| `per-symbol cap N hit by <sym(count)>…` | Those symbols show a first-`N` sample; the parenthesised number is the real total. |
+| `candidate list truncated to N of M — results are PARTIAL` | stdout is the first `N` rows of `M`. |
+| `scanned N symbol(s) x M doc(s), K candidate(s), S shown` | The coverage statement. `S < K` means you have a sample. |
+
+Only a `scanned …` line with `S == K` and no `PARTIAL` / `not searched` line above
+it means "searched, found nothing".
+
+**Fix:** Nothing is broken in most of these cases. Rows are **candidates, not
+violations** — matching is deliberately prefix-based (the symbol `cancel` has to
+match the prose word "Cancellation"), so a common-word symbol floods by design;
+discount its rows as a unit rather than reading each. Run the scan yourself to see
+both streams:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/doc-drift-scan.sh" --base <ref> --target "$(pwd)"
+```
+
+Tuning lives in named constants in that script: `SCAN_PATHSPEC` (add your
+language), `SYM_MINLEN`, `ROW_CAP_PER_SYM`, `ROW_CAP_TOTAL`. Widening `SCAN_PATHSPEC`
+is the supported way to extend coverage. Note the standing blind spot: only
+call/definition-shaped symbols are extracted, so a changed global, macro, enum
+constant, struct field or typedef produces no symbol — and a claim naming no symbol
+at all ("the pool is fast") has nothing to key on. A clean section is never "the docs
+were verified".
+
+## 15. A tool reports `NOT_FOUND` / "searched …, not found" but you know it is installed
+
+**Symptom:** `/cpp-init`, `cpp-static-analysis` or `cpp-formatting` reports
+`NOT_FOUND<TAB>clang-tidy<TAB>searched:PATH,vs-llvm,vs-cmake,versioned` for a tool
+that is definitely on the machine.
+
+**Diagnosis:** This is `scripts/cpp-tool-discovery.sh`'s documented residual blind
+spot, and the `searched:` list is there precisely so you can see where the search
+stopped. It covers PATH, the platform's known install locations (VS-bundled LLVM and
+Ninja on Windows, `xcrun` and keg-only Homebrew llvm on macOS, `/usr/lib/llvm-*` on
+Linux) and glob-enumerated versioned variants (`clang-tidy-21`, …). A portable unzip
+or a user-chosen prefix is in none of those.
+
+**Fix:** Put the directory on PATH — on Windows that usually means running
+`vcvars64.bat` in the shell first — then re-run discovery to confirm:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/cpp-tool-discovery.sh" clang-tidy clang-format
+```
+
+A `FOUND` line's absolute path is usable directly; the tool does not need to be on
+PATH for you to invoke it. If it stays `NOT_FOUND`, record that as
+`searched <scope>, not found (as of <YYYY-MM-DD>)` — never "not installed" or "not on
+this machine". The date is what lets the next session re-check it: `init-verification`
+step 6 re-checks inherited negative conclusions at session start, but **only** ones
+written in that exact form.

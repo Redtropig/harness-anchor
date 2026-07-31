@@ -3,7 +3,7 @@
 # Run inside the plugin root, or pass the plugin root as the first positional
 # argument (validate-anchor.sh [plugin-root]); it defaults to the repo root.
 #
-# Checks (labelled [1/12]..[11/12] in the output):
+# Checks (labelled [1/12]..[12/12] in the output):
 #   [1/12]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
 #   [2/12]   JSON files parse; scripts/*.mjs pass node --check
 #   [3-4/12] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
@@ -13,7 +13,7 @@
 #   [8/12]   Commands directory consistency (each commands/*.md is a usable /command)
 #   [9/12]   Every template referenced from commands/anchor.md + cpp-init.md AND from scaffold.sh's template map exists
 #   [10/12]  Command↔script wiring: the four mechanism scripts exist + executable + bash -n; every ${CLAUDE_PLUGIN_ROOT}/scripts/* referenced by a command/agent md resolves
-#   [11/12]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; every hook sources it AND calls ha_platform_init (the Windows python3→python→py→node engine-chain wiring)
+#   [11/12]  Platform layer (v0.13.0): scripts/lib/portable.sh exists + bash -n; the hook list is DERIVED from hooks/hooks.json (registry → disk: every registered hook exists, sources the lib, AND calls ha_platform_init — the Windows python3→python→py→node engine-chain wiring). tests/windows-compat.sh [5/5] runs the other direction (disk → wiring, globbing hooks/)
 #   [12/12]  Platform sidecars (v0.14.0): skills/*/platform/<os>.md ↔ SKILL.md pointer integrity (bidirectional, same-skill relative); os names in taxonomy
 
 set -uo pipefail   # no -e so we report all failures, not abort on first
@@ -374,9 +374,35 @@ if [ -f "$LIB" ]; then
     # and the hook silently reverts to bare `python3`, which fails where only
     # `python`/`py`/`node` exist. Static presence is the invariant; the runtime
     # source is graceful (|| true), but the wiring must be in the file.
-    for h in hooks/session-start hooks/post-tool-use hooks/stop hooks/user-prompt-submit hooks/pre-compact; do
+    # The hook list is DERIVED from hooks/hooks.json — the file Claude Code
+    # actually executes — never enumerated here. An enumeration rots: the same
+    # one in tests/windows-compat.sh silently stopped covering hooks/pre-compact
+    # for two releases. Deriving it also closes a hole no check in this repo
+    # covered: a hook REGISTERED in hooks.json whose file is missing. [1/12]
+    # lists only two of the five hooks, and hooks.json itself is validated for
+    # JSON syntax alone, so a dangling registration was invisible.
+    #
+    # Complementary, not redundant, with windows-compat's [5/5]: that one globs
+    # hooks/ (present on disk -> must be wired); this one starts from the
+    # registry (registered -> must exist AND be wired). Neither direction alone
+    # catches both failures.
+    n_cmd=$(grep -c '"type"[[:space:]]*:[[:space:]]*"command"' hooks/hooks.json 2>/dev/null || true)
+    hook_cmds=$(sed -n 's|.*run-hook\.cmd[^ ]*[[:space:]]\([a-z][a-z0-9-]*\).*|\1|p' hooks/hooks.json 2>/dev/null)
+    n_parsed=$(printf '%s\n' "$hook_cmds" | grep -c . || true)
+    # Non-vacuity guard: a parse that returns nothing (or misses a registration
+    # written in an unrecognized shape) would make the loop below a no-op and
+    # report all-pass having checked nothing.
+    if [ "$n_parsed" -eq 0 ]; then
+        fail "no hook command parsed from hooks/hooks.json — the wiring loop would pass vacuously"
+    elif [ "$n_parsed" -ne "$n_cmd" ]; then
+        fail "hooks.json declares $n_cmd command hook(s), only $n_parsed parsed — an unrecognized command shape is unchecked"
+    else
+        ok "hooks.json: all $n_parsed registered hook command(s) parsed"
+    fi
+    for name in $(printf '%s\n' "$hook_cmds" | sort -u); do
+        h="hooks/$name"
         if [ ! -f "$h" ]; then
-            fail "missing hook: $h"
+            fail "hooks.json registers '$name' but $h does not exist"
             continue
         fi
         if grep -q 'scripts/lib/portable\.sh' "$h"; then ok "$h sources portable.sh"; else fail "$h does not source portable.sh (engine chain unwired)"; fi
