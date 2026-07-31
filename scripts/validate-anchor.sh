@@ -6,7 +6,7 @@
 # Checks (labelled [1/12]..[12/12] in the output):
 #   [1/12]   Required top-level files exist (.claude-plugin/plugin.json, hooks/hooks.json, etc.)
 #   [2/12]   JSON files parse; scripts/*.mjs pass node --check
-#   [3-4/12] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12)
+#   [3-4/12] Every SKILL.md has name + description frontmatter (description ≤500 chars; see learn-harness gotchas #12), and every skills/cpp-* scopes itself to C/C++ within the first 80 chars — invariant #5's skill half, which nothing enforced before v0.18.0 (non-vacuity guarded)
 #   [5/12]   Every agent has name + description frontmatter (≤500 chars) + ends with the single-level constraint line (invariant #3); every evidence-writing agent mkdir -p .harness-anchor before writing (fresh-dir contract — .harness-anchor/ is gitignored, invariant #4)
 #   [6/12]   Every command has a description (≤500 chars) + a well-shaped allowed-tools list
 #   [7/12]   SessionStart hook is executable and produces valid JSON when run; meta-skill conditional regions (cpp-only + os-<name>) well-formed, jointly flat, taxonomy-whitelisted
@@ -108,7 +108,10 @@ fi
 echo ""
 
 # ---- 3 & 4. SKILL.md frontmatter ----
-echo "[3-4/12] SKILL.md frontmatter (name + description, ≤500 chars desc)..."
+echo "[3-4/12] SKILL.md frontmatter (name + description, ≤500 chars desc, invariant #5 scoping)..."
+# Initialised before the loop, not inside it: this file runs under `set -u`, where
+# reading an unset name aborts the script (CLAUDE.md, "Shell hazards", #1).
+CPP_SKILLS_SEEN=0
 while IFS= read -r skill; do
     if ! head -1 "$skill" | grep -q '^---$'; then
         fail "$skill: missing frontmatter opener"
@@ -128,7 +131,34 @@ while IFS= read -r skill; do
     else
         ok "$skill description ${#desc} chars"
     fi
+
+    # Invariant #5, skill half (v0.18.0): a C/C++ skill must scope itself to C/C++
+    # inside the first 80 chars — the window invariant #6 says carries the trigger
+    # load. cpp-detect.sh gates the injected meta-skill regions and the two C/C++
+    # commands, but NOT skill loading: skills are chosen by description matching,
+    # so this string is the whole gate. Nothing checked it before, and the
+    # invariant's old wording asked for something else entirely (a build-system
+    # reference), which three of the four skills correctly do not have.
+    case "$skill" in
+        skills/cpp-*)
+            CPP_SKILLS_SEEN=$((CPP_SKILLS_SEEN+1))
+            head80=$(printf '%s' "$desc" | cut -c1-80)
+            if printf '%s' "$head80" | grep -qF 'C/C++'; then
+                ok "$skill scopes to C/C++ in its first 80 chars"
+            else
+                fail "$skill: no 'C/C++' in the first 80 chars of the description — it can trigger in a non-C/C++ project (invariant #5)"
+            fi
+            ;;
+    esac
 done < <(find skills -name SKILL.md 2>/dev/null)
+
+# Non-vacuity guard: if the glob stops matching, every C/C++ assertion above
+# silently vanishes and this section reports all-pass having checked nothing.
+if [ "$CPP_SKILLS_SEEN" -eq 0 ]; then
+    fail "no skills/cpp-* SKILL.md matched — the invariant #5 check above ran zero times"
+else
+    ok "invariant #5 checked against $CPP_SKILLS_SEEN C/C++ skill(s)"
+fi
 echo ""
 
 # ---- 5. Agent frontmatter (name + description) ----

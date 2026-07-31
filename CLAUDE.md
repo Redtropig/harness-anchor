@@ -20,7 +20,24 @@ Stop. Read this before doing anything.
 2. **SessionStart token budget ≤ 3000 tokens.** Roughly 12000 chars of injected content. Hard-truncate with a pointer to the on-disk file. The meta-skill body is injected *slimmed* (frontmatter stripped; conditional regions dropped when their gate doesn't match — `cpp-only` by project type, `os-<name>` by HA_OS platform) — headroom belongs to the project-specific TOC/handoff, not to a fatter generic body.
 3. **Subagents are single-level.** Every subagent prompt must end with: *"Do not invoke other subagents from this one."*
 4. **State files are git-tracked by default.** `.harness-anchor/` (error log dir) is the only gitignored runtime path.
-5. **C/C++ skills are gated by `cpp-detect.sh`.** They must include a frontmatter trigger condition referencing the detected build system; they must not activate in non-C/C++ projects.
+5. **C/C++ components stay dormant in non-C/C++ projects — through two different
+   gates, and only one of them is `cpp-detect.sh`.** That script is the mechanical
+   gate: it sets the banner's project type, decides whether the meta-skill's
+   `cpp-only` regions are injected at all, and makes `/cpp-init` (exit 3) and
+   `/sanitize` refuse outright. It does **not** gate skill loading — skills are
+   selected by description matching, and nothing consults `cpp-detect.sh` at the
+   moment one loads. So the gate on the skills is their own frontmatter: every
+   `skills/cpp-*` description must scope itself to C/C++ within its first 80
+   characters, the window invariant #6 says carries the load. That string is the
+   only thing between a clang-tidy skill and a Python repo. Enforced by
+   `validate-anchor` [3-4/12].
+
+   The earlier wording of this invariant ("must include a frontmatter trigger
+   condition referencing the detected build system") described neither what the
+   files do — three of the four name no build system, and clang-format has no
+   reason to — nor what actually gates them, and nothing enforced it. An
+   unenforced entry in this list contradicts what the section below promises about
+   it.
 6. **Skill descriptions front-load distinctive trigger keywords.** First ~80 chars carry the load — Anthropic's skill listing budget is tight (see learn-harness `gotchas.md#12`).
 7. **Hooks must time out in ≤ 5 seconds** and fail silent on missing tools.
 8. **Default-FAIL evaluation contracts, both directions.** No skill or agent should

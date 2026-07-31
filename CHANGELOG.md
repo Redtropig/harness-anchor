@@ -30,6 +30,25 @@ capability, and it ships with a new gate check and a new contract test — an
   every hook `hooks/hooks.json` registers, so a newly added hook cannot ship
   without one. Structural check: it catches absence, not misbehaviour — proving
   the watchdog *fires* is the contract test's job. (163 assertions, was 158.)
+- **Invariant #5 is now enforced, and reworded to describe what actually gates
+  what.** It read "C/C++ skills are gated by `cpp-detect.sh`. They must include a
+  frontmatter trigger condition referencing the detected build system" — wrong on
+  both counts. `cpp-detect.sh` gates the banner's project type, the meta-skill's
+  `cpp-only` regions and the two C/C++ commands, but *not* skill loading: skills
+  are chosen by description matching, and nothing consults it at that moment. And
+  three of the four skills name no build system, correctly — clang-format has no
+  reason to. The rewritten invariant states both gates and requires what actually
+  does the work: every `skills/cpp-*` description must scope itself to C/C++
+  inside the first 80 characters, the window invariant #6 reserves for trigger
+  load. `validate-anchor` [3-4/12] now asserts exactly that, with a non-vacuity
+  guard for the day the glob stops matching. (168 assertions, was 163.)
+
+  The skills were left alone deliberately. Editing four descriptions to name build
+  systems would spend the scarcest trigger real estate on a term irrelevant to
+  three of them — and CLAUDE.md forbids rewriting skill descriptions without evals
+  showing improvement. It also would not have made the invariant's first sentence
+  true. An unenforced entry in that list contradicts what the section below it
+  promises: the list is the part that a test mechanically enforces.
 - **`tests/unit/doc-align.sh`** — integrity of the `doc-align` markers, which were
   a standing unverified claim. Per marker: exactly one 40-hex sha, it resolves to a
   real commit, that commit is an ancestor of HEAD, and any abbreviated sha in the
